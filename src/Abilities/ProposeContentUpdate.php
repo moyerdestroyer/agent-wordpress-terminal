@@ -13,7 +13,9 @@ namespace AWPT\Abilities;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Creates a staged content update action without saving the post.
@@ -136,11 +138,11 @@ final class ProposeContentUpdate
         $payload = [
             'operation' => 'content_update',
             'post_id' => $post_id,
-            'post_type' => (string) $post->post_type,
-            'post_status' => (string) $post->post_status,
-            'original_post_title' => (string) $post->post_title,
-            'original_post_content' => (string) $post->post_content,
-            'preview_url' => is_string($preview_url) ? $preview_url : '',
+            'post_type' => $post->post_type,
+            'post_status' => $post->post_status,
+            'original_post_title' => $post->post_title,
+            'original_post_content' => $post->post_content,
+            'preview_url' => $preview_url,
         ];
 
         if (array_key_exists('post_title', $input)) {

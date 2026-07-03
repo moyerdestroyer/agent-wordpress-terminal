@@ -21,7 +21,9 @@ use AWPT\REST\SessionsController;
 use AWPT\REST\ToolsController;
 use AWPT\Support\Environment;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Plugin singleton.

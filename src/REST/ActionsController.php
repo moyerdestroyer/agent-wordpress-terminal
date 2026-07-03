@@ -14,7 +14,9 @@ use AWPT\Abilities\ApplyAction;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Manages staged proposed actions.
@@ -35,7 +37,7 @@ final class ActionsController extends RestController
      */
     public function register_routes(): void
     {
-        register_rest_route(namespace: AWPT_REST_NAMESPACE, route: '/sessions/(?P<session_id>\d+)/actions', args: [
+        register_rest_route(AWPT_REST_NAMESPACE, '/sessions/(?P<session_id>\d+)/actions', [
             [
                 'methods' => \WP_REST_Server::CREATABLE,
                 'callback' => [$this, 'create_action'],
@@ -59,7 +61,7 @@ final class ActionsController extends RestController
             ],
         ]);
 
-        register_rest_route(namespace: AWPT_REST_NAMESPACE, route: '/actions/(?P<id>\d+)', args: [
+        register_rest_route(AWPT_REST_NAMESPACE, '/actions/(?P<id>\d+)', [
             [
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'get_action'],

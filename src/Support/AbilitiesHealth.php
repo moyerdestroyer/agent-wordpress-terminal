@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Verifies that AWPT abilities registered successfully.

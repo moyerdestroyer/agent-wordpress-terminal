@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Runs safe AWPT abilities requested by provider tool calls.
@@ -150,7 +152,7 @@ final class ProviderToolCallExecutor
      * Decode provider tool call arguments.
      *
      * @param string $arguments Raw JSON arguments.
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function decode_tool_arguments(string $arguments): array
     {

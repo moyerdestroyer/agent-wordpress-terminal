@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Contract for LLM providers.

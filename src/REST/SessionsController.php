@@ -12,7 +12,9 @@ namespace AWPT\REST;
 
 use AWPT\Database\SessionRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * CRUD endpoints for agent sessions.
@@ -31,7 +33,7 @@ final class SessionsController extends RestController
      */
     public function register_routes(): void
     {
-        register_rest_route(namespace: AWPT_REST_NAMESPACE, route: '/sessions', args: [
+        register_rest_route(AWPT_REST_NAMESPACE, '/sessions', [
             [
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'list_sessions'],
@@ -44,7 +46,7 @@ final class SessionsController extends RestController
             ],
         ]);
 
-        register_rest_route(namespace: AWPT_REST_NAMESPACE, route: '/sessions/(?P<id>\d+)', args: [
+        register_rest_route(AWPT_REST_NAMESPACE, '/sessions/(?P<id>\d+)', [
             [
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'get_session'],

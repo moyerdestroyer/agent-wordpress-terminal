@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Executes WordPress abilities as agent tools.
@@ -22,7 +24,7 @@ final class ToolExecutor
      *
      * @param string               $tool_name Ability name.
      * @param array<string, mixed> $input Ability input.
-     * @return array<string, mixed>|\WP_Error
+     * @return array<array-key, mixed>|\WP_Error
      */
     public function execute(string $tool_name, array $input): array|\WP_Error
     {

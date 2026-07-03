@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Returns parsed Gutenberg block structure for a post.
@@ -92,7 +94,7 @@ final class ReadBlockTree
     /**
      * Normalize blocks for agent consumption.
      *
-     * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, array<string, mixed>>
      */
     private function normalize_blocks(array $blocks): array
@@ -117,7 +119,7 @@ final class ReadBlockTree
     /**
      * Count blocks recursively.
      *
-     * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      */
     private function count_blocks(array $blocks): int
     {

@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles /knowledge commands.
@@ -23,7 +25,7 @@ final class KnowledgeCommandRouter
      */
     public function dispatch(array $parts): array
     {
-        $action = strtolower((string) ($parts[1] ?? 'search'));
+        $action = strtolower($parts[1] ?? 'search');
 
         return match ($action) {
             'read' => $this->read($parts),

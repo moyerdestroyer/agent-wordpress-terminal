@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Creates and maintains AWPT database tables.
@@ -58,7 +60,7 @@ final class Installer
      */
     public static function create_tables(): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 

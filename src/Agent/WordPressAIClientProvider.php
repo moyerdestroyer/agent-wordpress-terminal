@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\Support\ConnectorCatalog;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Uses WordPress Core's AI Client and Connectors infrastructure when available.
@@ -86,14 +88,14 @@ final class WordPressAIClientProvider implements ProviderInterface
         );
 
         return [
-            'content' => (string) ($result['content'] ?? ''),
-            'raw_tool_calls' => is_array($result['raw_tool_calls'] ?? null) ? $result['raw_tool_calls'] : [],
+            'content' => $result['content'],
+            'raw_tool_calls' => $result['raw_tool_calls'],
             'message' => [
                 'role' => 'assistant',
-                'content' => (string) ($result['content'] ?? ''),
-                'tool_calls' => is_array($result['raw_tool_calls'] ?? null) ? $result['raw_tool_calls'] : [],
+                'content' => $result['content'],
+                'tool_calls' => $result['raw_tool_calls'],
             ],
-            'model' => (string) ($result['model'] ?? ''),
+            'model' => $result['model'],
             'usage' => [],
         ];
     }

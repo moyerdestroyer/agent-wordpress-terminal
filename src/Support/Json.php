@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Safe JSON decoding at mixed boundaries.
@@ -20,7 +22,7 @@ final class Json
     /**
      * Decode JSON into an associative array.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public static function decode_array(string $json): array
     {

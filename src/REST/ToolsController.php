@@ -14,7 +14,9 @@ use AWPT\MCP\Adapter;
 use AWPT\MCP\StatusService;
 use AWPT\Support\Environment;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Exposes registered abilities and MCP status.
@@ -108,7 +110,7 @@ final class ToolsController
 
             if (method_exists($ability, 'get_meta')) {
                 $meta = $ability->get_meta();
-                $annotations = is_array($meta) ? $meta['annotations'] ?? [] : [];
+                $annotations = $meta['annotations'] ?? [];
 
                 if (is_array($annotations)) {
                     $item['readonly'] = $annotations['readonly'] ?? null;

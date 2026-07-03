@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Registers AWPT plugin abilities.

@@ -13,7 +13,9 @@ namespace AWPT\Agent;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Receives user messages and returns agent responses.
@@ -91,7 +93,7 @@ final class AgentRuntime
         $trimmed = trim($message);
 
         if (str_starts_with($trimmed, '/')) {
-            return (new SlashCommandRouter())->dispatch($trimmed);
+            return (new SlashCommandRouter())->dispatch($trimmed, $session_id);
         }
 
         return $this->provider_response($session_id);

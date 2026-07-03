@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Knowledge;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Converts an allowed file into an indexable source.

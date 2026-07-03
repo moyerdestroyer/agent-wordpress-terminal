@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Inspects installed connector plugins and credential state.

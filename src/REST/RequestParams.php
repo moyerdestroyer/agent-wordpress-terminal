@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\REST;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Extracts typed values from WP_REST_Request.
@@ -18,7 +20,7 @@ defined('ABSPATH') || exit();
 final class RequestParams
 {
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public static function object(\WP_REST_Request $request, string $key): array
     {

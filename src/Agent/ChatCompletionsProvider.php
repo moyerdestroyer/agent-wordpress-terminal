@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Shared HTTP implementation for OpenAI-compatible chat providers.
@@ -69,7 +71,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface
         }
 
         $status = (int) wp_remote_retrieve_response_code($response);
-        $body = (string) wp_remote_retrieve_body($response);
+        $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
         if ($status < 200 || $status >= 300) {

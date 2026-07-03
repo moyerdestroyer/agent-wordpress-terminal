@@ -12,7 +12,9 @@ namespace AWPT\Abilities;
 
 use AWPT\Knowledge\KnowledgeSearchService;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Searches indexed Knowledge and read-only site sources.

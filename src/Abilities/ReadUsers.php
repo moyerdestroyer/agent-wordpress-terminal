@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Returns admin-visible user summaries for agent analysis.
@@ -138,12 +140,12 @@ final class ReadUsers
     /**
      * Return user counts by role.
      *
-     * @return array<string, int>
+     * @return array<array-key, int>
      */
     private function role_counts(): array
     {
         $counts = count_users();
-        $roles = is_array($counts['avail_roles'] ?? null) ? $counts['avail_roles'] : [];
+        $roles = $counts['avail_roles'];
 
         return array_map('intval', $roles);
     }

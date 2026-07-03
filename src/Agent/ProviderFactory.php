@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\Support\ConnectorSelection;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Creates configured agent providers.

@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\REST;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Shared REST permission helpers.

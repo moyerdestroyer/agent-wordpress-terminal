@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\MCP;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Provides a small MCP discovery and execution contract for integrations.

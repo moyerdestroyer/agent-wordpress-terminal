@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\Abilities\AbilitySchemas;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Isolates dynamic calls to wp_ai_client_prompt().
@@ -139,8 +141,7 @@ final class WordPressAIClientPromptRunner
             $raw_schema = method_exists($ability, 'get_input_schema')
                 ? $ability->get_input_schema()
                 : AbilitySchemas::empty_object_input();
-            $input_schema = is_array($raw_schema) ? $raw_schema : AbilitySchemas::empty_object_input();
-            $normalized_schema = AbilitySchemas::normalize_for_provider($input_schema);
+            $normalized_schema = AbilitySchemas::normalize_for_provider($raw_schema);
 
             $declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
                 $function_name,

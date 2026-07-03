@@ -1,14 +1,24 @@
 #:schema vendor/carthage-software/mago/schema.json
 version = "1"
-php-version = "8.2"
+php-version = "8.4"
 
 [source]
 paths = ["src", "agent-wordpress-terminal.php"]
+# `includes` are parsed for symbol/type resolution but never analyzed or linted.
+#   - php-stubs/wordpress-stubs: all WordPress core functions/classes
+#   - stubs/wordpress.php: runtime-defined constants (ABSPATH, ARRAY_A, ...) that
+#     the stubs package documents only in PHPDoc, so Mago needs real definitions.
+#   - stubs/awpt-external.php: non-core symbols (AI Client connectors, Vite).
+# NOTE: do not add "vendor/**" to excludes below — it would shadow the stubs package.
 includes = [
-    "vendor/php-stubs/wordpress-stubs/wordpress-stubs.php",
+    "vendor/php-stubs/wordpress-stubs",
+    "stubs/wordpress.php",
     "stubs/awpt-external.php",
 ]
-excludes = ["build/**", "node_modules/**", "vendor/**"]
+# Type refinements for WordPress core symbols (wpdb return types, REST params).
+# Patches take precedence over includes and built-ins during analysis.
+patches = ["patches/wordpress.php"]
+excludes = ["build/**", "node_modules/**"]
 
 [source.glob]
 literal-separator = true

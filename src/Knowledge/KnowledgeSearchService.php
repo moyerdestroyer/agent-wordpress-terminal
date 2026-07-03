@@ -12,7 +12,9 @@ namespace AWPT\Knowledge;
 
 use AWPT\Database\KnowledgeIndexRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Searches AWPT's local Knowledge index.

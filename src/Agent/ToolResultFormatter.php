@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Builds readable assistant text when provider follow-up is empty.
@@ -28,7 +30,7 @@ final class ToolResultFormatter
         $sections = [];
 
         foreach ($tool_calls as $tool_call) {
-            if (!is_array($tool_call) || 'success' !== (string) ($tool_call['status'] ?? '')) {
+            if ('success' !== (string) ($tool_call['status'] ?? '')) {
                 continue;
             }
 

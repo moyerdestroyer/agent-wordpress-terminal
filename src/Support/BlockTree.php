@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Wraps parse_blocks() output with typed accessors.
@@ -33,10 +35,6 @@ final class BlockTree
         $normalized = [];
 
         foreach ($blocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
             $normalized[] = $block;
         }
 

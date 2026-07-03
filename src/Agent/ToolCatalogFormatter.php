@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\MCP\Adapter;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Formats registered tools for system prompts.

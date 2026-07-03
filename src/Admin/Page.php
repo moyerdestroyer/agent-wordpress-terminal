@@ -15,7 +15,9 @@ use AWPT\Support\ConnectorSelection;
 use AWPT\Support\Environment;
 use Kucrut\Vite;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Registers the AWPT admin terminal page.
@@ -323,7 +325,7 @@ final class Page
     private function sanitize_secret(mixed $value, string $option, string $clear_field): string
     {
         $raw_clear = $_POST[$clear_field] ?? '';
-        $raw_clear = is_array($raw_clear) ? '' : (string) $raw_clear;
+        $raw_clear = is_array($raw_clear) ? '' : $raw_clear;
         $clear = '1' === sanitize_text_field(wp_unslash($raw_clear));
 
         if ($clear) {

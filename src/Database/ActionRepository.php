@@ -12,7 +12,9 @@ namespace AWPT\Database;
 
 use AWPT\Support\Json;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reads and writes awpt_actions.
@@ -30,7 +32,7 @@ final class ActionRepository
         array $payload,
         string $status = 'proposed',
     ): ?int {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $now = current_time('mysql');
         $inserted = $wpdb->insert(
@@ -56,7 +58,7 @@ final class ActionRepository
 
     public function update_status(int $action_id, string $status): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $wpdb->update(
             $wpdb->prefix . 'awpt_actions',
@@ -80,7 +82,7 @@ final class ActionRepository
      */
     public function get_accessible_row(int $action_id): ?array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $actions = $wpdb->prefix . 'awpt_actions';
         $sessions = $wpdb->prefix . 'awpt_sessions';

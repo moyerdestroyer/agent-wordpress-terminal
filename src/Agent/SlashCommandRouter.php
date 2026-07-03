@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles terminal slash commands.
@@ -23,11 +25,11 @@ final class SlashCommandRouter
      * @param string $message User message.
      * @return array<string, mixed>
      */
-    public function dispatch(string $message): array
+    public function dispatch(string $message, int $session_id): array
     {
         $split = preg_split('/\s+/', trim($message));
         $parts = is_array($split) ? $split : [];
-        $command = strtolower((string) ($parts[0] ?? ''));
+        $command = strtolower($parts[0] ?? '');
         $content_commands = new ContentCommandRouter();
         $site_commands = new SiteCommandRouter();
         $tool_commands = new ToolCommandRouter();

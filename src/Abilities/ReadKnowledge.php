@@ -12,7 +12,9 @@ namespace AWPT\Abilities;
 
 use AWPT\Knowledge\KnowledgeRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reads one Core Knowledge or legacy guideline post.

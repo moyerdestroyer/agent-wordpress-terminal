@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles post/page slash commands.
@@ -188,7 +190,7 @@ final class ContentCommandRouter
      */
     public function propose(int $session_id, array $parts, string $message): array
     {
-        $subcommand = strtolower((string) ($parts[1] ?? ''));
+        $subcommand = strtolower($parts[1] ?? '');
         $post_id = (int) ($parts[2] ?? 0);
 
         if ('update' !== $subcommand || $post_id <= 0) {

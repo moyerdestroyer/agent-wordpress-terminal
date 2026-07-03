@@ -35,7 +35,7 @@ npm run build          # production assets
 
 Activate the plugin in WP admin → **Settings → Agent Terminal**.
 
-Requires WordPress 6.9+, PHP 8.2+. Abilities API must be available for tool registration.
+Requires WordPress 6.9+, PHP 8.4+. Abilities API must be available for tool registration.
 
 ## Commands
 

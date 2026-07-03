@@ -10,10 +10,13 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Database\WpDb;
 use AWPT\Knowledge\KnowledgeRepository;
 use AWPT\Knowledge\KnowledgeSearchService;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Assembles system instructions and session history for provider calls.
@@ -59,7 +62,7 @@ final class ProviderMessageBuilder
      */
     private function get_session_messages(int $session_id): array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
@@ -88,7 +91,7 @@ final class ProviderMessageBuilder
      */
     private function get_knowledge_summary(int $session_id): string
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $message = $wpdb->get_var($wpdb->prepare(
             "SELECT content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT 1",

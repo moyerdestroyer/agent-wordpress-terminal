@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Some WordPress AI connectors return ability calls as plain text instead of structured function calls.
@@ -39,19 +41,20 @@ final class EmbeddedToolCallExtractor
     /**
      * Parse <tool_call>{...}</tool_call> blocks.
      *
-     * @param-out string $content
      * @return array<int, array<string, mixed>>
      */
     private function extract_json_tool_calls(string $content, string &$cleaned): array
     {
         $raw_tool_calls = [];
 
+        $matches = [];
+
         if (!preg_match_all('/<tool_call>\s*(\{.*?\})\s*<\/tool_call>/s', $content, $matches, PREG_SET_ORDER)) {
             return $raw_tool_calls;
         }
 
         foreach ($matches as $match) {
-            $decoded = json_decode((string) ($match[1] ?? ''), true);
+            $decoded = json_decode($match[1] ?? '', true);
 
             if (!is_array($decoded)) {
                 continue;
@@ -75,19 +78,20 @@ final class EmbeddedToolCallExtractor
     /**
      * Parse <awpt/read-settings /> style ability tags.
      *
-     * @param-out string $content
      * @return array<int, array<string, mixed>>
      */
     private function extract_ability_tags(string $content, string &$cleaned): array
     {
         $raw_tool_calls = [];
 
+        $matches = [];
+
         if (!preg_match_all('/<((?:awpt|core)\/[\w-]+)\s*\/?>(?:<\/\1>)?/i', $content, $matches, PREG_SET_ORDER)) {
             return $raw_tool_calls;
         }
 
         foreach ($matches as $match) {
-            $call = $this->normalize_call((string) ($match[1] ?? ''), []);
+            $call = $this->normalize_call($match[1] ?? '', []);
 
             if (null !== $call) {
                 $raw_tool_calls[] = $call;

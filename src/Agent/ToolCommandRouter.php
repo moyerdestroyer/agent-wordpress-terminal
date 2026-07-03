@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\MCP\Adapter;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles slash commands for tool discovery.
@@ -52,7 +54,7 @@ final class ToolCommandRouter
 
         if (function_exists('wp_get_abilities')) {
             foreach (wp_get_abilities() as $ability) {
-                $name = (string) $ability->get_name();
+                $name = $ability->get_name();
 
                 if (str_starts_with($name, 'core/')) {
                     $groups[$core_label][] = $name;

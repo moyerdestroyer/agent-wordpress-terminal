@@ -13,7 +13,9 @@ namespace AWPT\Agent;
 use AWPT\MCP\Adapter;
 use AWPT\MCP\StatusService;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles MCP status, discovery, and explicit tool calls.
@@ -28,7 +30,7 @@ final class McpCommandRouter
      */
     public function dispatch(array $parts): array
     {
-        $subcommand = strtolower((string) ($parts[1] ?? 'status'));
+        $subcommand = strtolower($parts[1] ?? 'status');
 
         return match ($subcommand) {
             'status' => $this->status(),
@@ -92,7 +94,7 @@ final class McpCommandRouter
      */
     private function call(array $parts): array
     {
-        $tool_name = (string) sanitize_text_field((string) ($parts[2] ?? ''));
+        $tool_name = sanitize_text_field($parts[2] ?? '');
 
         if ('' === $tool_name) {
             return $this->usage();

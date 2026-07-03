@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Lists installed AI connectors and reports configuration status.
@@ -68,8 +70,8 @@ final class ConnectorCatalog
 
         $connectors = [];
 
-        foreach ((array) wp_get_connectors() as $connector_id => $data) {
-            if (!is_string($connector_id) || !is_array($data) || 'ai_provider' !== ($data['type'] ?? '')) {
+        foreach (wp_get_connectors() as $connector_id => $data) {
+            if ('ai_provider' !== ($data['type'] ?? '')) {
                 continue;
             }
 

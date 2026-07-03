@@ -12,7 +12,9 @@ namespace AWPT\Agent;
 
 use AWPT\Abilities\AbilitySchemas;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Converts safe AWPT abilities into chat completion tools.
@@ -74,9 +76,7 @@ final class ToolRegistry
                 'function' => [
                     'name' => $function_name,
                     'description' => $ability->get_description(),
-                    'parameters' => AbilitySchemas::normalize_for_provider(
-                        is_array($schema) ? $schema : AbilitySchemas::empty_object_input(),
-                    ),
+                    'parameters' => AbilitySchemas::normalize_for_provider($schema),
                 ],
             ];
         }

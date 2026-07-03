@@ -14,7 +14,9 @@ use AWPT\Knowledge\FilesystemSourceReader;
 use AWPT\Knowledge\KnowledgeIndexer;
 use AWPT\Knowledge\KnowledgeSearchService;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Exposes Knowledge status, settings, rebuild, and search.

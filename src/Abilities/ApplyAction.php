@@ -12,7 +12,9 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Applies an approved staged action.

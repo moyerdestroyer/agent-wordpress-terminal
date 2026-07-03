@@ -12,7 +12,9 @@ namespace AWPT\REST;
 
 use AWPT\Agent\AgentRuntime;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Handles chat messages for agent sessions.

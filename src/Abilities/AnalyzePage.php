@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Returns an agent-friendly page brief.
@@ -111,7 +113,7 @@ final class AnalyzePage
     /**
      * Extract heading blocks.
      *
-     * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
     private function extract_headings(array $blocks): array
@@ -137,6 +139,7 @@ final class AnalyzePage
      */
     private function extract_shortcodes(string $content): array
     {
+        $matches = [];
         preg_match_all('/\[(\w+)/', $content, $matches);
 
         return array_values(array_unique($matches[1] ?? []));
@@ -145,7 +148,7 @@ final class AnalyzePage
     /**
      * Detect form-like blocks.
      *
-     * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
     private function detect_forms(array $blocks): array
@@ -168,7 +171,7 @@ final class AnalyzePage
     /**
      * Detect non-core blocks.
      *
-     * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
     private function detect_custom_blocks(array $blocks): array

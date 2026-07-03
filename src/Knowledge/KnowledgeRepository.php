@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Knowledge;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reads Core Knowledge and compatible legacy guideline sources.
@@ -192,9 +194,9 @@ final class KnowledgeRepository
     private function post_to_source(\WP_Post $post, string $kind, string $taxonomy): array
     {
         $types = '' !== $taxonomy ? wp_get_object_terms($post->ID, $taxonomy, ['fields' => 'slugs']) : [];
-        $types = is_wp_error($types) ? [] : array_values(array_map('strval', (array) $types));
-        $content = (string) $post->post_content;
-        $excerpt = wp_strip_all_tags((string) $post->post_excerpt);
+        $types = is_wp_error($types) || !is_array($types) ? [] : array_values(array_map('strval', $types));
+        $content = $post->post_content;
+        $excerpt = wp_strip_all_tags($post->post_excerpt);
 
         if ('' !== $excerpt) {
             $content = trim($content . "\n\n" . $excerpt);
@@ -221,7 +223,7 @@ final class KnowledgeRepository
     {
         $title = get_the_title($post);
 
-        if (is_string($title) && '' !== $title) {
+        if ('' !== $title) {
             return $title;
         }
 
@@ -232,7 +234,7 @@ final class KnowledgeRepository
     {
         $permalink = get_permalink($post);
 
-        return is_string($permalink) ? $permalink : '';
+        return get_permalink($post);
     }
 
     private function taxonomy_for_post_type(string $post_type): string

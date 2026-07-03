@@ -12,7 +12,9 @@ namespace AWPT\Database;
 
 use AWPT\Support\Json;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Converts raw database rows into REST-friendly session shapes.

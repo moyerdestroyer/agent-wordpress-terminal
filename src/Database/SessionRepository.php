@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reads and writes awpt_sessions and related session detail.
@@ -29,7 +31,7 @@ final class SessionRepository
      */
     public function list_summaries(): array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $table = $wpdb->prefix . 'awpt_sessions';
         $rows = $wpdb->get_results(
@@ -45,7 +47,7 @@ final class SessionRepository
      */
     public function find_detail(int $session_id): ?array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $sessions = $wpdb->prefix . 'awpt_sessions';
         $messages = $wpdb->prefix . 'awpt_messages';
@@ -106,7 +108,7 @@ final class SessionRepository
      */
     public function create(string $title): array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $now = current_time('mysql');
         $table = $wpdb->prefix . 'awpt_sessions';
@@ -140,7 +142,7 @@ final class SessionRepository
      */
     public function update_title(int $session_id, string $title): ?array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $now = current_time('mysql');
         $table = $wpdb->prefix . 'awpt_sessions';
@@ -165,7 +167,7 @@ final class SessionRepository
      */
     public function update_fields(int $session_id, array $fields, array $formats): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $wpdb->update(
             $wpdb->prefix . 'awpt_sessions',
@@ -178,18 +180,18 @@ final class SessionRepository
 
     public function delete(int $session_id): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         foreach (['messages', 'tool_calls', 'context_items', 'actions'] as $suffix) {
-            $wpdb->delete($wpdb->prefix . 'awpt_' . $suffix, ['session_id' => $session_id], format: ['%d']);
+            $wpdb->delete($wpdb->prefix . 'awpt_' . $suffix, ['session_id' => $session_id], where_format: ['%d']);
         }
 
-        $wpdb->delete($wpdb->prefix . 'awpt_sessions', ['id' => $session_id], format: ['%d']);
+        $wpdb->delete($wpdb->prefix . 'awpt_sessions', ['id' => $session_id], where_format: ['%d']);
     }
 
     public function exists(int $session_id): bool
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $found = $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM {$wpdb->prefix}awpt_sessions WHERE id = %d",
@@ -204,7 +206,7 @@ final class SessionRepository
      */
     public function get_summary(int $session_id): array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $table = $wpdb->prefix . 'awpt_sessions';
         $row = $wpdb->get_row(

@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Stores transcript messages and tool calls.
@@ -19,7 +21,7 @@ final class MessageRepository
 {
     public function store_message(int $session_id, string $role, string $content, string $created_at): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $wpdb->insert(
             $wpdb->prefix . 'awpt_messages',
@@ -38,7 +40,7 @@ final class MessageRepository
      */
     public function store_tool_calls(int $session_id, array $tool_calls, string $created_at): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         foreach ($tool_calls as $tool_call) {
             if (!is_array($tool_call)) {
@@ -62,9 +64,9 @@ final class MessageRepository
 
     public function clear_transcript(int $session_id): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
-        $wpdb->delete($wpdb->prefix . 'awpt_messages', ['session_id' => $session_id], format: ['%d']);
-        $wpdb->delete($wpdb->prefix . 'awpt_tool_calls', ['session_id' => $session_id], format: ['%d']);
+        $wpdb->delete($wpdb->prefix . 'awpt_messages', ['session_id' => $session_id], where_format: ['%d']);
+        $wpdb->delete($wpdb->prefix . 'awpt_tool_calls', ['session_id' => $session_id], where_format: ['%d']);
     }
 }

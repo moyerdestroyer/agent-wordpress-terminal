@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reads and writes awpt_knowledge_* tables.
@@ -19,7 +21,7 @@ final class KnowledgeIndexRepository
 {
     public function clear_index(): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $chunks_table = $wpdb->prefix . 'awpt_knowledge_chunks';
         $index_table = $wpdb->prefix . 'awpt_knowledge_index';
@@ -33,7 +35,7 @@ final class KnowledgeIndexRepository
      */
     public function insert_source(array $source, string $content, string $now): int
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : [];
         $path = (string) ($source['path'] ?? '');
@@ -66,7 +68,7 @@ final class KnowledgeIndexRepository
 
     public function insert_chunk(int $index_id, int $chunk_index, string $chunk_text, string $now): void
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $wpdb->insert(
             $wpdb->prefix . 'awpt_knowledge_chunks',
@@ -85,14 +87,14 @@ final class KnowledgeIndexRepository
 
     public function count_sources(): int
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM %i', $wpdb->prefix . 'awpt_knowledge_index'));
     }
 
     public function count_chunks(): int
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM %i', $wpdb->prefix . 'awpt_knowledge_chunks'));
     }
@@ -103,7 +105,7 @@ final class KnowledgeIndexRepository
      */
     public function search_chunks(array $tokens): array
     {
-        global $wpdb;
+        $wpdb = WpDb::get();
 
         $like_clauses = [];
         $params = [];

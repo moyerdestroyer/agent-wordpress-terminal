@@ -13,7 +13,9 @@ namespace AWPT\Knowledge;
 use AWPT\Database\Installer;
 use AWPT\Database\KnowledgeIndexRepository;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Builds AWPT's local retrieval cache from Knowledge and safe read-only sources.

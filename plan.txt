@@ -213,7 +213,7 @@ Minimum target:
 ```txt
 WordPress: 6.9+ experimental support
 WordPress: 7.1+ preferred for Core read abilities
-PHP: 8.2+
+PHP: 8.4+
 ```
 
 ### Frontend
@@ -465,4 +465,3 @@ approval state
 ```
 
 That is the gap between raw MCP tools and a genuinely useful WordPress agent experience.
-

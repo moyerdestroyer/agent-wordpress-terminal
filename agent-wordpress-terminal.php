@@ -11,7 +11,7 @@
  * Description:       A WordPress-native terminal for agent-assisted site work.
  * Version:           0.1.0
  * Requires at least: 6.9
- * Requires PHP:      8.2
+ * Requires PHP:      8.4
  * Author:            AWPT Contributors
  * License:           GPL-2.0-or-later
  * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
@@ -22,7 +22,9 @@ declare(strict_types=1);
 
 namespace AWPT;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Define plugin constants.
@@ -58,7 +60,7 @@ function constants(): void
     }
 
     if (!defined('AWPT_MINIMUM_PHP_VERSION')) {
-        define('AWPT_MINIMUM_PHP_VERSION', '8.2');
+        define('AWPT_MINIMUM_PHP_VERSION', '8.4');
     }
 }
 

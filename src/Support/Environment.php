@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Reports WordPress, PHP, and Abilities API readiness.
@@ -180,7 +182,7 @@ final class Environment
         }
 
         if (function_exists('get_bloginfo')) {
-            return (string) get_bloginfo('version');
+            return get_bloginfo('version');
         }
 
         return '0';

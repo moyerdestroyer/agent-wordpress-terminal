@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Knowledge;
 
-defined('ABSPATH') || exit();
+if (!defined('ABSPATH')) {
+    exit();
+}
 
 /**
  * Resolves configured Knowledge document roots.
@@ -70,7 +72,7 @@ final class FilesystemRootProvider
         $roots = [];
 
         if (is_string($upload_dir['basedir'] ?? null)) {
-            $roots[] = (string) $upload_dir['basedir'];
+            $roots[] = $upload_dir['basedir'];
         }
 
         $configured = (string) get_option('awpt_knowledge_roots', '');
