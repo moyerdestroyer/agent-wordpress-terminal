@@ -57,6 +57,12 @@ final class WordPressAIClientPromptRunner
         $builder = $this->configure_builder($builder, $system_instruction, $connector_id, $ability_names);
         $result = $this->generate_result($builder);
 
+        if ([] !== $ability_names && $this->is_text_generation_model_error($result)) {
+            $builder = call_user_func('wp_ai_client_prompt', $prompt);
+            $builder = $this->configure_builder($builder, $system_instruction, $connector_id, []);
+            $result = $this->generate_result($builder);
+        }
+
         return $this->parser->parse($result);
     }
 
@@ -71,20 +77,27 @@ final class WordPressAIClientPromptRunner
         string $connector_id,
         array $ability_names,
     ): mixed {
-        $configured = call_user_func([$builder, 'using_max_tokens'], 1000);
-
-        if ('' !== $connector_id && is_object($configured) && method_exists($configured, 'using_provider')) {
-            $configured = call_user_func([$configured, 'using_provider'], $connector_id);
+        if (!is_object($builder)) {
+            return $builder;
         }
 
-        $configured = $this->apply_model_preference($configured);
+        $configured_result = $builder->using_max_tokens(1000);
+        $configured = is_object($configured_result) ? $configured_result : $builder;
+
+        if ('' !== $connector_id && method_exists($configured, 'using_provider')) {
+            $provider_result = $configured->using_provider($connector_id);
+            $configured = is_object($provider_result) ? $provider_result : $configured;
+        }
+
         $configured = $this->apply_abilities($configured, $ability_names);
 
         if ('' === $system_instruction) {
             return $configured;
         }
 
-        return call_user_func([$configured, 'using_system_instruction'], $system_instruction);
+        $system_result = $configured->using_system_instruction($system_instruction);
+
+        return is_object($system_result) ? $system_result : $configured;
     }
 
     /**
@@ -92,9 +105,9 @@ final class WordPressAIClientPromptRunner
      *
      * @param list<string> $ability_names Ability names exposed to the model.
      */
-    private function apply_abilities(mixed $builder, array $ability_names): mixed
+    private function apply_abilities(object $builder, array $ability_names): object
     {
-        if ([] === $ability_names || !is_object($builder)) {
+        if ([] === $ability_names) {
             return $builder;
         }
 
@@ -105,12 +118,16 @@ final class WordPressAIClientPromptRunner
             $declarations = $this->build_function_declarations($ability_names);
 
             if ([] !== $declarations) {
-                return call_user_func_array([$builder, 'using_function_declarations'], $declarations);
+                $configured = $builder->using_function_declarations(...$declarations);
+
+                return is_object($configured) ? $configured : $builder;
             }
         }
 
         if (method_exists($builder, 'using_abilities')) {
-            return call_user_func_array([$builder, 'using_abilities'], $ability_names);
+            $configured = $builder->using_abilities(...$ability_names);
+
+            return is_object($configured) ? $configured : $builder;
         }
 
         return $builder;
@@ -154,28 +171,6 @@ final class WordPressAIClientPromptRunner
     }
 
     /**
-     * Apply WordPress preferred model routing when available.
-     */
-    private function apply_model_preference(mixed $builder): mixed
-    {
-        if (
-            !function_exists('WordPress\AI\get_preferred_models_for_text_generation')
-            || !is_object($builder)
-            || !method_exists($builder, 'using_model_preference')
-        ) {
-            return $builder;
-        }
-
-        $models = \WordPress\AI\get_preferred_models_for_text_generation();
-
-        if ([] === $models) {
-            return $builder;
-        }
-
-        return call_user_func_array([$builder, 'using_model_preference'], $models);
-    }
-
-    /**
      * Generate a provider result object when available.
      */
     private function generate_result(mixed $builder): mixed
@@ -185,13 +180,33 @@ final class WordPressAIClientPromptRunner
         }
 
         if (is_callable([$builder, 'generate_text_result'])) {
-            return $builder->generate_text_result();
+            try {
+                return $builder->generate_text_result();
+            } catch (\Throwable $error) {
+                return new \WP_Error('awpt_provider_generation_failed', $error->getMessage());
+            }
         }
 
         if (is_callable([$builder, 'generate_text'])) {
-            return $builder->generate_text();
+            try {
+                return $builder->generate_text();
+            } catch (\Throwable $error) {
+                return new \WP_Error('awpt_provider_generation_failed', $error->getMessage());
+            }
         }
 
         return '';
+    }
+
+    private function is_text_generation_model_error(mixed $result): bool
+    {
+        if (!is_wp_error($result)) {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/no models found.*text_generation|support text_generation/i',
+            $result->get_error_message(),
+        );
     }
 }

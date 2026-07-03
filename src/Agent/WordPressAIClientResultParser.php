@@ -116,6 +116,13 @@ final class WordPressAIClientResultParser
     {
         $message = $error->get_error_message();
 
+        if ($this->is_text_generation_model_error($message)) {
+            return __(
+                'The selected AI connector could not find a text-generation model for this request. Check Settings > Connectors or choose another provider in AWPT settings.',
+                'agent-wordpress-terminal',
+            );
+        }
+
         if ($this->is_recoverable_provider_error($message)) {
             return '';
         }
@@ -129,5 +136,10 @@ final class WordPressAIClientResultParser
     private function is_recoverable_provider_error(string $message): bool
     {
         return (bool) preg_match('/no text content found|invalid schema|bad request/i', $message);
+    }
+
+    private function is_text_generation_model_error(string $message): bool
+    {
+        return (bool) preg_match('/no models found.*text_generation|support text_generation/i', $message);
     }
 }
