@@ -296,7 +296,7 @@ export function Transcript({
 			{messages.length === 0 && !isThinking ? (
 				<p className="awpt-empty">
 					{__(
-						'Ask the agent or try /tools, /mcp status, /knowledge search brand voice, /read 291, /preview 291',
+						'Ask the agent or try /help, /focus 291, /preview 291, or /knowledge search brand voice',
 						'agent-wordpress-terminal',
 					)}
 				</p>

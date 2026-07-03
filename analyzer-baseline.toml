@@ -195,26 +195,14 @@ count = 1
 [[issues]]
 file = "src/Agent/ContentCommandRouter.php"
 code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `count`: expected `Countable|array<array-key, mixed>`, but found `nonnull`."
-count = 1
-
-[[issues]]
-file = "src/Agent/ContentCommandRouter.php"
-code = "mixed-argument"
 message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
-count = 3
-
-[[issues]]
-file = "src/Agent/ContentCommandRouter.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #3 of `AWPT\Agent\ContentCommandRouter::stage_content_update`: expected `WP_Post`, but found `truthy-mixed`.'
 count = 1
 
 [[issues]]
 file = "src/Agent/ContentCommandRouter.php"
 code = "mixed-argument"
 message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
-count = 3
+count = 1
 
 [[issues]]
 file = "src/Agent/ContentCommandRouter.php"
@@ -268,24 +256,6 @@ count = 2
 file = "src/Agent/ProviderToolLoop.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Agent/SiteCommandRouter.php"
-code = "less-specific-return-statement"
-message = 'Returned type `WP_Error|array<array-key, mixed>` is less specific than the declared return type `WP_Error|array<string, mixed>` for function `AWPT\Agent\SiteCommandRouter::execute_tool`.'
-count = 1
-
-[[issues]]
-file = "src/Agent/SiteCommandRouter.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `nonnull`."
-count = 1
-
-[[issues]]
-file = "src/Agent/SiteCommandRouter.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `nonnull`."
 count = 1
 
 [[issues]]

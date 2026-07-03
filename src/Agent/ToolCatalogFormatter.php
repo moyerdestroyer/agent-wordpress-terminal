@@ -88,16 +88,14 @@ final class ToolCatalogFormatter
         }
 
         $lines[] = 'Slash commands (typed by the user, not ability names):';
-        $lines[] = '- /tools — list all registered tools';
+        $lines[] = '- /help — list user-facing slash commands';
+        $lines[] = '- /focus {id} — set the session focus to a post or page';
+        $lines[] = '- /preview {id} — load a post preview in the preview workspace';
+        $lines[] = '- /tools — list registered abilities and MCP tools';
         $lines[] = '- /mcp status — show MCP connection status';
         $lines[] = '- /mcp tools — list MCP tools';
         $lines[] = '- /knowledge search {query} — search indexed Knowledge and read-only site sources';
         $lines[] = '- /knowledge read {id} — read a Core Knowledge or legacy guideline item';
-        $lines[] = '- /read {id} — read post content';
-        $lines[] = '- /analyze {id} — analyze a page';
-        $lines[] = '- /preview {id} — open preview for a post';
-        $lines[] = '- /read-settings — read site settings';
-        $lines[] = '- /read-users — read user summaries';
         $lines[] = '- /clear — clear the transcript';
 
         if (!function_exists('wp_get_abilities')) {

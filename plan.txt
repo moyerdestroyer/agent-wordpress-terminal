@@ -64,7 +64,7 @@ Examples:
 ```txt
 Summarize the selected page.
 Analyze this draft for layout issues.
-/context add page 291
+/focus 291
 /tools
 /mcp status
 /preview 291

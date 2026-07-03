@@ -93,7 +93,7 @@ final class AgentRuntime
         $trimmed = trim($message);
 
         if (str_starts_with($trimmed, '/')) {
-            return new SlashCommandRouter()->dispatch($trimmed, $session_id);
+            return new SlashCommandRouter()->dispatch($trimmed);
         }
 
         return $this->provider_response($session_id);

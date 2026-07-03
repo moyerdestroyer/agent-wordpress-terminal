@@ -118,7 +118,10 @@ function InspectorView({
 					<pre>{JSON.stringify(blocks, null, 2)}</pre>
 				) : (
 					<span>
-						{__('Run /read-block-tree {id} or /analyze {id}.', 'agent-wordpress-terminal')}
+						{__(
+							'Ask the agent to analyze a page or inspect its block structure.',
+							'agent-wordpress-terminal',
+						)}
 					</span>
 				)}
 			</div>
