@@ -12,7 +12,10 @@ interface TranscriptProps {
 	onActionPreview: (action: ProposedAction) => void;
 }
 
-type TranscriptItem = { kind: 'message'; message: Message } | { kind: 'tool'; call: ToolCall };
+type TranscriptItem =
+	| { kind: 'message'; message: Message }
+	| { kind: 'tool'; call: ToolCall }
+	| { kind: 'action-record'; action: ProposedAction };
 
 function ThinkingIndicator(): JSX.Element {
 	return (
@@ -51,6 +54,20 @@ function toolCallKey(call: ToolCall): string {
 	return `${call.id ?? call.tool}-${call.created_at ?? JSON.stringify(call.input)}`;
 }
 
+function normalizedActionId(value: unknown): number | null {
+	if (typeof value === 'number' && Number.isFinite(value)) {
+		return value;
+	}
+
+	if (typeof value === 'string' && value.trim() !== '') {
+		const parsed = Number.parseInt(value, 10);
+
+		return Number.isNaN(parsed) ? null : parsed;
+	}
+
+	return null;
+}
+
 function toolsForAssistant(
 	message: Message,
 	toolCalls: ToolCall[],
@@ -67,9 +84,28 @@ function toolsForAssistant(
 	});
 }
 
-function buildTranscriptItems(messages: Message[], toolCalls: ToolCall[]): TranscriptItem[] {
+function actionIdFromToolCall(call: ToolCall): number | null {
+	return normalizedActionId(call.output?.id);
+}
+
+function isResolvedAction(action: ProposedAction): boolean {
+	return action.status === 'applied' || action.status === 'rejected';
+}
+
+function buildTranscriptItems(
+	messages: Message[],
+	toolCalls: ToolCall[],
+	actions: ProposedAction[],
+): TranscriptItem[] {
 	const items: TranscriptItem[] = [];
 	const assignedTools = new Set<string>();
+	const assignedActions = new Set<number>();
+	const resolvedActionsById = new Map(
+		actions
+			.filter(isResolvedAction)
+			.map((action) => [normalizedActionId(action.id), action] as const)
+			.filter((entry): entry is readonly [number, ProposedAction] => entry[0] !== null),
+	);
 	const liveAssistantCount = messages.filter(
 		(message) => message.role === 'assistant' && !message.created_at,
 	).length;
@@ -95,6 +131,13 @@ function buildTranscriptItems(messages: Message[], toolCalls: ToolCall[]): Trans
 		for (const call of turnTools) {
 			assignedTools.add(toolCallKey(call));
 			items.push({ kind: 'tool', call });
+			const actionId = actionIdFromToolCall(call);
+			const action = actionId ? resolvedActionsById.get(actionId) : null;
+
+			if (action?.id) {
+				assignedActions.add(action.id);
+				items.push({ kind: 'action-record', action });
+			}
 		}
 	}
 
@@ -104,6 +147,20 @@ function buildTranscriptItems(messages: Message[], toolCalls: ToolCall[]): Trans
 		if (!assignedTools.has(key)) {
 			items.push({ kind: 'tool', call });
 			assignedTools.add(key);
+			const actionId = actionIdFromToolCall(call);
+			const action = actionId ? resolvedActionsById.get(actionId) : null;
+
+			if (action?.id) {
+				assignedActions.add(action.id);
+				items.push({ kind: 'action-record', action });
+			}
+		}
+	}
+
+	for (const action of actions) {
+		if (action.id && isResolvedAction(action) && !assignedActions.has(action.id)) {
+			items.push({ kind: 'action-record', action });
+			assignedActions.add(action.id);
 		}
 	}
 
@@ -273,6 +330,28 @@ function ActionCard({
 	);
 }
 
+function ActionRecord({
+	action,
+	onPreview,
+}: {
+	action: ProposedAction;
+	onPreview: (action: ProposedAction) => void;
+}): JSX.Element {
+	return (
+		<div className="awpt-action-record">
+			<span className={`awpt-action-record__status awpt-action-card__status--${action.status}`}>
+				{action.status}
+			</span>
+			<span className="awpt-action-record__title">{action.title}</span>
+			{action.payload?.preview_url ? (
+				<Button variant="link" onClick={() => onPreview(action)}>
+					{__('Preview', 'agent-wordpress-terminal')}
+				</Button>
+			) : null}
+		</div>
+	);
+}
+
 export function Transcript({
 	messages,
 	toolCalls,
@@ -283,13 +362,14 @@ export function Transcript({
 }: TranscriptProps): JSX.Element {
 	const scrollAnchorRef = useRef<HTMLDivElement>(null);
 	const transcriptItems = useMemo(
-		() => buildTranscriptItems(messages, toolCalls),
-		[messages, toolCalls],
+		() => buildTranscriptItems(messages, toolCalls, actions),
+		[messages, toolCalls, actions],
 	);
+	const pendingActions = actions.filter((action) => !isResolvedAction(action));
 
 	useEffect(() => {
 		scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-	}, [transcriptItems.length, isThinking, actions.length]);
+	}, [transcriptItems.length, isThinking, pendingActions.length]);
 
 	return (
 		<div className="awpt-messages">
@@ -304,6 +384,16 @@ export function Transcript({
 				transcriptItems.map((item) => {
 					if (item.kind === 'tool') {
 						return <InlineToolNote call={item.call} key={`tool-${toolCallKey(item.call)}`} />;
+					}
+
+					if (item.kind === 'action-record') {
+						return (
+							<ActionRecord
+								action={item.action}
+								key={`action-record-${item.action.id ?? item.action.title}`}
+								onPreview={onActionPreview}
+							/>
+						);
 					}
 
 					const message = item.message;
@@ -327,7 +417,7 @@ export function Transcript({
 
 			{isThinking ? <ThinkingIndicator /> : null}
 
-			{actions.map((action) => (
+			{pendingActions.map((action) => (
 				<ActionCard
 					key={action.id ?? `${action.title}-${action.status}-${action.description}`}
 					action={action}

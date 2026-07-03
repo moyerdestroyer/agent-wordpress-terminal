@@ -77,7 +77,7 @@ final class SessionHydrator
 
         foreach ($rows as $action) {
             $hydrated[] = [
-                'id' => $action['id'] ?? 0,
+                'id' => (int) ($action['id'] ?? 0),
                 'title' => (string) ($action['title'] ?? ''),
                 'description' => (string) ($action['description'] ?? ''),
                 'payload' => Json::decode_array((string) ($action['payload_json'] ?? '')),

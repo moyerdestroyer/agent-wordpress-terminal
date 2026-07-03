@@ -1061,6 +1061,43 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	color: inherit;
 }
 
+.awpt-action-record {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: fit-content;
+	max-width: min(72ch, 100%);
+	margin: 4px 0 10px 1.4em;
+	padding: 5px 8px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.025);
+	color: var(--awpt-muted);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.awpt-action-record__status {
+	flex: 0 0 auto;
+	font-weight: 700;
+	text-transform: capitalize;
+}
+
+.awpt-action-record__title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.awpt-action-record .components-button.is-link {
+	flex: 0 0 auto;
+	height: auto;
+	min-height: 0;
+	padding: 0;
+	font-size: 11px;
+}
+
 .awpt-command-bar {
 	flex: 0 0 auto;
 	display: flex;
