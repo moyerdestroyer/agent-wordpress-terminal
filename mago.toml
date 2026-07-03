@@ -1,0 +1,36 @@
+#:schema vendor/carthage-software/mago/schema.json
+version = "1"
+php-version = "8.2"
+
+[source]
+paths = ["src", "agent-wordpress-terminal.php"]
+includes = [
+    "vendor/php-stubs/wordpress-stubs/wordpress-stubs.php",
+    "stubs/awpt-external.php",
+]
+excludes = ["build/**", "node_modules/**", "vendor/**"]
+
+[source.glob]
+literal-separator = true
+
+[formatter]
+preset = "default"
+
+[linter]
+integrations = ["wordpress"]
+
+[linter.rules]
+no-global = { enabled = false }
+no-empty = { level = "warning" }
+cyclomatic-complexity = { threshold = 35, level = "warning" }
+too-many-methods = { threshold = 15, level = "warning" }
+no-db-schema-change = { enabled = false }
+no-else-clause = { enabled = false }
+no-direct-db-query = { enabled = false }
+literal-named-argument = { enabled = false }
+halstead = { effort-threshold = 8000, volume-threshold = 1500 }
+
+[analyzer]
+baseline = "analyzer-baseline.toml"
+check-missing-type-hints = false
+strict-array-index-existence = false

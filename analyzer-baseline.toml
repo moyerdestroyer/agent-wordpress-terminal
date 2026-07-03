@@ -1,0 +1,4309 @@
+variant = "loose"
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `printf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-constant"
+message = 'Undefined constant: `AWPT\ABSPATH`.'
+count = 2
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\add_action` (also tried as `add_action` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\deactivate_plugins` (also tried as `deactivate_plugins` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\esc_html__` (also tried as `esc_html__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\esc_html` (also tried as `esc_html` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\plugin_basename` (also tried as `plugin_basename` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\plugin_dir_path` (also tried as `plugin_dir_path` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\plugin_dir_url` (also tried as `plugin_dir_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\register_activation_hook` (also tried as `register_activation_hook` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\register_deactivation_hook` (also tried as `register_deactivation_hook` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\wp_die` (also tried as `wp_die` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "agent-wordpress-terminal.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/AbilityRegistrar.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 1
+
+[[issues]]
+file = "src/Abilities/AbilityRegistrar.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/AbilitySchemas.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `list<truthy-mixed>` is less specific than the declared return type `array<int, string>` for function `AWPT\Abilities\AnalyzePage::extract_headings` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `list{1: mixed}|list{mixed}|list{mixed}` is less specific than the declared return type `array<int, string>` for function `AWPT\Abilities\AnalyzePage::recommend_actions` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_custom_blocks`: expected `array<int, array<string, mixed>>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_custom_blocks`: expected `array<int, array<string, mixed>>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_forms`: expected `array<int, array<string, mixed>>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_forms`: expected `array<int, array<string, mixed>>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::extract_headings`: expected `array<int, array<string, mixed>>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::extract_headings`: expected `array<int, array<string, mixed>>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
+count = 2
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 7
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_permalink` (also tried as `get_permalink` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\parse_blocks` (also tried as `parse_blocks` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "possibly-invalid-array-access"
+message = "Cannot perform array access on value of type `unknown-ref(WP_Error)`."
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "reference-to-undefined-variable"
+message = "Reference created from a previously undefined variable `$matches`."
+count = 1
+
+[[issues]]
+file = "src/Abilities/AnalyzePage.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "less-specific-nested-argument-type"
+message = '''Argument type mismatch for argument #1 of `AWPT\Abilities\AbilityRegistrar::register`: expected `array{'annotations'?: array<string, bool>, 'description': string, 'execute_callback': (callable(array<string, mixed>): array<string, mixed>|unknown-ref(WP_Error)), 'input_schema': array<string, mixed>, 'label': string, 'name': string, 'output_schema': array<string, mixed>, 'permission_callback': (callable(array<string, mixed>): bool)}`, but provided type `array{'annotations': array{'destructive': true, 'readonly': false, 'requires_approval': true}, 'description': mixed, 'execute_callback': list{$this(AWPT\Abilities\ApplyAction), string('execute')}, 'input_schema': array{'properties': array{'action_id': array{'description': mixed, 'type': string('integer')}}, 'required': list{string('action_id')}, 'type': string('object')}, 'label': mixed, 'name': string('awpt/apply-action'), 'output_schema': array{'type': string('object')}, 'permission_callback': list{$this(AWPT\Abilities\ApplyAction), string('can_apply')}}` is less specific.'''
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Abilities\ApplyAction::execute`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 5
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 5
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 8
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_kses_post` (also tried as `wp_kses_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_update_post` (also tried as `wp_update_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ApplyAction.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_permalink` (also tried as `get_permalink` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_preview_post_link` (also tried as `get_preview_post_link` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/PreviewPost.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "less-specific-nested-argument-type"
+message = '''Argument type mismatch for argument #1 of `AWPT\Abilities\AbilityRegistrar::register`: expected `array{'annotations'?: array<string, bool>, 'description': string, 'execute_callback': (callable(array<string, mixed>): array<string, mixed>|unknown-ref(WP_Error)), 'input_schema': array<string, mixed>, 'label': string, 'name': string, 'output_schema': array<string, mixed>, 'permission_callback': (callable(array<string, mixed>): bool)}`, but provided type `array{'annotations': array{'destructive': false, 'readonly': false, 'requires_approval': true}, 'description': mixed, 'execute_callback': list{$this(AWPT\Abilities\ProposeContentUpdate), string('execute')}, 'input_schema': array{'properties': array{'affected': array{'description': mixed, 'type': string('string')}, 'description': array{'description': mixed, 'type': string('string')}, 'post_content': array{'description': mixed, 'type': string('string')}, 'post_id': array{'description': mixed, 'type': string('integer')}, 'post_title': array{'description': mixed, 'type': string('string')}, 'session_id': array{'description': mixed, 'type': string('integer')}, 'title': array{'description': mixed, 'type': string('string')}}, 'required': list{string('session_id'), string('post_id'), string('title'), string('description')}, 'type': string('object')}, 'label': mixed, 'name': string('awpt/propose-content-update'), 'output_schema': array{'type': string('object')}, 'permission_callback': list{$this(AWPT\Abilities\ProposeContentUpdate), string('can_propose')}}` is less specific.'''
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Database\ActionRepository::create`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #3 of `AWPT\Database\ActionRepository::create`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 3
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 3
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-class-like"
+message = "Class, Interface, or Trait `WP_Post` does not exist."
+count = 5
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 12
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_permalink` (also tried as `get_permalink` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_preview_post_link` (also tried as `get_preview_post_link` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\sanitize_textarea_field` (also tried as `sanitize_textarea_field` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_kses_post` (also tried as `wp_kses_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ProposeContentUpdate.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\ReadBlockTree::count_blocks`: expected `array<int, array<string, mixed>>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\ReadBlockTree::count_blocks`: expected `array<int, array<string, mixed>>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\ReadBlockTree::normalize_blocks`: expected `array<int, array<string, mixed>>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Abilities\ReadBlockTree::normalize_blocks`: expected `array<int, array<string, mixed>>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\parse_blocks` (also tried as `parse_blocks` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadBlockTree.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
+count = 6
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_permalink` (also tried as `get_permalink` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadContent.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadKnowledge.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadKnowledge.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Abilities/ReadKnowledge.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadKnowledge.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadKnowledge.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Abilities\ReadSettings::can_read`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\admin_url` (also tried as `admin_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_bloginfo` (also tried as `get_bloginfo` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_option` (also tried as `get_option` in a broader scope).'
+count = 17
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_stylesheet` (also tried as `get_stylesheet` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_template` (also tried as `get_template` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\home_url` (also tried as `home_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_get_theme` (also tried as `wp_get_theme` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\wp_timezone_string` (also tried as `wp_timezone_string` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadSettings.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "impossible-assignment"
+message = "Invalid assignment: the right-hand side has type `never` and cannot produce a value."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "invalid-property-access"
+message = "Attempting to access a property on a non-object type (`unknown-ref(WP_User)`)."
+count = 5
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, int>|list<int>` is less specific than the declared return type `array<string, int>` for function `AWPT\Abilities\ReadUsers::role_counts`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `array_map`: expected `array<('K.array_map() extends array-key), unknown-ref(WP_User)>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "mixed-operand"
+message = "Invalid middle operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Abilities\ReadUsers::can_read`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-class"
+message = "Class `WP_User_Query` not found."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_User`."
+count = 2
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\count_user_posts` (also tried as `count_user_posts` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\count_users` (also tried as `count_users` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "null-argument"
+message = "Argument #1 of function `array_values` is `null`, but parameter type `array<('K.array_values() extends array-key), ('V.array_values() extends mixed)>` does not accept it."
+count = 1
+
+[[issues]]
+file = "src/Abilities/ReadUsers.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/RegisterAbilities.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/RegisterAbilities.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\add_action` (also tried as `add_action` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Abilities/RegisterAbilities.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Abilities/SearchKnowledge.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Abilities/SearchKnowledge.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Abilities\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Abilities/SearchKnowledge.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Support\ConnectorCatalog::is_valid_provider`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `printf`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `trim`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `printf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-argument"
+message = "The first value for `echo` is too general."
+count = 19
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Admin\Page::sanitize_provider`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Admin\Page::secret_placeholder`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\__` (also tried as `__` in a broader scope).'
+count = 17
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\add_action` (also tried as `add_action` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\add_options_page` (also tried as `add_options_page` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\checked` (also tried as `checked` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\esc_attr` (also tried as `esc_attr` in a broader scope).'
+count = 6
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\esc_html__` (also tried as `esc_html__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\esc_html` (also tried as `esc_html` in a broader scope).'
+count = 13
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\esc_url` (also tried as `esc_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\get_option` (also tried as `get_option` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\register_setting` (also tried as `register_setting` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\sanitize_html_class` (also tried as `sanitize_html_class` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\settings_fields` (also tried as `settings_fields` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\submit_button` (also tried as `submit_button` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\wp_create_nonce` (also tried as `wp_create_nonce` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\wp_die` (also tried as `wp_die` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\wp_kses` (also tried as `wp_kses` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\wp_localize_script` (also tried as `wp_localize_script` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Admin\wp_unslash` (also tried as `wp_unslash` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Admin/Page.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Database\MessageRepository::store_tool_calls`: expected `array<int, mixed>`, but found `nonnull`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #3 of `AWPT\Database\MessageRepository::store_tool_calls`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #4 of `AWPT\Database\MessageRepository::store_message`: expected `string`, but found `mixed`.'
+count = 2
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 4
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\current_time` (also tried as `current_time` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "possibly-invalid-argument"
+message = "Possible argument type mismatch for argument #2 of `array_key_exists`: expected `array<array-key, mixed>`, but possibly received `array<string, mixed>|unknown-ref(WP_Error)`."
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "possibly-invalid-array-access"
+message = "Cannot perform array access on value of type `unknown-ref(WP_Error)`."
+count = 1
+
+[[issues]]
+file = "src/Agent/AgentRuntime.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `AWPT\Agent\ChatCompletionsProvider::format_error_message`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-assignment"
+message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\ChatCompletionsProvider::complete`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\ChatCompletionsProvider::get_missing_endpoint_message`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 6
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 6
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 6
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_remote_post` (also tried as `wp_remote_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_remote_retrieve_body` (also tried as `wp_remote_retrieve_body` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_remote_retrieve_response_code` (also tried as `wp_remote_retrieve_response_code` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_trim_words` (also tried as `wp_trim_words` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatCompletionsProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatPromptFormatter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatPromptFormatter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ChatPromptFormatter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 5
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 5
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `count`: expected `Countable|array<array-key, mixed>`, but found `nonnull`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 5
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Agent\ContentCommandRouter::error_response`: expected `string`, but found `mixed`.'
+count = 6
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Agent\ContentCommandRouter::usage`: expected `string`, but found `mixed`.'
+count = 6
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 4
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #3 of `AWPT\Agent\ContentCommandRouter::stage_content_update`: expected `unknown-ref(WP_Post)`, but found `truthy-mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 3
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Post`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 15
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wpautop` (also tried as `wpautop` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "possibly-invalid-array-access"
+message = "Cannot perform array access on value of type `unknown-ref(WP_Error)`."
+count = 7
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Agent/ContentCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "invalid-param-out-tag"
+message = "@param-out tag used on a non-by-reference parameter"
+count = 2
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `AWPT\Agent\EmbeddedToolCallExtractor::normalize_call`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_generate_password` (also tried as `wp_generate_password` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 2
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "reference-to-undefined-variable"
+message = "Reference created from a previously undefined variable `$matches`."
+count = 2
+
+[[issues]]
+file = "src/Agent/EmbeddedToolCallExtractor.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/IntentToolCallEnricher.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_generate_password` (also tried as `wp_generate_password` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/IntentToolCallEnricher.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Agent\KnowledgeCommandRouter::error_response`: expected `string`, but found `mixed`.'
+count = 2
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Agent/KnowledgeCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/LocalProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\LocalProvider::get_missing_endpoint_message`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/LocalProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\LocalProvider::get_missing_key_message`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/LocalProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/LocalProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_option` (also tried as `get_option` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/LocalProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<array-key, mixed>`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #2 of `AWPT\Agent\McpCommandRouter::execute`: expected `array<array-key, mixed>`, but possibly received `array<array-key, mixed>|unknown-ref(WP_Error)`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 2
+
+[[issues]]
+file = "src/Agent/McpCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenAIProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\OpenAIProvider::get_missing_key_message`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenAIProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenAIProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenAIProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'HTTP-Referer': mixed, 'X-Title': mixed, ...<string, string>}` is less specific than the declared return type `array<string, string>` for function `AWPT\Agent\OpenRouterProvider::get_headers` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\OpenRouterProvider::get_missing_key_message`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_bloginfo` (also tried as `get_bloginfo` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\home_url` (also tried as `home_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/OpenRouterProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderFactory.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderFactory.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderInterface.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "less-specific-return-statement"
+message = '''Returned type `array<array-key, array{'content': string, 'role': string}>|list<array{'content': string, 'role': string}>` is less specific than the declared return type `array<int, array<string, string>>` for function `AWPT\Agent\ProviderMessageBuilder::get_session_messages`.'''
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `array_slice`: expected `array<('K.array_slice() extends array-key), ('V.array_slice() extends mixed)>`, but found `truthy-mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "non-existent-constant"
+message = 'Undefined constant: `AWPT\Agent\ARRAY_A`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderMessageBuilder.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderRuntime.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderRuntime.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderRuntime.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderRuntime.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #2 of `AWPT\Agent\IntentToolCallEnricher::enrich`: expected `array<string, mixed>`, but possibly received `array<string, mixed>|unknown-ref(WP_Error)`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderRuntime.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "invalid-return-statement"
+message = '''Invalid return type for function `AWPT\Agent\ProviderToolCallExecutor::run_safe_tool`: expected `array{0: string, 1: array<string, mixed>}`, but found `list{string('failed'), array{'error': mixed}}|list{string('success'), array<string, mixed>|unknown-ref(WP_Error)}`.'''
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Agent\ProviderToolCallExecutor::execute_single_tool_call`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `AWPT\Agent\ProviderToolCallExecutor::decode_tool_arguments`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_generate_password` (also tried as `wp_generate_password` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolCallExecutor.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolLoop.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/ProviderToolLoop.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Agent\SiteCommandRouter::error_response`: expected `string`, but found `mixed`.'
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `nonnull`."
+count = 1
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `nonnull`."
+count = 1
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/SiteCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\ContentCommandRouter::propose`: expected `int`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "undefined-variable"
+message = "Undefined variable: `$session_id`."
+count = 1
+
+[[issues]]
+file = "src/Agent/SlashCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCatalogFormatter.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCatalogFormatter.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\ToolCatalogFormatter::describe_ability`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCatalogFormatter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "invalid-array-element-key"
+message = "Invalid array key type."
+count = 3
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "less-specific-return-statement"
+message = 'Returned type `non-empty-array<array-key, list<string>>` is less specific than the declared return type `array<string, array<int, string>>` for function `AWPT\Agent\ToolCommandRouter::groups`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolCommandRouter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Ability)`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>|unknown-ref(WP_Error)` for function `AWPT\Agent\ToolExecutor::execute`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 3
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\ToolExecutor::execute`. Saw type `mixed`.'
+count = 3
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Ability`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "possibly-invalid-argument"
+message = "Possible argument type mismatch for argument #1 of `method_exists`: expected `class-string|object`, but possibly received `unknown-ref(WP_Ability)`."
+count = 2
+
+[[issues]]
+file = "src/Agent/ToolExecutor.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Abilities\AbilitySchemas::normalize_for_provider`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\ToolRegistry::can_auto_execute`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\ToolRegistry::function_name_for_tool`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `method_exists`: expected `class-string|object`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\ToolRegistry::tool_name_for_function`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "non-existent-method"
+message = "Method `function_name_to_ability_name` does not exist on type `WP_AI_Client_Ability_Function_Resolver`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolRegistry.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Agent\ToolResultFormatter::format_read_settings`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `AWPT\Agent\ToolResultFormatter::format_generic_tool`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #2 of `implode`: expected `array<array-key, Stringable|null|scalar>|null`, but provided type `list{1: string}|list{3: string}|list{mixed, string, string}|list{mixed, string, string}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 7
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 10
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "redundant-logical-operation"
+message = "Redundant `||` operation: left operand is always false and right operand is evaluated."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "redundant-type-comparison"
+message = "Redundant condition: variable `$tool_call` (type `array<string, mixed>`) is already known to be `array<array-key, mixed>`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "redundant-type-comparison"
+message = "Redundant type assertion: `$tool_call` is already `array<string, mixed>`."
+count = 1
+
+[[issues]]
+file = "src/Agent/ToolResultFormatter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "invalid-iterator"
+message = "The expression provided to `foreach` is not iterable. It resolved to type `mixed`, which is not iterable."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{(has-method<'getId'>&has-method<'getArgs'>)|(has-method<'getName'>&has-method<'getArgs'>)|(has-method<'getName'>&has-method<'getId'>&has-method<'getArgs'>)|has-method<'getArgs'>, string('getArgs')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{(has-method<'getName'>&has-method<'getId'>)|has-method<'getId'>, string('getId')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getCandidates'>, string('getCandidates')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getFunctionCall'>, string('getFunctionCall')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getMessage'>, string('getMessage')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getName'>, string('getName')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getParts'>, string('getParts')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 7
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientFunctionCallExtractor.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "ambiguous-object-method-access"
+message = "Cannot statically verify method call on a generic `object` type."
+count = 2
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "invalid-argument"
+message = "Invalid argument type for argument #1 of `method_exists`: expected `class-string|object`, but found `array<string, mixed>`."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`array<string, mixed>`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Abilities\AbilitySchemas::normalize_for_provider`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func_array`: expected `(callable(...('I.call_user_func_array() extends mixed)): ('R.call_user_func_array() extends mixed))|string`, but provided type `list{has-method<'using_model_preference'>, string('using_model_preference')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func_array`: expected `(callable(...object): ('R.call_user_func_array() extends mixed))|string`, but provided type `list{has-method<'using_function_declarations'>, string('using_function_declarations')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func_array`: expected `(callable(...string): ('R.call_user_func_array() extends mixed))|string`, but provided type `list{has-method<'using_abilities'>, string('using_abilities')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...int(1000)): ('R.call_user_func() extends mixed))|string`, but provided type `list{mixed, string('using_max_tokens')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...non-empty-string): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'using_provider'>, string('using_provider')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...non-empty-string): ('R.call_user_func() extends mixed))|string`, but provided type `list{mixed, string('using_system_instruction')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `call_user_func_array`: expected `array<array-key, ('I.call_user_func_array() extends mixed)>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 10
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "non-existent-class"
+message = 'Class `WordPress\AiClient\Tools\DTO\FunctionDeclaration` not found.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "non-existent-method"
+message = "Method `ability_name_to_function_name` does not exist on type `WP_AI_Client_Ability_Function_Resolver`."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientPromptRunner.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\WordPressAIClientProvider::response`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "mixed-property-type-coercion"
+message = "A value with a less specific type `mixed` is being assigned to property `$$connector_id` (string)."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 3
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "redundant-condition"
+message = "Redundant ternary operator: condition is always truthy."
+count = 2
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "redundant-null-coalesce"
+message = "Redundant null coalesce: left-hand side can never be `null` or undefined."
+count = 5
+
+[[issues]]
+file = "src/Agent/WordPressAIClientProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_Error)`)."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getId'>, string('getId')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'getModelMetadata'>, string('getModelMetadata')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'get_text'>, string('get_text')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `call_user_func`: expected `(callable(...('I.call_user_func() extends mixed)): ('R.call_user_func() extends mixed))|string`, but provided type `list{has-method<'toText'>, string('toText')}` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\WordPressAIClientResultParser::is_recoverable_provider_error`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Agent\WordPressAIClientResultParser::provider_error_content`: expected `unknown-ref(WP_Error)`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Agent\WordPressAIClientResultParser::provider_error_content`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Agent\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Agent/WordPressAIClientResultParser.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>|null` is less specific than the declared return type `array<string, mixed>|null` for function `AWPT\Database\ActionRepository::get_accessible_row`.'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 4
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-constant"
+message = "Undefined constant: `ARRAY_A`."
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\absint` (also tried as `absint` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\current_time` (also tried as `current_time` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\esc_url_raw` (also tried as `esc_url_raw` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\sanitize_textarea_field` (also tried as `sanitize_textarea_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\wp_kses_post` (also tried as `wp_kses_post` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/ActionRepository.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "non-existent-constant"
+message = 'Undefined constant: `AWPT\Database\ABSPATH`.'
+count = 2
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\dbDelta` (also tried as `dbDelta` in a broader scope).'
+count = 7
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\flush_rewrite_rules` (also tried as `flush_rewrite_rules` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\update_option` (also tried as `update_option` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/Installer.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `AWPT\Database\KnowledgeIndexRepository::search_chunks`: expected `list<array<string, mixed>>`, but found `array<array-key, mixed>`.'
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 13
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 6
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "mixed-operand"
+message = "Invalid middle operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 7
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "non-existent-constant"
+message = "Undefined constant: `ARRAY_A`."
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/KnowledgeIndexRepository.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 4
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 3
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\wp_json_encode` (also tried as `wp_json_encode` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/MessageRepository.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/SessionHydrator.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `AWPT\Database\SessionRepository::list_summaries`: expected `list<array<string, mixed>>`, but found `array<array-key, mixed>`.'
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `AWPT\Database\SessionRepository::get_summary`.'
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "less-specific-return-statement"
+message = '''Returned type `array{'actions': list<array<string, mixed>>, 'context': list<array<string, mixed>>, 'messages': array<array-key, mixed>, 'tool_calls': list<array<string, mixed>>, ...}` is less specific than the declared return type `array<string, mixed>|null` for function `AWPT\Database\SessionRepository::find_detail`.'''
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 11
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 20
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 12
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 9
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "non-existent-constant"
+message = "Undefined constant: `ARRAY_A`."
+count = 7
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\current_time` (also tried as `current_time` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Database\get_current_user_id` (also tried as `get_current_user_id` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `AWPT\Database\SessionHydrator::actions`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `AWPT\Database\SessionHydrator::context_items`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `AWPT\Database\SessionHydrator::tool_calls`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
+count = 1
+
+[[issues]]
+file = "src/Database/SessionRepository.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `realpath`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `str_starts_with`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "non-existent-constant"
+message = 'Undefined constant: `AWPT\Knowledge\WP_CONTENT_DIR`.'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\trailingslashit` (also tried as `trailingslashit` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemAccessPolicy.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemRootProvider.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemRootProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemRootProvider.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_get_upload_dir` (also tried as `wp_get_upload_dir` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemRootProvider.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemRootProvider.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemSourceFactory.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Knowledge\FilesystemSourceFactory::read_text_file`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemSourceFactory.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemSourceFactory.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/FilesystemSourceReader.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `trim`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #3 of `AWPT\Database\KnowledgeIndexRepository::insert_source`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #4 of `AWPT\Database\KnowledgeIndexRepository::insert_chunk`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\add_action` (also tried as `add_action` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\current_time` (also tried as `current_time` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_option` (also tried as `get_option` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\update_option` (also tried as `update_option` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeIndexer.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "impossible-assignment"
+message = "Invalid assignment: the right-hand side has type `never` and cannot produce a value."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "impossible-condition"
+message = "Redundant ternary operator: condition is always falsy."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "invalid-property-access"
+message = "Attempting to access a property on a non-object type (`never`)."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "invalid-property-access"
+message = "Attempting to access a property on a non-object type (`unknown-ref(WP_Post)`)."
+count = 9
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "invalid-type-cast"
+message = "Casting `mixed` to `array`."
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #2 of `array_filter`: expected `(callable(non-negative-int): bool)|(callable(string('attachment')|string('page')|string('post')|string('wp_block')|string('wp_template')|string('wp_template_part')): bool)|(callable(string('attachment')|string('page')|string('post')|string('wp_block')|string('wp_template')|string('wp_template_part'), non-negative-int): bool)|null`, but provided type `(closure(string): mixed)` is less specific."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'core_available': mixed, 'label': mixed, 'legacy_guidelines_available': mixed, 'mode': string('core')|string('fallback_index')|string('legacy_guidelines')}` is less specific than the declared return type `array{'core_available': bool, 'label': string, 'legacy_guidelines_available': bool, 'mode': string}` for function `AWPT\Knowledge\KnowledgeRepository::status` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `mb_substr`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 12
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-operand"
+message = "Invalid right operand: type `mixed` cannot be reliably used in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:src/Knowledge/KnowledgeRepository.php:81:13}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "no-value"
+message = 'Argument #1 passed to method `AWPT\Knowledge\KnowledgeRepository::taxonomy_for_post_type` has type `never`, meaning it cannot produce a value.'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-class"
+message = "Class `WP_Query` not found."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Post`."
+count = 3
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-class-like"
+message = "Class, Interface, or Trait `WP_Post` does not exist."
+count = 4
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\__` (also tried as `__` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\esc_attr` (also tried as `esc_attr` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\esc_html` (also tried as `esc_html` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_permalink` (also tried as `get_permalink` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_post` (also tried as `get_post` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\get_the_title` (also tried as `get_the_title` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\post_type_exists` (also tried as `post_type_exists` in a broader scope).'
+count = 5
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_get_object_terms` (also tried as `wp_get_object_terms` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "null-iterator"
+message = "Iterating over `null` in `foreach`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "null-operand"
+message = "Implicit conversion of `null` to empty string for right operand in string concatenation."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `AWPT\Knowledge\KnowledgeRepository::post_to_source`: expected `unknown-ref(WP_Post)`, but possibly received `WP_Post`.'
+count = 2
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "redundant-comparison"
+message = "Redundant `===` comparison: left-hand side is never identical to right-hand side."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeRepository.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchRanker.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #3 of `preg_replace`: expected `array<array-key, string>|string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchRanker.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchRanker.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Knowledge\wp_strip_all_tags` (also tried as `wp_strip_all_tags` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchRanker.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchService.php"
+code = "mixed-operand"
+message = "Left operand in spaceship comparison (`<=>`) has `mixed` type."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchService.php"
+code = "mixed-operand"
+message = "Right operand in spaceship comparison (`<=>`) has `mixed` type."
+count = 1
+
+[[issues]]
+file = "src/Knowledge/KnowledgeSearchService.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\MCP\Adapter::normalize_tool`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 5
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "mixed-operand"
+message = "Casting `mixed` to `bool`."
+count = 3
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\MCP\Adapter::execute_tool`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 3
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 3
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\apply_filters` (also tried as `apply_filters` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\sanitize_textarea_field` (also tried as `sanitize_textarea_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/MCP/Adapter.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/MCP/StatusService.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\__` (also tried as `__` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/MCP/StatusService.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\apply_filters` (also tried as `apply_filters` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/MCP/StatusService.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\MCP\get_option` (also tried as `get_option` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/MCP/StatusService.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Plugin.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\add_action` (also tried as `add_action` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Plugin.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_REST_Request)`)."
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `AWPT\REST\ActionsController::update_action`: expected `unknown-ref(WP_Error)|unknown-ref(WP_REST_Response)`, but found `array<string, mixed>|unknown-ref(WP_Error)`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #4 of `AWPT\Database\ActionRepository::create`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Database\ActionRepository::create`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #3 of `AWPT\Database\ActionRepository::create`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 11
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 6
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class"
+message = "Class `WP_REST_Response` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 3
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 3
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Response`."
+count = 3
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-class-like"
+message = "Class, interface, enum, or trait `WP_REST_Server` not found."
+count = 3
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\__` (also tried as `__` in a broader scope).'
+count = 6
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\register_rest_route` (also tried as `register_rest_route` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\sanitize_key` (also tried as `sanitize_key` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\sanitize_textarea_field` (also tried as `sanitize_textarea_field` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ActionsController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/BlockSourceAnalyzer.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/REST/BlockSourceAnalyzer.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_REST_Request)`)."
+count = 2
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `AWPT\REST\ChatController::send_message`: expected `unknown-ref(WP_Error)|unknown-ref(WP_REST_Response)`, but found `array<string, mixed>|unknown-ref(WP_Error)`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\REST\ChatController::can_manage`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 2
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class"
+message = "Class `WP_REST_Response` not found."
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 2
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Response`."
+count = 2
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-class-like"
+message = "Class, interface, enum, or trait `WP_REST_Server` not found."
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\register_rest_route` (also tried as `register_rest_route` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ChatController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_REST_Request)`)."
+count = 3
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\REST\KnowledgeController::can_manage`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 6
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-class"
+message = "Class `WP_REST_Response` not found."
+count = 6
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 2
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Response`."
+count = 5
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-class-like"
+message = "Class, interface, enum, or trait `WP_REST_Server` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\get_option` (also tried as `get_option` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\register_rest_route` (also tried as `register_rest_route` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\update_option` (also tried as `update_option` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/REST/KnowledgeController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/RequestParams.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_REST_Request)`)."
+count = 3
+
+[[issues]]
+file = "src/REST/RequestParams.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `AWPT\REST\RequestParams::object`.'
+count = 1
+
+[[issues]]
+file = "src/REST/RequestParams.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/REST/RequestParams.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 3
+
+[[issues]]
+file = "src/REST/RequestParams.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/RestController.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\REST\RestController::can_manage`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/RestController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/RestController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `AWPT\Database\SessionRepository::create`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `AWPT\Database\SessionRepository::update_title`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 10
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class"
+message = "Class `WP_Error` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class"
+message = "Class `WP_REST_Response` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 4
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 4
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Response`."
+count = 5
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-class-like"
+message = "Class, interface, enum, or trait `WP_REST_Server` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\__` (also tried as `__` in a broader scope).'
+count = 6
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\register_rest_route` (also tried as `register_rest_route` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\sanitize_text_field` (also tried as `sanitize_text_field` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/REST/SessionsController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`unknown-ref(WP_REST_Request)`)."
+count = 2
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `AWPT\REST\ToolsController::execute_mcp_tool`: expected `unknown-ref(WP_Error)|unknown-ref(WP_REST_Response)`, but found `array<array-key, mixed>|unknown-ref(WP_Error)`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `method_exists`: expected `class-string|object`, but found `mixed`."
+count = 3
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `str_starts_with`: expected `string`, but found `mixed`."
+count = 2
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-assignment"
+message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\REST\ToolsController::can_manage`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 5
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-class"
+message = "Class `WP_REST_Response` not found."
+count = 5
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_Error`."
+count = 2
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Request`."
+count = 2
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-class-like"
+message = "Cannot find class, interface, enum, or type alias `WP_REST_Response`."
+count = 8
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-class-like"
+message = "Class, interface, enum, or trait `WP_REST_Server` not found."
+count = 4
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\is_wp_error` (also tried as `is_wp_error` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\REST\register_rest_route` (also tried as `register_rest_route` in a broader scope).'
+count = 4
+
+[[issues]]
+file = "src/REST/ToolsController.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `list<mixed>` is less specific than the declared return type `list<string>` for function `AWPT\Support\AbilitiesHealth::registered_awpt_abilities` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `str_starts_with`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Support\AbilitiesHealth::is_awpt_registry_healthy`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\wp_has_ability` (also tried as `wp_has_ability` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/AbilitiesHealth.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/ArrayKey.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Support/ArrayKey.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "invalid-iterator"
+message = "The expression provided to `foreach` is not iterable. It resolved to type `mixed`, which is not iterable."
+count = 1
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Support\BlockTree::__construct`: expected `array<int, array<string, mixed>>`, but provided type `array{}|list<array<array-key, mixed>>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "mixed-assignment"
+message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\parse_blocks` (also tried as `parse_blocks` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/BlockTree.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `AWPT\Support\ConnectorInspector::is_installed`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 2
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `AWPT\Support\ConnectorInspector::build_status`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `AWPT\Support\ConnectorInspector::connector_name_from_data`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 2
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 4
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Support\ConnectorCatalog::connectors_admin_url`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Support\ConnectorCatalog::get_provider_label`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\__` (also tried as `__` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\admin_url` (also tried as `admin_url` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\wp_get_connector` (also tried as `wp_get_connector` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\wp_get_connectors` (also tried as `wp_get_connectors` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\wp_is_connector_registered` (also tried as `wp_is_connector_registered` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorCatalog.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'active': false, 'authenticated': bool, 'ready': false, 'status': string('inactive'), 'status_label': mixed}` is less specific than the declared return type `array{'active': bool, 'authenticated': bool, 'ready': bool, 'status': string, 'status_label': string}` for function `AWPT\Support\ConnectorInspector::build_status` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'active': true, 'authenticated': false, 'ready': false, 'status': string('not_configured'), 'status_label': mixed}` is less specific than the declared return type `array{'active': bool, 'authenticated': bool, 'ready': bool, 'status': string, 'status_label': string}` for function `AWPT\Support\ConnectorInspector::build_status` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'active': true, 'authenticated': true, 'ready': true, 'status': string('ready'), 'status_label': mixed}` is less specific than the declared return type `array{'active': bool, 'authenticated': bool, 'ready': bool, 'status': string, 'status_label': string}` for function `AWPT\Support\ConnectorInspector::build_status` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `array_key_exists`: expected `array<array-key, mixed>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `AWPT\Support\ConnectorInspector::is_active`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-constant"
+message = 'Undefined constant: `AWPT\Support\ABSPATH`.'
+count = 4
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\get_plugins` (also tried as `get_plugins` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\is_multisite` (also tried as `is_multisite` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\is_plugin_active_for_network` (also tried as `is_plugin_active_for_network` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\is_plugin_active` (also tried as `is_plugin_active` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorInspector.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorSelection.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'connectors_url': string, 'id': string('openrouter'), 'label': string, 'ready': bool, 'status': string('not_configured')|string('ready'), 'status_label': mixed}` is less specific than the declared return type `array{'connectors_url': string, 'id': string, 'label': string, 'ready': bool, 'status': string, 'status_label': string}` for function `AWPT\Support\ConnectorSelection::openrouter_summary` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorSelection.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array{'connectors_url': string, 'id': string, 'label': string, 'ready': false, 'status': string('unavailable'), 'status_label': mixed}` is less specific than the declared return type `array{'connectors_url': string, 'id': string, 'label': string, 'ready': bool, 'status': string, 'status_label': string}` for function `AWPT\Support\ConnectorSelection::active_connection_summary` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/ConnectorSelection.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\__` (also tried as `__` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Support/ConnectorSelection.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\get_option` (also tried as `get_option` in a broader scope).'
+count = 3
+
+[[issues]]
+file = "src/Support/ConnectorSelection.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `list<mixed>` is less specific than the declared return type `list<string>` for function `AWPT\Support\Environment::warnings` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `non-empty-list<mixed>` is less specific than the declared return type `list<string>` for function `AWPT\Support\Environment::warnings` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `sprintf`: expected `string`, but found `mixed`."
+count = 3
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `printf`: expected `Stringable|null|scalar`, but found `mixed`."
+count = 2
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\__` (also tried as `__` in a broader scope).'
+count = 7
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\current_user_can` (also tried as `current_user_can` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\esc_html` (also tried as `esc_html` in a broader scope).'
+count = 2
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "non-existent-function"
+message = 'Could not find definition for function `AWPT\Support\get_bloginfo` (also tried as `get_bloginfo` in a broader scope).'
+count = 1
+
+[[issues]]
+file = "src/Support/Environment.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "src/Support/Json.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `AWPT\Support\Json::decode_array`.'
+count = 1
+
+[[issues]]
+file = "src/Support/Json.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Support/Json.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
