@@ -28,7 +28,7 @@ final class StatusService
     {
         $connected = (bool) apply_filters('awpt_mcp_connected', false);
         $server = (string) apply_filters('awpt_mcp_server_url', '');
-        $tool_count = count((new Adapter())->list_tools());
+        $tool_count = count(new Adapter()->list_tools());
 
         return [
             'connected' => $connected,

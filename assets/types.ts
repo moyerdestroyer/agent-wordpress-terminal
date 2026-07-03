@@ -150,9 +150,7 @@ export interface EnvironmentStatus {
 	wordpress: {
 		version: string;
 		minimum: string;
-		preferred: string;
 		supported: boolean;
-		preferred_supported: boolean;
 	};
 	abilities: {
 		available: boolean;

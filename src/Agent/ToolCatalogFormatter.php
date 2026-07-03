@@ -73,7 +73,7 @@ final class ToolCatalogFormatter
             $lines[] = sprintf('- %s: %s', $ability_name, $this->describe_ability($ability_name));
         }
 
-        $mcp_tools = (new Adapter())->list_tools();
+        $mcp_tools = new Adapter()->list_tools();
 
         if ([] !== $mcp_tools) {
             $lines[] = 'Connected MCP tools:';

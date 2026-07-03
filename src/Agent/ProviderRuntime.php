@@ -27,8 +27,8 @@ final class ProviderRuntime
      */
     public function respond(int $session_id): array
     {
-        $provider = (new ProviderFactory())->make();
-        $messages = (new ProviderMessageBuilder())->build($session_id);
+        $provider = new ProviderFactory()->make();
+        $messages = new ProviderMessageBuilder()->build($session_id);
         $tool_registry = new ToolRegistry();
         $result = $provider->complete($messages, $tool_registry->get_chat_completion_tools());
 
@@ -41,7 +41,7 @@ final class ProviderRuntime
             ];
         }
 
-        $result = (new IntentToolCallEnricher())->enrich($messages, $result, $tool_registry);
+        $result = new IntentToolCallEnricher()->enrich($messages, $result, $tool_registry);
 
         return $this->finalize_response($session_id, $provider, $messages, $result, $tool_registry);
     }
@@ -63,7 +63,7 @@ final class ProviderRuntime
         array $result,
         ToolRegistry $tool_registry,
     ): array {
-        $loop_result = (new ProviderToolLoop())->run($session_id, $provider, $messages, $result, $tool_registry);
+        $loop_result = new ProviderToolLoop()->run($session_id, $provider, $messages, $result, $tool_registry);
 
         return [
             'content' => $loop_result['content'],

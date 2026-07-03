@@ -143,7 +143,7 @@ final class ProviderToolCallExecutor
             ];
         }
 
-        $result = (new ToolExecutor())->execute($tool_name, $input);
+        $result = new ToolExecutor()->execute($tool_name, $input);
 
         return is_wp_error($result) ? ['failed', ['error' => $result->get_error_message()]] : ['success', $result];
     }

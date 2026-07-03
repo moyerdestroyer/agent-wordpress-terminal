@@ -183,7 +183,7 @@ final class ActionsController extends RestController
 
         $this->actions->update_status($action_id, 'approved');
 
-        $result = (new ApplyAction())->execute(['action_id' => $action_id]);
+        $result = new ApplyAction()->execute(['action_id' => $action_id]);
 
         if (is_wp_error($result)) {
             return $result;

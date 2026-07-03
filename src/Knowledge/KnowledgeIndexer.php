@@ -67,9 +67,9 @@ final class KnowledgeIndexer
 
         $now = current_time('mysql');
         $sources = array_merge(
-            (new KnowledgeRepository())->list_sources(),
-            (new KnowledgeRepository())->list_site_content_sources(),
-            (new FilesystemSourceReader())->list_sources(),
+            new KnowledgeRepository()->list_sources(),
+            new KnowledgeRepository()->list_site_content_sources(),
+            new FilesystemSourceReader()->list_sources(),
         );
 
         $this->index->clear_index();
@@ -137,10 +137,10 @@ final class KnowledgeIndexer
                 ),
             ],
             'filesystem' => [
-                'allowed_roots' => (new FilesystemSourceReader())->allowed_roots(),
+                'allowed_roots' => new FilesystemSourceReader()->allowed_roots(),
                 'max_file_size' => (int) get_option('awpt_knowledge_max_file_size', 2_097_152),
             ],
-            'repository' => (new KnowledgeRepository())->status(),
+            'repository' => new KnowledgeRepository()->status(),
         ];
     }
 

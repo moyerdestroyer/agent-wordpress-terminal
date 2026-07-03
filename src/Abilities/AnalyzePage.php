@@ -83,7 +83,7 @@ final class AnalyzePage
         }
 
         $blocks = parse_blocks((string) $post->post_content);
-        $block_tree = (new ReadBlockTree())->execute(['id' => $post_id]);
+        $block_tree = new ReadBlockTree()->execute(['id' => $post_id]);
         $plain_text = wp_strip_all_tags((string) $post->post_content);
         $headings = $this->extract_headings($blocks);
         $shortcodes = $this->extract_shortcodes((string) $post->post_content);

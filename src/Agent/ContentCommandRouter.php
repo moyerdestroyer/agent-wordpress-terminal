@@ -306,6 +306,6 @@ final class ContentCommandRouter
      */
     private function execute_tool(string $tool_name, array $input): array|\WP_Error
     {
-        return (new ToolExecutor())->execute($tool_name, $input);
+        return new ToolExecutor()->execute($tool_name, $input);
     }
 }

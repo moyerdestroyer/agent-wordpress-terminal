@@ -85,7 +85,7 @@ final class ToolsController
         $tools = [
             'core' => [],
             'plugin' => [],
-            'mcp' => (new Adapter())->list_tools(),
+            'mcp' => new Adapter()->list_tools(),
             'environment' => Environment::status(),
         ];
 
@@ -140,7 +140,7 @@ final class ToolsController
      */
     public function mcp_status(): \WP_REST_Response
     {
-        return new \WP_REST_Response((new StatusService())->get_status(), 200);
+        return new \WP_REST_Response(new StatusService()->get_status(), 200);
     }
 
     /**
@@ -150,7 +150,7 @@ final class ToolsController
      */
     public function mcp_tools(): \WP_REST_Response
     {
-        return new \WP_REST_Response((new Adapter())->list_tools(), 200);
+        return new \WP_REST_Response(new Adapter()->list_tools(), 200);
     }
 
     /**
@@ -162,7 +162,7 @@ final class ToolsController
     public function execute_mcp_tool(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
     {
         $input = $request->get_param('input');
-        $result = (new Adapter())->execute_tool(
+        $result = new Adapter()->execute_tool(
             rawurldecode((string) $request->get_param('name')),
             is_array($input) ? $input : [],
         );

@@ -93,10 +93,7 @@ function EnvironmentGroup({ environment }: { environment?: EnvironmentStatus }):
 						<div>
 							<dt>{__('WordPress', 'agent-wordpress-terminal')}</dt>
 							<dd>
-								{environment.wordpress.version}
-								{environment.wordpress.preferred_supported
-									? ''
-									: ` / ${__('Preferred', 'agent-wordpress-terminal')} ${environment.wordpress.preferred}+`}
+								{environment.wordpress.version} / {environment.wordpress.minimum}+
 							</dd>
 						</div>
 						<div>

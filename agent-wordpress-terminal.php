@@ -55,10 +55,6 @@ function constants(): void
         define('AWPT_MINIMUM_WP_VERSION', '6.9');
     }
 
-    if (!defined('AWPT_PREFERRED_WP_VERSION')) {
-        define('AWPT_PREFERRED_WP_VERSION', '7.1');
-    }
-
     if (!defined('AWPT_MINIMUM_PHP_VERSION')) {
         define('AWPT_MINIMUM_PHP_VERSION', '8.4');
     }

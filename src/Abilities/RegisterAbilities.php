@@ -52,15 +52,15 @@ final class RegisterAbilities
             return;
         }
 
-        (new ReadContent())->register();
-        (new ReadSettings())->register();
-        (new ReadUsers())->register();
-        (new ReadBlockTree())->register();
-        (new AnalyzePage())->register();
-        (new PreviewPost())->register();
-        (new SearchKnowledge())->register();
-        (new ReadKnowledge())->register();
-        (new ProposeContentUpdate())->register();
-        (new ApplyAction())->register();
+        new ReadContent()->register();
+        new ReadSettings()->register();
+        new ReadUsers()->register();
+        new ReadBlockTree()->register();
+        new AnalyzePage()->register();
+        new PreviewPost()->register();
+        new SearchKnowledge()->register();
+        new ReadKnowledge()->register();
+        new ProposeContentUpdate()->register();
+        new ApplyAction()->register();
     }
 }

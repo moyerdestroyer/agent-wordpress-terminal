@@ -29,7 +29,6 @@ final class Environment
         $wordpress_version = self::wordpress_version();
         $php_supported = version_compare(PHP_VERSION, AWPT_MINIMUM_PHP_VERSION, '>=');
         $wordpress_supported = version_compare($wordpress_version, AWPT_MINIMUM_WP_VERSION, '>=');
-        $wordpress_preferred = version_compare($wordpress_version, AWPT_PREFERRED_WP_VERSION, '>=');
         $abilities_available = self::abilities_available();
         $registration = AbilitiesHealth::registration_status();
 
@@ -42,9 +41,7 @@ final class Environment
             'wordpress' => [
                 'version' => $wordpress_version,
                 'minimum' => AWPT_MINIMUM_WP_VERSION,
-                'preferred' => AWPT_PREFERRED_WP_VERSION,
                 'supported' => $wordpress_supported,
-                'preferred_supported' => $wordpress_preferred,
             ],
             'abilities' => [
                 'available' => $abilities_available,
@@ -148,14 +145,6 @@ final class Environment
             $warnings[] = __(
                 'AWPT abilities failed to register. Ensure ability categories register on wp_abilities_api_categories_init and abilities on wp_abilities_api_init. Check debug.log for Abilities API notices.',
                 'agent-wordpress-terminal',
-            );
-        }
-
-        if (version_compare(self::wordpress_version(), AWPT_PREFERRED_WP_VERSION, '<')) {
-            $warnings[] = sprintf(
-                /* translators: 1: preferred WordPress version. */
-                __('WordPress %s or newer is preferred for Core read abilities.', 'agent-wordpress-terminal'),
-                AWPT_PREFERRED_WP_VERSION,
             );
         }
 

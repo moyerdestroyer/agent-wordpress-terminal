@@ -76,7 +76,7 @@ final class SearchKnowledge
      */
     public function execute(array $input): array
     {
-        $items = (new KnowledgeSearchService())->search((string) ($input['query'] ?? ''), (int) ($input['limit'] ?? 6));
+        $items = new KnowledgeSearchService()->search((string) ($input['query'] ?? ''), (int) ($input['limit'] ?? 6));
 
         return [
             'items' => $items,

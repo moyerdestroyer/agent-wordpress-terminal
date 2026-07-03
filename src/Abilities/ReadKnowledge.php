@@ -70,7 +70,7 @@ final class ReadKnowledge
      */
     public function execute(array $input): array|\WP_Error
     {
-        $source = (new KnowledgeRepository())->read_knowledge_post((int) ($input['id'] ?? 0));
+        $source = new KnowledgeRepository()->read_knowledge_post((int) ($input['id'] ?? 0));
 
         if (is_wp_error($source)) {
             return $source;

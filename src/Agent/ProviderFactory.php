@@ -26,7 +26,7 @@ final class ProviderFactory
      */
     public function make(): ProviderInterface
     {
-        $provider_id = (new ConnectorSelection())->normalize_provider_option((string) get_option('awpt_provider', ''));
+        $provider_id = new ConnectorSelection()->normalize_provider_option((string) get_option('awpt_provider', ''));
 
         if ('openrouter' === $provider_id) {
             return new OpenRouterProvider();

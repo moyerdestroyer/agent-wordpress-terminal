@@ -81,7 +81,7 @@ final class WordPressAIClientProvider implements ProviderInterface
         }
 
         $tool_registry = new ToolRegistry();
-        $result = (new WordPressAIClientPromptRunner())->generate(
+        $result = new WordPressAIClientPromptRunner()->generate(
             $messages,
             $this->connector_id,
             $tool_registry->get_auto_executable_ability_names(),
@@ -105,7 +105,7 @@ final class WordPressAIClientProvider implements ProviderInterface
      */
     public function get_name(): string
     {
-        return (new ConnectorCatalog())->get_provider_label($this->connector_id);
+        return new ConnectorCatalog()->get_provider_label($this->connector_id);
     }
 
     /**

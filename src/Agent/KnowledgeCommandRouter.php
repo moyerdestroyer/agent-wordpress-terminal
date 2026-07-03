@@ -46,7 +46,7 @@ final class KnowledgeCommandRouter
             return $this->usage();
         }
 
-        $result = (new ToolExecutor())->execute('awpt/search-knowledge', ['query' => $query, 'limit' => 8]);
+        $result = new ToolExecutor()->execute('awpt/search-knowledge', ['query' => $query, 'limit' => 8]);
 
         if (is_wp_error($result)) {
             return $this->error_response('knowledge', $result->get_error_message());
@@ -97,7 +97,7 @@ final class KnowledgeCommandRouter
             return $this->usage();
         }
 
-        $result = (new ToolExecutor())->execute('awpt/read-knowledge', ['id' => $post_id]);
+        $result = new ToolExecutor()->execute('awpt/read-knowledge', ['id' => $post_id]);
 
         if (is_wp_error($result)) {
             return $this->error_response('knowledge', $result->get_error_message());

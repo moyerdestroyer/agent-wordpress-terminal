@@ -59,11 +59,11 @@ final class ProviderToolLoop
             $follow_up = $provider->complete($messages, $tool_registry->get_chat_completion_tools());
 
             if (!is_array($follow_up)) {
-                $content = (new ToolResultFormatter())->format_for_transcript($tool_calls, $content);
+                $content = new ToolResultFormatter()->format_for_transcript($tool_calls, $content);
                 break;
             }
 
-            $result = (new IntentToolCallEnricher())->enrich($messages, $follow_up, $tool_registry);
+            $result = new IntentToolCallEnricher()->enrich($messages, $follow_up, $tool_registry);
             $follow_up_content = trim((string) ($result['content'] ?? ''));
 
             if ($this->has_tool_calls($result)) {
@@ -73,12 +73,12 @@ final class ProviderToolLoop
 
             $content = '' !== $follow_up_content
                 ? $follow_up_content
-                : (new ToolResultFormatter())->format_for_transcript($tool_calls, $content);
+                : new ToolResultFormatter()->format_for_transcript($tool_calls, $content);
             break;
         }
 
         if ($tool_round >= self::MAX_TOOL_ROUNDS && $this->has_tool_calls($result)) {
-            $content = (new ToolResultFormatter())->format_for_transcript($tool_calls, $content);
+            $content = new ToolResultFormatter()->format_for_transcript($tool_calls, $content);
         }
 
         return [

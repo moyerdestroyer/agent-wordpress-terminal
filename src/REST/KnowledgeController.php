@@ -76,24 +76,24 @@ final class KnowledgeController
 
     public function status(): \WP_REST_Response
     {
-        return new \WP_REST_Response((new KnowledgeIndexer())->status(), 200);
+        return new \WP_REST_Response(new KnowledgeIndexer()->status(), 200);
     }
 
     public function rebuild(): \WP_REST_Response
     {
         try {
-            $result = (new KnowledgeIndexer())->rebuild();
+            $result = new KnowledgeIndexer()->rebuild();
         } catch (\Throwable $throwable) {
             update_option('awpt_knowledge_last_error', $throwable->getMessage(), false);
 
             return new \WP_REST_Response([
                 'error' => $throwable->getMessage(),
-                'status' => (new KnowledgeIndexer())->status(),
+                'status' => new KnowledgeIndexer()->status(),
             ], 500);
         }
 
         return new \WP_REST_Response(array_merge($result, [
-            'status' => (new KnowledgeIndexer())->status(),
+            'status' => new KnowledgeIndexer()->status(),
         ]), 200);
     }
 
@@ -102,7 +102,7 @@ final class KnowledgeController
         $query = (string) $request->get_param('query');
 
         return new \WP_REST_Response([
-            'items' => (new KnowledgeSearchService())->search($query, 10),
+            'items' => new KnowledgeSearchService()->search($query, 10),
         ], 200);
     }
 

@@ -66,8 +66,8 @@ final class Plugin
     {
         Installer::maybe_upgrade();
         KnowledgeIndexer::register_content_hooks();
-        (new Page())->init();
-        (new RegisterAbilities())->init();
+        new Page()->init();
+        new RegisterAbilities()->init();
     }
 
     /**
@@ -75,10 +75,10 @@ final class Plugin
      */
     public function register_rest_routes(): void
     {
-        (new SessionsController())->register_routes();
-        (new ChatController())->register_routes();
-        (new KnowledgeController())->register_routes();
-        (new ActionsController())->register_routes();
-        (new ToolsController())->register_routes();
+        new SessionsController()->register_routes();
+        new ChatController()->register_routes();
+        new KnowledgeController()->register_routes();
+        new ActionsController()->register_routes();
+        new ToolsController()->register_routes();
     }
 }

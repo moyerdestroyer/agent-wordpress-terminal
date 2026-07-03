@@ -56,7 +56,7 @@ final class McpCommandRouter
     private function status(): array
     {
         return [
-            'content' => wp_json_encode((new StatusService())->get_status(), JSON_PRETTY_PRINT),
+            'content' => wp_json_encode(new StatusService()->get_status(), JSON_PRETTY_PRINT),
             'tool_calls' => [],
             'actions' => [],
             'command' => 'mcp',
@@ -70,7 +70,7 @@ final class McpCommandRouter
      */
     private function tools(): array
     {
-        $tools = (new Adapter())->list_tools();
+        $tools = new Adapter()->list_tools();
 
         return [
             'content' => [] === $tools
@@ -123,7 +123,7 @@ final class McpCommandRouter
      */
     private function execute(string $tool_name, array $input): array
     {
-        $result = (new Adapter())->execute_tool($tool_name, $input);
+        $result = new Adapter()->execute_tool($tool_name, $input);
 
         if (is_wp_error($result)) {
             $message = $result->get_error_message();

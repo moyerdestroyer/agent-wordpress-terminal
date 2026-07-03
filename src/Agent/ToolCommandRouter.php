@@ -67,7 +67,7 @@ final class ToolCommandRouter
             }
         }
 
-        foreach ((new Adapter())->list_tools() as $tool) {
+        foreach (new Adapter()->list_tools() as $tool) {
             $groups[$mcp_label][] = (string) $tool['name'];
         }
 

@@ -41,8 +41,8 @@ final class ProviderMessageBuilder
             'When asked to update WordPress content, identify the target post or page, read the current content, then stage the full replacement content with awpt/propose-content-update.',
             'Answer concisely and include evidence from tool calls when relevant.',
             'When you need site data, call the relevant awpt/ ability immediately. Do not say you will check something without invoking the tool in the same turn.',
-            (new ToolCatalogFormatter())->get_system_prompt_catalog(),
-            (new KnowledgeRepository())->format_guidelines_for_prompt(),
+            new ToolCatalogFormatter()->get_system_prompt_catalog(),
+            new KnowledgeRepository()->format_guidelines_for_prompt(),
             $this->get_knowledge_summary($session_id),
         ]);
 
@@ -98,6 +98,6 @@ final class ProviderMessageBuilder
             $session_id,
         ));
 
-        return (new KnowledgeSearchService())->format_context_for_prompt((string) $message);
+        return new KnowledgeSearchService()->format_context_for_prompt((string) $message);
     }
 }

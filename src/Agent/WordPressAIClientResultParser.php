@@ -51,7 +51,7 @@ final class WordPressAIClientResultParser
         $content = [] === $raw_tool_calls ? $this->extract_content($result) : '';
 
         if ([] === $raw_tool_calls && '' !== trim($content)) {
-            $embedded = (new EmbeddedToolCallExtractor())->extract($content);
+            $embedded = new EmbeddedToolCallExtractor()->extract($content);
             $raw_tool_calls = $embedded['raw_tool_calls'];
             $content = $embedded['content'];
         }
