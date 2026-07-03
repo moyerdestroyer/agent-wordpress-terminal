@@ -26,6 +26,74 @@ function sourceId(item: KnowledgeSearchItem): string {
 	return item.source_id.replace(/^file:/, 'file:').slice(0, 18);
 }
 
+function sourceCount(status: KnowledgeStatus | null, kind: string): number {
+	return status?.source_kinds?.[kind] ?? 0;
+}
+
+function indexedLabel(count: number): string {
+	if (count > 0) {
+		return sprintf(
+			/* translators: %d: indexed source count */
+			__('%d indexed', 'agent-wordpress-terminal'),
+			count,
+		);
+	}
+
+	return __('Detected, not indexed', 'agent-wordpress-terminal');
+}
+
+function knowledgeSourceRows(status: KnowledgeStatus | null): Array<{
+	key: string;
+	label: string;
+	state: string;
+	available: boolean;
+}> {
+	const coreCount = sourceCount(status, 'core_knowledge');
+	const legacyCount = sourceCount(status, 'legacy_guideline');
+	const contentCount = sourceCount(status, 'wp_content');
+	const filesystemCount = sourceCount(status, 'filesystem');
+	const configuredRoots = status?.filesystem.allowed_roots.length ?? 0;
+
+	return [
+		{
+			key: 'core',
+			label: __('Core Knowledge', 'agent-wordpress-terminal'),
+			state: status?.repository.core_available
+				? indexedLabel(coreCount)
+				: __('Not detected', 'agent-wordpress-terminal'),
+			available: Boolean(status?.repository.core_available),
+		},
+		{
+			key: 'legacy',
+			label: __('Guidelines', 'agent-wordpress-terminal'),
+			state: status?.repository.legacy_guidelines_available
+				? indexedLabel(legacyCount)
+				: __('Not detected', 'agent-wordpress-terminal'),
+			available: Boolean(status?.repository.legacy_guidelines_available),
+		},
+		{
+			key: 'content',
+			label: __('Site content', 'agent-wordpress-terminal'),
+			state:
+				contentCount > 0
+					? indexedLabel(contentCount)
+					: __('No indexed entries', 'agent-wordpress-terminal'),
+			available: contentCount > 0,
+		},
+		{
+			key: 'filesystem',
+			label: __('Docs', 'agent-wordpress-terminal'),
+			state:
+				filesystemCount > 0
+					? indexedLabel(filesystemCount)
+					: configuredRoots > 0
+						? __('No indexed files', 'agent-wordpress-terminal')
+						: __('Not configured', 'agent-wordpress-terminal'),
+			available: filesystemCount > 0,
+		},
+	];
+}
+
 export function KnowledgePanel(): JSX.Element {
 	const [status, setStatus] = useState<KnowledgeStatus | null>(null);
 	const [settings, setSettings] = useState<KnowledgeSettings | null>(null);
@@ -122,12 +190,14 @@ export function KnowledgePanel(): JSX.Element {
 	return (
 		<div className="awpt-knowledge">
 			<h3 className="awpt-section-title">{__('Knowledge', 'agent-wordpress-terminal')}</h3>
-			<p className="awpt-empty">
-				{__(
-					'The agent uses Core Knowledge, guidelines, indexed site content, and allowed uploaded docs as read-only retrieval sources.',
-					'agent-wordpress-terminal',
-				)}
-			</p>
+			<ul className="awpt-knowledge-sources">
+				{knowledgeSourceRows(status).map((source) => (
+					<li key={source.key} className={source.available ? 'is-available' : 'is-unavailable'}>
+						<span>{source.label}</span>
+						<strong>{source.state}</strong>
+					</li>
+				))}
+			</ul>
 
 			<dl className="awpt-knowledge-status">
 				<div>

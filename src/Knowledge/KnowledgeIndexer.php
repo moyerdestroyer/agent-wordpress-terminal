@@ -118,9 +118,11 @@ final class KnowledgeIndexer
 
         $source_count = $this->index->count_sources();
         $chunk_count = $this->index->count_chunks();
+        $source_kinds = $this->index->count_sources_by_kind();
 
         return [
             'source_count' => $source_count,
+            'source_kinds' => $source_kinds,
             'chunk_count' => $chunk_count,
             'stale' => '1' === (string) get_option('awpt_knowledge_stale', '0'),
             'needs_rebuild' =>

@@ -100,6 +100,39 @@ final class KnowledgeIndexRepository
     }
 
     /**
+     * @return array<string, int>
+     */
+    public function count_sources_by_kind(): array
+    {
+        $wpdb = WpDb::get();
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT source_kind, COUNT(*) AS source_count FROM %i GROUP BY source_kind',
+                $wpdb->prefix . 'awpt_knowledge_index',
+            ),
+            output: \ARRAY_A,
+        );
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $counts = [];
+
+        foreach ($rows as $row) {
+            $kind = (string) ($row['source_kind'] ?? '');
+
+            if ('' === $kind) {
+                continue;
+            }
+
+            $counts[$kind] = (int) ($row['source_count'] ?? 0);
+        }
+
+        return $counts;
+    }
+
+    /**
      * @param list<string> $tokens
      * @return list<array<string, mixed>>
      */

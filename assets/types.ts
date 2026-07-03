@@ -100,6 +100,7 @@ export interface ToolsResponse {
 
 export interface KnowledgeStatus {
 	source_count: number;
+	source_kinds: Record<string, number>;
 	chunk_count: number;
 	stale: boolean;
 	needs_rebuild: boolean;

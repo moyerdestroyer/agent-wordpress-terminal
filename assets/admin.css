@@ -843,6 +843,64 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	gap: 10px;
 }
 
+.awpt-knowledge-sources {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.awpt-knowledge-sources li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-width: 0;
+	padding: 6px 8px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.025);
+	font-size: 11px;
+}
+
+.awpt-knowledge-sources li::before {
+	content: "";
+	flex: 0 0 auto;
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--awpt-muted);
+}
+
+.awpt-knowledge-sources li.is-available::before {
+	background: var(--awpt-success);
+}
+
+.awpt-knowledge-sources li.is-unavailable {
+	color: var(--awpt-muted);
+}
+
+.awpt-knowledge-sources span {
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.awpt-knowledge-sources strong {
+	flex: 0 0 auto;
+	color: var(--awpt-text);
+	font-size: 10px;
+	font-weight: 600;
+	text-align: right;
+}
+
+.awpt-knowledge-sources li.is-unavailable strong {
+	color: var(--awpt-muted);
+}
+
 .awpt-knowledge-status {
 	display: grid;
 	gap: 6px;
