@@ -3,7 +3,33 @@
 }
 
 body.settings_page_awpt-terminal {
+	scrollbar-color: rgba(139, 149, 168, 0.58) #070a12;
+	scrollbar-width: thin;
 	background: var(--awpt-page-bg);
+}
+
+body.settings_page_awpt-terminal::-webkit-scrollbar,
+html:has(body.settings_page_awpt-terminal)::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+body.settings_page_awpt-terminal::-webkit-scrollbar-track,
+html:has(body.settings_page_awpt-terminal)::-webkit-scrollbar-track {
+	background: #070a12;
+}
+
+body.settings_page_awpt-terminal::-webkit-scrollbar-thumb,
+html:has(body.settings_page_awpt-terminal)::-webkit-scrollbar-thumb {
+	min-height: 36px;
+	border: 2px solid #070a12;
+	border-radius: 999px;
+	background: rgba(139, 149, 168, 0.58);
+}
+
+body.settings_page_awpt-terminal::-webkit-scrollbar-thumb:hover,
+html:has(body.settings_page_awpt-terminal)::-webkit-scrollbar-thumb:hover {
+	background: rgba(174, 184, 201, 0.78);
 }
 
 body.settings_page_awpt-terminal #wpcontent {
@@ -210,6 +236,9 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	--awpt-warning: #e8b84a;
 	--awpt-danger: #e86a6a;
 	--awpt-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	--awpt-scrollbar-track: rgba(7, 10, 18, 0.72);
+	--awpt-scrollbar-thumb: rgba(139, 149, 168, 0.46);
+	--awpt-scrollbar-thumb-hover: rgba(174, 184, 201, 0.72);
 
 	margin: 0;
 	position: relative;
@@ -222,6 +251,71 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	color: var(--awpt-text);
 	font-family: var(--awpt-mono);
 	background: rgba(7, 10, 18, 0.18);
+}
+
+.awpt-sidebar,
+.awpt-messages,
+.awpt-action-card__diff,
+.awpt-preview-panel,
+.awpt-preview-detail pre,
+.awpt-compare-grid pre,
+.awpt-terminal textarea {
+	scrollbar-color: var(--awpt-scrollbar-thumb) var(--awpt-scrollbar-track);
+	scrollbar-width: thin;
+}
+
+.awpt-sidebar::-webkit-scrollbar,
+.awpt-messages::-webkit-scrollbar,
+.awpt-action-card__diff::-webkit-scrollbar,
+.awpt-preview-panel::-webkit-scrollbar,
+.awpt-preview-detail pre::-webkit-scrollbar,
+.awpt-compare-grid pre::-webkit-scrollbar,
+.awpt-terminal textarea::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.awpt-sidebar::-webkit-scrollbar-track,
+.awpt-messages::-webkit-scrollbar-track,
+.awpt-action-card__diff::-webkit-scrollbar-track,
+.awpt-preview-panel::-webkit-scrollbar-track,
+.awpt-preview-detail pre::-webkit-scrollbar-track,
+.awpt-compare-grid pre::-webkit-scrollbar-track,
+.awpt-terminal textarea::-webkit-scrollbar-track {
+	background: var(--awpt-scrollbar-track);
+}
+
+.awpt-sidebar::-webkit-scrollbar-thumb,
+.awpt-messages::-webkit-scrollbar-thumb,
+.awpt-action-card__diff::-webkit-scrollbar-thumb,
+.awpt-preview-panel::-webkit-scrollbar-thumb,
+.awpt-preview-detail pre::-webkit-scrollbar-thumb,
+.awpt-compare-grid pre::-webkit-scrollbar-thumb,
+.awpt-terminal textarea::-webkit-scrollbar-thumb {
+	min-height: 36px;
+	border: 2px solid var(--awpt-scrollbar-track);
+	border-radius: 999px;
+	background: var(--awpt-scrollbar-thumb);
+}
+
+.awpt-sidebar::-webkit-scrollbar-thumb:hover,
+.awpt-messages::-webkit-scrollbar-thumb:hover,
+.awpt-action-card__diff::-webkit-scrollbar-thumb:hover,
+.awpt-preview-panel::-webkit-scrollbar-thumb:hover,
+.awpt-preview-detail pre::-webkit-scrollbar-thumb:hover,
+.awpt-compare-grid pre::-webkit-scrollbar-thumb:hover,
+.awpt-terminal textarea::-webkit-scrollbar-thumb:hover {
+	background: var(--awpt-scrollbar-thumb-hover);
+}
+
+.awpt-sidebar::-webkit-scrollbar-corner,
+.awpt-messages::-webkit-scrollbar-corner,
+.awpt-action-card__diff::-webkit-scrollbar-corner,
+.awpt-preview-panel::-webkit-scrollbar-corner,
+.awpt-preview-detail pre::-webkit-scrollbar-corner,
+.awpt-compare-grid pre::-webkit-scrollbar-corner,
+.awpt-terminal textarea::-webkit-scrollbar-corner {
+	background: var(--awpt-scrollbar-track);
 }
 
 .awpt-settings-panel {
