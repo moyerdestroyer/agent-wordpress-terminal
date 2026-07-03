@@ -44,6 +44,12 @@ export interface ActionPayload {
 	post_content?: string;
 	preview_url?: string;
 	affected?: string;
+	settings_changes?: Record<string, string | number | boolean>;
+	original_settings?: Record<string, string | number | boolean>;
+	stylesheet?: string;
+	theme_name?: string;
+	current_stylesheet?: string;
+	current_theme?: string;
 }
 
 export interface PreviewDetails {

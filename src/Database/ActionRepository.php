@@ -135,43 +135,6 @@ final class ActionRepository
      */
     public function sanitize_payload(array $payload): array
     {
-        $clean = [
-            'operation' => sanitize_key((string) ($payload['operation'] ?? 'content_update')),
-            'post_id' => absint($payload['post_id'] ?? 0),
-        ];
-
-        if (array_key_exists('post_title', $payload)) {
-            $clean['post_title'] = sanitize_text_field((string) $payload['post_title']);
-        }
-
-        if (array_key_exists('post_type', $payload)) {
-            $clean['post_type'] = sanitize_text_field((string) $payload['post_type']);
-        }
-
-        if (array_key_exists('post_status', $payload)) {
-            $clean['post_status'] = sanitize_text_field((string) $payload['post_status']);
-        }
-
-        if (array_key_exists('original_post_title', $payload)) {
-            $clean['original_post_title'] = sanitize_text_field((string) $payload['original_post_title']);
-        }
-
-        if (array_key_exists('post_content', $payload)) {
-            $clean['post_content'] = wp_kses_post((string) $payload['post_content']);
-        }
-
-        if (array_key_exists('original_post_content', $payload)) {
-            $clean['original_post_content'] = wp_kses_post((string) $payload['original_post_content']);
-        }
-
-        if (array_key_exists('preview_url', $payload)) {
-            $clean['preview_url'] = esc_url_raw((string) $payload['preview_url']);
-        }
-
-        if (array_key_exists('affected', $payload)) {
-            $clean['affected'] = sanitize_textarea_field((string) $payload['affected']);
-        }
-
-        return $clean;
+        return new ActionPayloadSanitizer()->sanitize($payload);
     }
 }

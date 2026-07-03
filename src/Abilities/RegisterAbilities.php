@@ -54,6 +54,7 @@ final class RegisterAbilities
 
         new ReadContent()->register();
         new ReadSettings()->register();
+        new ReadThemes()->register();
         new ReadUsers()->register();
         new ReadBlockTree()->register();
         new AnalyzePage()->register();
@@ -61,6 +62,8 @@ final class RegisterAbilities
         new SearchKnowledge()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
+        new ProposeSiteSettingsUpdate()->register();
+        new ProposeThemeSwitch()->register();
         new ApplyAction()->register();
     }
 }

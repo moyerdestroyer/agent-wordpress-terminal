@@ -29,6 +29,7 @@ final class ToolCatalogFormatter
     private const ABILITY_DESCRIPTIONS = [
         'awpt/read-content' => 'Returns readable post or page content and metadata.',
         'awpt/read-settings' => 'Returns non-secret WordPress site settings and environment details.',
+        'awpt/read-themes' => 'Returns installed WordPress themes and the active stylesheet.',
         'awpt/read-users' => 'Returns WordPress user summaries without exposing emails or password data.',
         'awpt/read-block-tree' => 'Returns parsed Gutenberg block structure for a post.',
         'awpt/analyze-page' => 'Returns an agent-friendly page brief with structure and risk signals.',
@@ -36,6 +37,8 @@ final class ToolCatalogFormatter
         'awpt/search-knowledge' => 'Searches Core Knowledge, legacy guidelines, site content, and allowed read-only document sources.',
         'awpt/read-knowledge' => 'Reads a specific Core Knowledge or legacy guideline record by WordPress post ID.',
         'awpt/propose-content-update' => 'Stages a proposed post content update for explicit admin approval.',
+        'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
+        'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
         'awpt/apply-action' => 'Applies an explicitly approved AWPT staged action.',
     ];
 
@@ -46,6 +49,8 @@ final class ToolCatalogFormatter
      */
     private const APPROVAL_REQUIRED_ABILITIES = [
         'awpt/propose-content-update',
+        'awpt/propose-site-settings-update',
+        'awpt/propose-theme-switch',
         'awpt/apply-action',
     ];
 

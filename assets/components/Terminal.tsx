@@ -289,15 +289,19 @@ export function Terminal(): JSX.Element {
 	};
 
 	const handleActionPreview = (action: ProposedAction): void => {
-		if (!action.payload?.preview_url) {
+		if (!action.payload) {
 			return;
 		}
 
-		setPreview({
-			id: action.payload.post_id,
-			preview_url: action.payload.preview_url,
-			title: action.title,
-		});
+		setPreview(
+			action.payload.preview_url
+				? {
+						id: action.payload.post_id,
+						preview_url: action.payload.preview_url,
+						title: action.title,
+					}
+				: null,
+		);
 		setPreviewAction(action);
 		setIsPreviewOpen(true);
 	};

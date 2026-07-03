@@ -100,10 +100,7 @@ final class ProviderToolLoop
         $actions = [];
 
         foreach ($tool_calls as $tool_call) {
-            if (
-                'awpt/propose-content-update' !== (string) ($tool_call['tool'] ?? '')
-                || 'success' !== (string) ($tool_call['status'] ?? '')
-            ) {
+            if ('success' !== (string) ($tool_call['status'] ?? '') || !$this->is_proposal_tool($tool_call)) {
                 continue;
             }
 
@@ -117,6 +114,22 @@ final class ProviderToolLoop
         }
 
         return $actions;
+    }
+
+    /**
+     * @param array<string, mixed> $tool_call
+     */
+    private function is_proposal_tool(array $tool_call): bool
+    {
+        return in_array(
+            (string) ($tool_call['tool'] ?? ''),
+            [
+                'awpt/propose-content-update',
+                'awpt/propose-site-settings-update',
+                'awpt/propose-theme-switch',
+            ],
+            true,
+        );
     }
 
     /**

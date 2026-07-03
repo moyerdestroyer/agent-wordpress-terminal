@@ -226,6 +226,36 @@ function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: 
 		return [];
 	}
 
+	if (payload.operation === 'site_settings_update') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: __('Site settings', 'agent-wordpress-terminal'),
+			},
+			{
+				label: __('Settings', 'agent-wordpress-terminal'),
+				value: Object.keys(payload.settings_changes ?? {}).join(', '),
+			},
+		].filter((item) => item.value !== '');
+	}
+
+	if (payload.operation === 'theme_switch') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: __('Active theme', 'agent-wordpress-terminal'),
+			},
+			{
+				label: __('Current', 'agent-wordpress-terminal'),
+				value: payload.current_theme ?? payload.current_stylesheet ?? '',
+			},
+			{
+				label: __('New', 'agent-wordpress-terminal'),
+				value: payload.theme_name ?? payload.stylesheet ?? '',
+			},
+		].filter((item) => item.value !== '');
+	}
+
 	const postTitle = payload.original_post_title || payload.post_title || '';
 	const postType = payload.post_type
 		? titleCase(payload.post_type)
@@ -254,6 +284,31 @@ function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: 
 	].filter((item) => item.value !== '');
 }
 
+function actionDiff(payload?: ActionPayload): { before: string; after: string } {
+	if (!payload) {
+		return { before: '', after: '' };
+	}
+
+	if (payload.operation === 'site_settings_update') {
+		return {
+			before: formatValue(payload.original_settings),
+			after: formatValue(payload.settings_changes),
+		};
+	}
+
+	if (payload.operation === 'theme_switch') {
+		return {
+			before: [payload.current_theme, payload.current_stylesheet].filter(Boolean).join(' / '),
+			after: [payload.theme_name, payload.stylesheet].filter(Boolean).join(' / '),
+		};
+	}
+
+	return {
+		before: formatValue(payload.original_post_content),
+		after: formatValue(payload.post_content),
+	};
+}
+
 function ActionCard({
 	action,
 	onOperation,
@@ -267,6 +322,7 @@ function ActionCard({
 	const canApply = action.status === 'proposed' || action.status === 'approved';
 	const canReject = action.status === 'proposed' || action.status === 'approved';
 	const metadata = actionMetadata(action.payload);
+	const diff = actionDiff(action.payload);
 
 	return (
 		<div className="awpt-action-card">
@@ -292,11 +348,7 @@ function ActionCard({
 				</dl>
 			) : null}
 			<div className="awpt-action-card__buttons">
-				<Button
-					variant="secondary"
-					onClick={() => onPreview(action)}
-					disabled={!action.payload?.preview_url}
-				>
+				<Button variant="secondary" onClick={() => onPreview(action)} disabled={!action.payload}>
 					{__('Preview', 'agent-wordpress-terminal')}
 				</Button>
 				<Button variant="secondary" onClick={() => setShowDiff((current) => !current)}>
@@ -319,10 +371,10 @@ function ActionCard({
 				<pre className="awpt-action-card__diff">
 					{[
 						`${__('Before', 'agent-wordpress-terminal')}:`,
-						formatValue(action.payload?.original_post_content),
+						diff.before,
 						'',
 						`${__('After', 'agent-wordpress-terminal')}:`,
-						formatValue(action.payload?.post_content),
+						diff.after,
 					].join('\n')}
 				</pre>
 			) : null}
@@ -343,7 +395,7 @@ function ActionRecord({
 				{action.status}
 			</span>
 			<span className="awpt-action-record__title">{action.title}</span>
-			{action.payload?.preview_url ? (
+			{action.payload ? (
 				<Button variant="link" onClick={() => onPreview(action)}>
 					{__('Preview', 'agent-wordpress-terminal')}
 				</Button>

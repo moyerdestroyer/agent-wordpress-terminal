@@ -27,6 +27,7 @@ final class ToolRegistry
     private const AUTO_TOOL_MAP = [
         'awpt__read_content' => 'awpt/read-content',
         'awpt__read_settings' => 'awpt/read-settings',
+        'awpt__read_themes' => 'awpt/read-themes',
         'awpt__read_users' => 'awpt/read-users',
         'awpt__read_block_tree' => 'awpt/read-block-tree',
         'awpt__analyze_page' => 'awpt/analyze-page',
@@ -34,6 +35,8 @@ final class ToolRegistry
         'awpt__search_knowledge' => 'awpt/search-knowledge',
         'awpt__read_knowledge' => 'awpt/read-knowledge',
         'awpt__propose_content_update' => 'awpt/propose-content-update',
+        'awpt__propose_site_settings_update' => 'awpt/propose-site-settings-update',
+        'awpt__propose_theme_switch' => 'awpt/propose-theme-switch',
     ];
 
     /**

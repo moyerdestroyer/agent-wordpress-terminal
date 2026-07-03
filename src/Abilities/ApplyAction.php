@@ -10,6 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
+use AWPT\Abilities\ActionAppliers\SiteSettingsActionApplier;
+use AWPT\Abilities\ActionAppliers\ThemeSwitchActionApplier;
 use AWPT\Database\ActionRepository;
 
 if (!defined('ABSPATH')) {
@@ -22,10 +25,20 @@ if (!defined('ABSPATH')) {
 final class ApplyAction
 {
     private ActionRepository $actions;
+    private ContentUpdateActionApplier $content_updates;
+    private SiteSettingsActionApplier $site_settings;
+    private ThemeSwitchActionApplier $theme_switches;
 
-    public function __construct(?ActionRepository $actions = null)
-    {
+    public function __construct(
+        ?ActionRepository $actions = null,
+        ?ContentUpdateActionApplier $content_updates = null,
+        ?SiteSettingsActionApplier $site_settings = null,
+        ?ThemeSwitchActionApplier $theme_switches = null,
+    ) {
         $this->actions = $actions ?? new ActionRepository();
+        $this->content_updates = $content_updates ?? new ContentUpdateActionApplier();
+        $this->site_settings = $site_settings ?? new SiteSettingsActionApplier();
+        $this->theme_switches = $theme_switches ?? new ThemeSwitchActionApplier();
     }
 
     /**
@@ -70,13 +83,15 @@ final class ApplyAction
         }
 
         $payload = $this->actions->decode_payload($action);
-        $post_id = (int) ($payload['post_id'] ?? 0);
 
-        return (
-            $post_id > 0
-            && current_user_can('edit_post', $post_id)
-            && current_user_can(capability: 'manage_options')
-        );
+        return match ((string) ($payload['operation'] ?? '')) {
+            'content_update' => (int) ($payload['post_id'] ?? 0) > 0
+                && current_user_can('edit_post', (int) ($payload['post_id'] ?? 0))
+                && current_user_can(capability: 'manage_options'),
+            'site_settings_update' => current_user_can('manage_options'),
+            'theme_switch' => current_user_can('switch_themes') && current_user_can('manage_options'),
+            default => false,
+        };
     }
 
     /**
@@ -104,51 +119,25 @@ final class ApplyAction
 
         $payload = $this->actions->decode_payload($action);
 
-        if ('content_update' !== ($payload['operation'] ?? '')) {
-            return new \WP_Error(code: 'awpt_unsupported_action', message: __(
+        $result = match ((string) ($payload['operation'] ?? '')) {
+            'content_update' => $this->content_updates->apply($payload),
+            'site_settings_update' => $this->site_settings->apply($payload),
+            'theme_switch' => $this->theme_switches->apply($payload),
+            default => new \WP_Error(code: 'awpt_unsupported_action', message: __(
                 'Unsupported action operation.',
                 'agent-wordpress-terminal',
-            ));
-        }
+            )),
+        };
 
-        $post_id = (int) ($payload['post_id'] ?? 0);
-
-        if ($post_id <= 0 || !current_user_can(capability: 'edit_post', args: $post_id)) {
-            return new \WP_Error(code: 'awpt_cannot_edit_post', message: __(
-                'You do not have permission to edit this post.',
-                'agent-wordpress-terminal',
-            ));
-        }
-
-        $update = ['ID' => $post_id];
-
-        if (array_key_exists('post_title', $payload)) {
-            $update['post_title'] = sanitize_text_field((string) $payload['post_title']);
-        }
-
-        if (array_key_exists('post_content', $payload)) {
-            $update['post_content'] = wp_kses_post((string) $payload['post_content']);
-        }
-
-        if (1 === count($update)) {
-            return new \WP_Error(code: 'awpt_empty_action', message: __(
-                'Action has no post changes to apply.',
-                'agent-wordpress-terminal',
-            ));
-        }
-
-        $updated = wp_update_post($update, wp_error: true);
-
-        if (is_wp_error($updated)) {
-            return $updated;
+        if (is_wp_error($result)) {
+            return $result;
         }
 
         $this->actions->mark_applied($action_id);
 
-        return [
+        return array_merge([
             'action_id' => $action_id,
-            'post_id' => $post_id,
             'status' => 'applied',
-        ];
+        ], $result);
     }
 }

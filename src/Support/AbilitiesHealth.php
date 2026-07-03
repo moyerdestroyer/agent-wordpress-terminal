@@ -25,6 +25,7 @@ final class AbilitiesHealth
     private const EXPECTED_ABILITIES = [
         'awpt/read-content',
         'awpt/read-settings',
+        'awpt/read-themes',
         'awpt/read-users',
         'awpt/read-block-tree',
         'awpt/analyze-page',
@@ -32,6 +33,8 @@ final class AbilitiesHealth
         'awpt/search-knowledge',
         'awpt/read-knowledge',
         'awpt/propose-content-update',
+        'awpt/propose-site-settings-update',
+        'awpt/propose-theme-switch',
         'awpt/apply-action',
     ];
 

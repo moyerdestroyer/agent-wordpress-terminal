@@ -87,7 +87,15 @@ final class ProviderToolCallExecutor
         $tool_name = $tool_registry->tool_name_for_function($function_name);
         $input = $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}'));
 
-        if ('awpt/propose-content-update' === $tool_name) {
+        if (in_array(
+            $tool_name,
+            [
+                'awpt/propose-content-update',
+                'awpt/propose-site-settings-update',
+                'awpt/propose-theme-switch',
+            ],
+            true,
+        )) {
             $input['session_id'] = $session_id;
         }
 

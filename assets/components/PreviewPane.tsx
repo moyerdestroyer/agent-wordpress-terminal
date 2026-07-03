@@ -1,5 +1,5 @@
 import { Button } from '@wordpress/components';
-import { useMemo, useState } from '@wordpress/element';
+import { useEffect, useMemo, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import type {
 	ActionPayload,
@@ -47,6 +47,36 @@ function titleCase(value: string): string {
 function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: string }> {
 	if (!payload) {
 		return [];
+	}
+
+	if (payload.operation === 'site_settings_update') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: __('Site settings', 'agent-wordpress-terminal'),
+			},
+			{
+				label: __('Settings', 'agent-wordpress-terminal'),
+				value: Object.keys(payload.settings_changes ?? {}).join(', '),
+			},
+		].filter((item) => item.value !== '');
+	}
+
+	if (payload.operation === 'theme_switch') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: __('Active theme', 'agent-wordpress-terminal'),
+			},
+			{
+				label: __('Current', 'agent-wordpress-terminal'),
+				value: payload.current_theme ?? payload.current_stylesheet ?? '',
+			},
+			{
+				label: __('New', 'agent-wordpress-terminal'),
+				value: payload.theme_name ?? payload.stylesheet ?? '',
+			},
+		].filter((item) => item.value !== '');
 	}
 
 	const postTitle = payload.original_post_title || payload.post_title || '';
@@ -130,10 +160,21 @@ function InspectorView({
 }
 
 function CompareView({ action }: { action: ProposedAction | null }): JSX.Element {
-	const originalTitle = action?.payload?.original_post_title ?? '';
-	const newTitle = action?.payload?.post_title ?? originalTitle;
-	const originalContent = stripBlocks(action?.payload?.original_post_content ?? '');
-	const newContent = stripBlocks(action?.payload?.post_content ?? '');
+	const originalTitle =
+		action?.payload?.original_post_title ?? action?.payload?.current_theme ?? '';
+	const newTitle = action?.payload?.post_title ?? action?.payload?.theme_name ?? originalTitle;
+	const originalContent = stripBlocks(
+		action?.payload?.original_post_content ??
+			(action?.payload?.original_settings
+				? JSON.stringify(action.payload.original_settings, null, 2)
+				: (action?.payload?.current_stylesheet ?? '')),
+	);
+	const newContent = stripBlocks(
+		action?.payload?.post_content ??
+			(action?.payload?.settings_changes
+				? JSON.stringify(action.payload.settings_changes, null, 2)
+				: (action?.payload?.stylesheet ?? '')),
+	);
 	const metadata = actionMetadata(action?.payload);
 
 	if (!action) {
@@ -194,6 +235,12 @@ export function PreviewPane({
 	const iframeSrc = preview?.iframe?.src ?? preview?.preview_url ?? null;
 	const iframeTitle =
 		preview?.iframe?.title ?? preview?.title ?? __('Preview', 'agent-wordpress-terminal');
+
+	useEffect(() => {
+		if (action && !iframeSrc) {
+			setTab('compare');
+		}
+	}, [action, iframeSrc]);
 
 	const tabs = useMemo(
 		() => [
