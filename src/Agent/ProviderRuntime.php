@@ -20,6 +20,13 @@ if (!defined('ABSPATH')) {
 final class ProviderRuntime
 {
     /**
+     * Error code WordPressAIClientProvider returns when the connector has no model
+     * that can perform text generation for the current request, even after AWPT's
+     * own retry-without-abilities safety net.
+     */
+    private const NO_TEXT_GENERATION_ERROR_CODE = 'awpt_connector_no_text_generation';
+
+    /**
      * Get a provider-backed response.
      *
      * @param int $session_id Session ID.
@@ -31,6 +38,15 @@ final class ProviderRuntime
         $messages = new ProviderMessageBuilder()->build($session_id);
         $tool_registry = new ToolRegistry();
         $result = $provider->complete($messages, $tool_registry->get_chat_completion_tools());
+        $notice = '';
+
+        if (is_wp_error($result)) {
+            $failover = $this->maybe_failover($provider, $result, $messages, $tool_registry);
+
+            if (null !== $failover) {
+                [$provider, $result, $notice] = $failover;
+            }
+        }
 
         if (is_wp_error($result)) {
             return [
@@ -42,8 +58,49 @@ final class ProviderRuntime
         }
 
         $result = new IntentToolCallEnricher()->enrich($messages, $result, $tool_registry);
+        $response = $this->finalize_response($session_id, $provider, $messages, $result, $tool_registry);
 
-        return $this->finalize_response($session_id, $provider, $messages, $result, $tool_registry);
+        if ('' !== $notice) {
+            $response['content'] = trim($notice . "\n\n" . (string) $response['content']);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Fail over to the guaranteed OpenRouter baseline when the WordPress AI Client
+     * connector cannot perform text generation at all, so a Connectors misconfiguration
+     * never blocks basic agent use.
+     *
+     * @param array<int, array<string, mixed>> $messages Provider messages.
+     * @return array{0: ProviderInterface, 1: array<string, mixed>|\WP_Error, 2: string}|null
+     */
+    private function maybe_failover(
+        ProviderInterface $provider,
+        \WP_Error $error,
+        array $messages,
+        ToolRegistry $tool_registry,
+    ): ?array {
+        if (
+            !$provider instanceof WordPressAIClientProvider
+            || self::NO_TEXT_GENERATION_ERROR_CODE !== $error->get_error_code()
+        ) {
+            return null;
+        }
+
+        $fallback = new OpenRouterProvider();
+        $fallback_result = $fallback->complete($messages, $tool_registry->get_chat_completion_tools());
+
+        $notice = sprintf(
+            /* translators: %s: original connector/provider name. */
+            __(
+                '[AWPT] "%s" has no model available for text generation, so this reply used OpenRouter instead. Check AI connection settings.',
+                'agent-wordpress-terminal',
+            ),
+            $provider->get_name(),
+        );
+
+        return [$fallback, $fallback_result, $notice];
     }
 
     /**

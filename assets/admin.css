@@ -453,6 +453,10 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	line-height: 1.45;
 }
 
+.awpt-connector-option__warning {
+	color: #e8b84a;
+}
+
 .awpt-connector-status {
 	flex: 0 0 auto;
 	align-self: center;
@@ -1252,31 +1256,6 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	min-width: 0;
 	min-height: 0;
 	overflow: auto;
-}
-
-.awpt-inspector-list {
-	display: grid;
-	gap: 8px;
-	margin: 0 0 12px;
-}
-
-.awpt-inspector-list div {
-	display: flex;
-	justify-content: space-between;
-	gap: 10px;
-	padding: 6px 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-	font-size: 11px;
-}
-
-.awpt-inspector-list dt {
-	color: var(--awpt-muted);
-}
-
-.awpt-inspector-list dd {
-	margin: 0;
-	color: var(--awpt-text);
-	text-align: right;
 }
 
 .awpt-preview-detail {

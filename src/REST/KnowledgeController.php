@@ -12,14 +12,13 @@ namespace AWPT\REST;
 
 use AWPT\Knowledge\FilesystemSourceReader;
 use AWPT\Knowledge\KnowledgeIndexer;
-use AWPT\Knowledge\KnowledgeSearchService;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /**
- * Exposes Knowledge status, settings, rebuild, and search.
+ * Exposes Knowledge status, settings, and rebuild.
  */
 final class KnowledgeController
 {
@@ -38,20 +37,6 @@ final class KnowledgeController
                 'methods' => \WP_REST_Server::CREATABLE,
                 'callback' => [$this, 'rebuild'],
                 'permission_callback' => [$this, 'can_manage'],
-            ],
-        ]);
-
-        register_rest_route(AWPT_REST_NAMESPACE, '/knowledge/search', [
-            [
-                'methods' => \WP_REST_Server::READABLE,
-                'callback' => [$this, 'search'],
-                'permission_callback' => [$this, 'can_manage'],
-                'args' => [
-                    'query' => [
-                        'type' => 'string',
-                        'sanitize_callback' => 'sanitize_text_field',
-                    ],
-                ],
             ],
         ]);
 
@@ -95,15 +80,6 @@ final class KnowledgeController
         return new \WP_REST_Response(array_merge($result, [
             'status' => new KnowledgeIndexer()->status(),
         ]), 200);
-    }
-
-    public function search(\WP_REST_Request $request): \WP_REST_Response
-    {
-        $query = (string) $request->get_param('query');
-
-        return new \WP_REST_Response([
-            'items' => new KnowledgeSearchService()->search($query, 10),
-        ], 200);
     }
 
     public function settings(): \WP_REST_Response

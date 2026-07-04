@@ -12,6 +12,7 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -24,11 +25,16 @@ final class ProposeContentUpdate
 {
     private ActionRepository $actions;
     private SessionRepository $sessions;
+    private StagedPostPreview $preview;
 
-    public function __construct(?ActionRepository $actions = null, ?SessionRepository $sessions = null)
-    {
+    public function __construct(
+        ?ActionRepository $actions = null,
+        ?SessionRepository $sessions = null,
+        ?StagedPostPreview $preview = null,
+    ) {
         $this->actions = $actions ?? new ActionRepository();
         $this->sessions = $sessions ?? new SessionRepository();
+        $this->preview = $preview ?? new StagedPostPreview();
     }
 
     /**
@@ -40,7 +46,7 @@ final class ProposeContentUpdate
             'name' => 'awpt/propose-content-update',
             'label' => __('Propose Content Update', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages a proposed post content update for explicit admin approval.',
+                'Stages a proposed post update (title, content, status, or meta) for explicit admin approval.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -72,6 +78,21 @@ final class ProposeContentUpdate
                     'post_content' => [
                         'type' => 'string',
                         'description' => __('Optional replacement post content.', 'agent-wordpress-terminal'),
+                    ],
+                    'post_status' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional replacement post status (publish, draft, pending, private, future).',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'post_meta' => [
+                        'type' => 'object',
+                        'description' => __(
+                            'Optional post meta key/value pairs to update on approval.',
+                            'agent-wordpress-terminal',
+                        ),
+                        'additionalProperties' => true,
                     ],
                     'affected' => [
                         'type' => 'string',
@@ -129,12 +150,6 @@ final class ProposeContentUpdate
             ));
         }
 
-        $preview_url = get_preview_post_link($post);
-
-        if (!is_string($preview_url) || '' === $preview_url) {
-            $preview_url = get_permalink($post);
-        }
-
         $payload = [
             'operation' => 'content_update',
             'post_id' => $post_id,
@@ -142,7 +157,7 @@ final class ProposeContentUpdate
             'post_status' => $post->post_status,
             'original_post_title' => $post->post_title,
             'original_post_content' => $post->post_content,
-            'preview_url' => $preview_url,
+            'original_post_status' => $post->post_status,
         ];
 
         if (array_key_exists('post_title', $input)) {
@@ -153,8 +168,54 @@ final class ProposeContentUpdate
             $payload['post_content'] = wp_kses_post((string) $input['post_content']);
         }
 
+        if (array_key_exists('post_status', $input)) {
+            $status = sanitize_key((string) $input['post_status']);
+
+            if (!in_array($status, array_keys(get_post_statuses()), true)) {
+                return new \WP_Error(code: 'awpt_invalid_post_status', message: __(
+                    'Unsupported post status.',
+                    'agent-wordpress-terminal',
+                ));
+            }
+
+            $payload['post_status'] = $status;
+        }
+
+        if (array_key_exists('post_meta', $input) && is_array($input['post_meta'])) {
+            $meta_changes = [];
+            $original_meta = [];
+
+            foreach ($input['post_meta'] as $key => $value) {
+                $meta_key = sanitize_key((string) $key);
+
+                if ('' === $meta_key) {
+                    continue;
+                }
+
+                $meta_changes[$meta_key] = $this->sanitize_meta_value($value);
+                $original_meta[$meta_key] = get_post_meta($post_id, $meta_key, true);
+            }
+
+            if ([] !== $meta_changes) {
+                $payload['post_meta'] = $meta_changes;
+                $payload['original_post_meta'] = $original_meta;
+            }
+        }
+
         if (array_key_exists('affected', $input)) {
             $payload['affected'] = sanitize_textarea_field((string) $input['affected']);
+        }
+
+        $preview = $this->preview->preview_from_payload($payload);
+
+        if (is_wp_error($preview)) {
+            return $preview;
+        }
+
+        $payload['preview_url'] = $preview['preview_url'];
+
+        if (array_key_exists('autosave_id', $preview)) {
+            $payload['preview_autosave_id'] = (int) $preview['autosave_id'];
         }
 
         $action_id = $this->actions->create(
@@ -165,6 +226,8 @@ final class ProposeContentUpdate
         );
 
         if (null === $action_id) {
+            $this->preview->discard_preview_resources($payload);
+
             return new \WP_Error(code: 'awpt_action_create_failed', message: __(
                 'Could not create proposed action.',
                 'agent-wordpress-terminal',
@@ -174,5 +237,22 @@ final class ProposeContentUpdate
         $action = $this->actions->format_action($action_id);
 
         return is_array($action) ? $action : [];
+    }
+
+    private function sanitize_meta_value(mixed $value): string|int|float|bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_float($value)) {
+            return $value;
+        }
+
+        return sanitize_text_field((string) $value);
     }
 }

@@ -26,6 +26,7 @@
 		"lint": "mago lint",
 		"format": "mago format",
 		"analyze": "mago analyze",
-		"check": ["@lint", "@analyze"]
+		"check": ["@lint", "@analyze"],
+		"test": "php tests/run.php"
 	}
 }

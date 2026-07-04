@@ -36,10 +36,12 @@ final class ToolCatalogFormatter
         'awpt/preview-post' => 'Returns preview URL and iframe metadata for a post.',
         'awpt/search-knowledge' => 'Searches Core Knowledge, legacy guidelines, site content, and allowed read-only document sources.',
         'awpt/read-knowledge' => 'Reads a specific Core Knowledge or legacy guideline record by WordPress post ID.',
-        'awpt/propose-content-update' => 'Stages a proposed post content update for explicit admin approval.',
+        'awpt/propose-content-update' => 'Stages a proposed post update (title, content, status, or meta) for explicit admin approval.',
+        'awpt/propose-new-post' => 'Stages creation of a brand new post or page for explicit admin approval. Use for new posts, not existing ones. Optional featured_image_id sets the WordPress featured image on apply.',
         'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
         'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
         'awpt/apply-action' => 'Applies an explicitly approved AWPT staged action.',
+        'awpt/sideload-media' => 'Downloads a remote image or video URL and adds it to the Media Library, returning its attachment ID and hosted URL. Automatically resolves share/preview page links (e.g. Tenor, Giphy) to their underlying direct media file.',
     ];
 
     /**
@@ -49,6 +51,7 @@ final class ToolCatalogFormatter
      */
     private const APPROVAL_REQUIRED_ABILITIES = [
         'awpt/propose-content-update',
+        'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
         'awpt/apply-action',

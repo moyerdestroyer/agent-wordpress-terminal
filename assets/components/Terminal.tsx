@@ -4,6 +4,7 @@ import { __ } from '@wordpress/i18n';
 import {
 	createSession,
 	deleteSession,
+	fetchActionPreview,
 	getMcpStatus,
 	getSession,
 	listSessions,
@@ -12,9 +13,9 @@ import {
 	updateAction,
 	updateSession,
 } from '../api';
+import { mergeProposalActions, proposalActionsFromToolCalls } from '../proposalActions';
 import type {
 	ChatResponse,
-	ContextItem,
 	McpStatus,
 	Message,
 	PreviewDetails,
@@ -32,7 +33,6 @@ export function Terminal(): JSX.Element {
 	const [sessions, setSessions] = useState<SessionSummary[]>([]);
 	const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
 	const [messages, setMessages] = useState<Message[]>([]);
-	const [contextItems, setContextItems] = useState<ContextItem[]>([]);
 	const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
 	const [actions, setActions] = useState<ProposedAction[]>([]);
 	const [tools, setTools] = useState<ToolsResponse | null>(null);
@@ -41,6 +41,9 @@ export function Terminal(): JSX.Element {
 	const [previewAction, setPreviewAction] = useState<ProposedAction | null>(null);
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 	const [input, setInput] = useState('');
+	const [commandHistory, setCommandHistory] = useState<string[]>([]);
+	const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+	const [historyDraft, setHistoryDraft] = useState('');
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSending, setIsSending] = useState(false);
 	const [sidebarTab, setSidebarTab] = useState<'knowledge' | 'tools'>('knowledge');
@@ -105,23 +108,33 @@ export function Terminal(): JSX.Element {
 				created_at: message.created_at,
 			})),
 		);
-		setContextItems(session.context);
+		const sessionToolCalls = session.tool_calls ?? [];
+		setToolCalls(sessionToolCalls);
 		setActions(
-			session.actions.map((action) => ({
-				id: action.id,
-				session_id: action.session_id,
-				title: action.title,
-				description: action.description,
-				payload: action.payload,
-				status: action.status as ProposedAction['status'],
-				created_at: action.created_at,
-				updated_at: action.updated_at,
-			})),
+			mergeProposalActions(
+				session.actions.map((action) => ({
+					id: action.id,
+					session_id: action.session_id,
+					title: action.title,
+					description: action.description,
+					payload: action.payload,
+					status: action.status as ProposedAction['status'],
+					created_at: action.created_at,
+					updated_at: action.updated_at,
+				})),
+				proposalActionsFromToolCalls(sessionToolCalls),
+			),
 		);
-		setToolCalls(session.tool_calls ?? []);
 		setPreview(null);
 		setPreviewAction(null);
 		setIsPreviewOpen(false);
+		setCommandHistory(
+			session.messages
+				.filter((message) => message.role === 'user' && message.content.trim() !== '')
+				.map((message) => message.content),
+		);
+		setHistoryIndex(null);
+		setHistoryDraft('');
 	};
 
 	const handleSend = async (): Promise<void> => {
@@ -132,6 +145,11 @@ export function Terminal(): JSX.Element {
 		const message = input.trim();
 		setInput('');
 		setIsSending(true);
+		setCommandHistory((current) =>
+			current[current.length - 1] === message ? current : [...current, message],
+		);
+		setHistoryIndex(null);
+		setHistoryDraft('');
 
 		const turnAt = new Date().toISOString();
 
@@ -156,14 +174,32 @@ export function Terminal(): JSX.Element {
 			]);
 
 			if (response.tool_calls?.length) {
-				setToolCalls((current) => [
-					...current,
-					...response.tool_calls.map((call) => ({ ...call, created_at: turnAt })),
-				]);
+				const turnToolCalls = response.tool_calls.map((call) => ({ ...call, created_at: turnAt }));
+				setToolCalls((current) => [...current, ...turnToolCalls]);
+
+				const proposalActions = proposalActionsFromToolCalls(turnToolCalls);
+
+				if (proposalActions.length > 0) {
+					setActions((current) => mergeProposalActions(current, proposalActions));
+				}
 			}
 
 			if (response.actions?.length) {
-				setActions((current) => [...current, ...response.actions]);
+				setActions((current) =>
+					mergeProposalActions(
+						current,
+						response.actions.map((action) => ({
+							id: action.id,
+							session_id: action.session_id,
+							title: action.title,
+							description: action.description,
+							payload: action.payload,
+							status: action.status as ProposedAction['status'],
+							created_at: action.created_at,
+							updated_at: action.updated_at,
+						})),
+					),
+				);
 			}
 
 			if (response.preview?.preview_url) {
@@ -212,12 +248,14 @@ export function Terminal(): JSX.Element {
 		setEditingSessionId(null);
 		setConfirmDeleteSessionId(null);
 		setMessages([]);
-		setContextItems([]);
 		setToolCalls([]);
 		setActions([]);
 		setPreview(null);
 		setPreviewAction(null);
 		setIsPreviewOpen(false);
+		setCommandHistory([]);
+		setHistoryIndex(null);
+		setHistoryDraft('');
 	};
 
 	const handleStartRename = (session: SessionSummary): void => {
@@ -239,12 +277,14 @@ export function Terminal(): JSX.Element {
 
 	const clearWorkspace = (): void => {
 		setMessages([]);
-		setContextItems([]);
 		setToolCalls([]);
 		setActions([]);
 		setPreview(null);
 		setPreviewAction(null);
 		setIsPreviewOpen(false);
+		setCommandHistory([]);
+		setHistoryIndex(null);
+		setHistoryDraft('');
 	};
 
 	const handleDeleteSession = async (session: SessionSummary): Promise<void> => {
@@ -283,14 +323,62 @@ export function Terminal(): JSX.Element {
 			return;
 		}
 
-		const updated = await updateAction(action.id, operation);
-		setActions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-		setPreviewAction((current) => (current?.id === updated.id ? updated : current));
+		try {
+			const updated = await updateAction(action.id, operation);
+			setActions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+			setPreviewAction((current) => (current?.id === updated.id ? updated : current));
+		} catch (error: unknown) {
+			let messageText = __('The action request failed. Try again.', 'agent-wordpress-terminal');
+
+			if (
+				error &&
+				typeof error === 'object' &&
+				'message' in error &&
+				typeof error.message === 'string' &&
+				error.message.trim() !== ''
+			) {
+				messageText = error.message;
+			}
+
+			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+		}
 	};
 
-	const handleActionPreview = (action: ProposedAction): void => {
+	const handleActionPreview = async (action: ProposedAction): Promise<void> => {
 		if (!action.payload) {
 			return;
+		}
+
+		setPreviewAction(action);
+		setIsPreviewOpen(true);
+
+		if (action.id) {
+			try {
+				const stagedPreview = await fetchActionPreview(action.id);
+				setPreview(stagedPreview);
+				return;
+			} catch (error: unknown) {
+				if (!action.payload.preview_url) {
+					let messageText = __(
+						'Could not load a preview for this action.',
+						'agent-wordpress-terminal',
+					);
+
+					if (
+						error &&
+						typeof error === 'object' &&
+						'message' in error &&
+						typeof error.message === 'string' &&
+						error.message.trim() !== ''
+					) {
+						messageText = error.message;
+					}
+
+					setPreview(null);
+					setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+					return;
+				}
+			}
 		}
 
 		setPreview(
@@ -299,14 +387,17 @@ export function Terminal(): JSX.Element {
 						id: action.payload.post_id,
 						preview_url: action.payload.preview_url,
 						title: action.title,
+						iframe: {
+							src: action.payload.preview_url,
+							title: action.title,
+							height: 640,
+						},
 					}
 				: null,
 		);
-		setPreviewAction(action);
-		setIsPreviewOpen(true);
 	};
 
-	const canOpenPreview = Boolean(preview || previewAction || toolCalls.length > 0);
+	const canOpenPreview = Boolean(preview || previewAction);
 
 	if (isLoading) {
 		return (
@@ -478,11 +569,58 @@ export function Terminal(): JSX.Element {
 						<input
 							type="text"
 							value={input}
-							onChange={(event) => setInput(event.target.value)}
+							onChange={(event) => {
+								setInput(event.target.value);
+
+								if (historyIndex !== null) {
+									setHistoryIndex(null);
+								}
+							}}
 							placeholder="/ ask the agent…"
 							onKeyDown={(event) => {
 								if (event.key === 'Enter') {
 									void handleSend();
+									return;
+								}
+
+								if (event.key === 'ArrowUp') {
+									if (commandHistory.length === 0) {
+										return;
+									}
+
+									event.preventDefault();
+
+									const nextIndex =
+										historyIndex === null
+											? commandHistory.length - 1
+											: Math.max(0, historyIndex - 1);
+
+									if (historyIndex === null) {
+										setHistoryDraft(input);
+									}
+
+									setHistoryIndex(nextIndex);
+									setInput(commandHistory[nextIndex]);
+									return;
+								}
+
+								if (event.key === 'ArrowDown') {
+									if (historyIndex === null) {
+										return;
+									}
+
+									event.preventDefault();
+
+									const nextIndex = historyIndex + 1;
+
+									if (nextIndex >= commandHistory.length) {
+										setHistoryIndex(null);
+										setInput(historyDraft);
+										return;
+									}
+
+									setHistoryIndex(nextIndex);
+									setInput(commandHistory[nextIndex]);
 								}
 							}}
 							disabled={isSending}
@@ -506,19 +644,14 @@ export function Terminal(): JSX.Element {
 								<span>
 									{previewAction?.title ??
 										preview?.title ??
-										__('Evidence', 'agent-wordpress-terminal')}
+										__('Preview', 'agent-wordpress-terminal')}
 								</span>
 							</div>
 							<Button variant="secondary" onClick={() => setIsPreviewOpen(false)}>
 								{__('Close', 'agent-wordpress-terminal')}
 							</Button>
 						</div>
-						<PreviewPane
-							preview={preview}
-							contextItems={contextItems}
-							toolCalls={toolCalls}
-							action={previewAction}
-						/>
+						<PreviewPane preview={preview} action={previewAction} />
 					</aside>
 				) : null}
 			</div>

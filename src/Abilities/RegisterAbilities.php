@@ -62,8 +62,10 @@ final class RegisterAbilities
         new SearchKnowledge()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
+        new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();
         new ApplyAction()->register();
+        new SideloadMedia()->register();
     }
 }

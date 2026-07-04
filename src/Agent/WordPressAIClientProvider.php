@@ -39,9 +39,9 @@ final class WordPressAIClientProvider implements ProviderInterface
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      * @param array<int, array<string, mixed>> $tools Available tools.
-     * @return array<string, mixed>
+     * @return array<string, mixed>|\WP_Error
      */
-    public function complete(array $messages, array $tools = []): array
+    public function complete(array $messages, array $tools = []): array|\WP_Error
     {
         unset($tools);
 
@@ -86,6 +86,21 @@ final class WordPressAIClientProvider implements ProviderInterface
             $this->connector_id,
             $tool_registry->get_auto_executable_ability_names(),
         );
+
+        if ($result['no_text_generation_model']) {
+            // Surface this as a distinct, catchable failure so ProviderRuntime can fail
+            // over to a guaranteed direct-key provider instead of showing a dead-end,
+            // jargon-heavy error for what may have been the simplest possible request.
+            return new \WP_Error(
+                'awpt_connector_no_text_generation',
+                '' !== $result['content']
+                    ? $result['content']
+                    : __(
+                        'The selected AI connector has no model available that supports text generation.',
+                        'agent-wordpress-terminal',
+                    ),
+            );
+        }
 
         return [
             'content' => $result['content'],

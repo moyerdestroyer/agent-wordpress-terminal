@@ -49,28 +49,6 @@ final class SessionHydrator
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
-    public function context_items(array $rows): array
-    {
-        $hydrated = [];
-
-        foreach ($rows as $context_item) {
-            $hydrated[] = [
-                'id' => $context_item['id'] ?? 0,
-                'item_type' => (string) ($context_item['item_type'] ?? ''),
-                'item_id' => $context_item['item_id'] ?? null,
-                'label' => (string) ($context_item['label'] ?? ''),
-                'payload' => Json::decode_array((string) ($context_item['payload_json'] ?? '')),
-                'created_at' => (string) ($context_item['created_at'] ?? ''),
-            ];
-        }
-
-        return $hydrated;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $rows
-     * @return list<array<string, mixed>>
-     */
     public function actions(array $rows): array
     {
         $hydrated = [];
@@ -78,6 +56,7 @@ final class SessionHydrator
         foreach ($rows as $action) {
             $hydrated[] = [
                 'id' => (int) ($action['id'] ?? 0),
+                'session_id' => (int) ($action['session_id'] ?? 0),
                 'title' => (string) ($action['title'] ?? ''),
                 'description' => (string) ($action['description'] ?? ''),
                 'payload' => Json::decode_array((string) ($action['payload_json'] ?? '')),

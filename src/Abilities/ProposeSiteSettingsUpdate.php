@@ -12,6 +12,7 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\SiteSettingsWhitelist;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -24,11 +25,16 @@ final class ProposeSiteSettingsUpdate
 {
     private ActionRepository $actions;
     private SessionRepository $sessions;
+    private SiteSettingsWhitelist $whitelist;
 
-    public function __construct(?ActionRepository $actions = null, ?SessionRepository $sessions = null)
-    {
+    public function __construct(
+        ?ActionRepository $actions = null,
+        ?SessionRepository $sessions = null,
+        ?SiteSettingsWhitelist $whitelist = null,
+    ) {
         $this->actions = $actions ?? new ActionRepository();
         $this->sessions = $sessions ?? new SessionRepository();
+        $this->whitelist = $whitelist ?? new SiteSettingsWhitelist();
     }
 
     /**
@@ -75,6 +81,8 @@ final class ProposeSiteSettingsUpdate
      */
     public function can_propose(array $input): bool
     {
+        unset($input);
+
         return current_user_can('manage_options');
     }
 
@@ -91,7 +99,7 @@ final class ProposeSiteSettingsUpdate
         }
 
         $raw_settings = is_array($input['settings'] ?? null) ? $input['settings'] : [];
-        $settings = $this->sanitize_settings($raw_settings);
+        $settings = $this->whitelist->sanitize_map($raw_settings);
 
         if ([] === $settings) {
             return new \WP_Error('awpt_empty_settings_update', __(
@@ -128,78 +136,5 @@ final class ProposeSiteSettingsUpdate
         $action = $this->actions->format_action($action_id);
 
         return is_array($action) ? $action : [];
-    }
-
-    /**
-     * @param array<array-key, mixed> $raw_settings
-     * @return array<string, mixed>
-     */
-    private function sanitize_settings(array $raw_settings): array
-    {
-        $settings = [];
-
-        foreach (array_keys($raw_settings) as $key) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $sanitized = $this->sanitize_setting($key, $raw_settings[$key]);
-
-            if (null !== $sanitized) {
-                $settings[$key] = $sanitized;
-            }
-        }
-
-        return $settings;
-    }
-
-    private function sanitize_setting(string $key, mixed $value): string|int|null
-    {
-        return match ($key) {
-            'blogname', 'blogdescription', 'category_base', 'tag_base' => sanitize_text_field((string) $value),
-            'blog_public',
-            'require_name_email',
-            'comment_registration',
-            'thread_comments',
-            'page_comments',
-                => $this->truthy($value) ? 1 : 0,
-            'show_on_front' => in_array((string) $value, ['posts', 'page'], true) ? (string) $value : null,
-            'page_on_front', 'page_for_posts' => $this->sanitize_page_id($value),
-            'posts_per_page' => max(1, min(100, $this->to_absint($value))),
-            'comments_per_page' => max(1, min(500, $this->to_absint($value))),
-            'default_comment_status', 'default_ping_status' => in_array((string) $value, ['open', 'closed'], true)
-                ? (string) $value
-                : null,
-            'permalink_structure' => $this->sanitize_permalink_structure($value),
-            default => null,
-        };
-    }
-
-    private function sanitize_page_id(mixed $value): int
-    {
-        $page_id = $this->to_absint($value);
-
-        return $page_id > 0 && get_post($page_id) instanceof \WP_Post ? $page_id : 0;
-    }
-
-    private function to_absint(mixed $value): int
-    {
-        return absint(is_scalar($value) ? $value : 0);
-    }
-
-    private function sanitize_permalink_structure(mixed $value): ?string
-    {
-        $structure = sanitize_text_field((string) $value);
-
-        if ('' === $structure) {
-            return '';
-        }
-
-        return preg_match('/^\/[A-Za-z0-9_\/%\-]+\/$/', $structure) ? $structure : null;
-    }
-
-    private function truthy(mixed $value): bool
-    {
-        return in_array($value, [true, 1, '1', 'true', 'yes', 'on'], true);
     }
 }

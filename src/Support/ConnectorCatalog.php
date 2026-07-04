@@ -20,6 +20,17 @@ if (!defined('ABSPATH')) {
 final class ConnectorCatalog
 {
     /**
+     * Direct-key providers that AWPT supports without any WordPress connector plugin.
+     *
+     * These are always-available baseline providers: every WordPress version can use
+     * them, independent of whether Core Connectors or an AI Client companion plugin
+     * is installed.
+     *
+     * @var list<string>
+     */
+    public const DIRECT_PROVIDER_IDS = ['openrouter', 'openai'];
+
+    /**
      * Connector inspection helper.
      */
     private ConnectorInspector $inspector;
@@ -103,8 +114,10 @@ final class ConnectorCatalog
      */
     public function get_provider_label(string $provider_id): string
     {
-        if ('openrouter' === $provider_id) {
-            return __('OpenRouter', 'agent-wordpress-terminal');
+        $direct_label = $this->direct_provider_label($provider_id);
+
+        if (null !== $direct_label) {
+            return $direct_label;
         }
 
         if ($this->is_available() && function_exists('wp_get_connector')) {
@@ -123,7 +136,7 @@ final class ConnectorCatalog
      */
     public function is_valid_provider(string $provider_id): bool
     {
-        if ('openrouter' === $provider_id) {
+        if (in_array($provider_id, self::DIRECT_PROVIDER_IDS, true)) {
             return true;
         }
 
@@ -142,6 +155,18 @@ final class ConnectorCatalog
             && 'ai_provider' === ($connector['type'] ?? '')
             && $this->inspector->is_installed($connector)
         );
+    }
+
+    /**
+     * Resolve a display label for a built-in direct-key provider.
+     */
+    private function direct_provider_label(string $provider_id): ?string
+    {
+        return match ($provider_id) {
+            'openrouter' => __('OpenRouter', 'agent-wordpress-terminal'),
+            'openai' => __('OpenAI', 'agent-wordpress-terminal'),
+            default => null,
+        };
     }
 
     /**

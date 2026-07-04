@@ -28,4 +28,7 @@ namespace {
     // Core path constants.
     define('WP_CONTENT_DIR', '/wordpress/wp-content');
     define('WP_PLUGIN_DIR', '/wordpress/wp-content/plugins');
+
+    // Debug mode, usually toggled in wp-config.php.
+    define('WP_DEBUG', false);
 }

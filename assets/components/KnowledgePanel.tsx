@@ -5,10 +5,9 @@ import {
 	getKnowledgeSettings,
 	getKnowledgeStatus,
 	rebuildKnowledge,
-	searchKnowledge,
 	updateKnowledgeSettings,
 } from '../api';
-import type { KnowledgeSearchItem, KnowledgeSettings, KnowledgeStatus } from '../types';
+import type { KnowledgeSettings, KnowledgeStatus } from '../types';
 
 function formatBytes(value: number): string {
 	if (value >= 1048576) {
@@ -16,14 +15,6 @@ function formatBytes(value: number): string {
 	}
 
 	return `${Math.max(1, Math.round(value / 1024))} KB`;
-}
-
-function sourceId(item: KnowledgeSearchItem): string {
-	if (item.source_post_id) {
-		return `#${item.source_post_id}`;
-	}
-
-	return item.source_id.replace(/^file:/, 'file:').slice(0, 18);
 }
 
 function sourceCount(status: KnowledgeStatus | null, kind: string): number {
@@ -99,12 +90,9 @@ export function KnowledgePanel(): JSX.Element {
 	const [settings, setSettings] = useState<KnowledgeSettings | null>(null);
 	const [rootsText, setRootsText] = useState('');
 	const [maxFileSize, setMaxFileSize] = useState('2097152');
-	const [query, setQuery] = useState('');
-	const [results, setResults] = useState<KnowledgeSearchItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isRebuilding, setIsRebuilding] = useState(false);
 	const [autoRebuildAttempted, setAutoRebuildAttempted] = useState(false);
-	const [isSearching, setIsSearching] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 
 	const refresh = async (): Promise<KnowledgeStatus> => {
@@ -145,21 +133,6 @@ export function KnowledgePanel(): JSX.Element {
 			setStatus(response.status);
 		} finally {
 			setIsRebuilding(false);
-		}
-	};
-
-	const handleSearch = async (): Promise<void> => {
-		if (!query.trim()) {
-			return;
-		}
-
-		setIsSearching(true);
-
-		try {
-			const response = await searchKnowledge(query.trim());
-			setResults(response.items);
-		} finally {
-			setIsSearching(false);
 		}
 	};
 
@@ -240,45 +213,6 @@ export function KnowledgePanel(): JSX.Element {
 					? __('Rebuilding…', 'agent-wordpress-terminal')
 					: __('Rebuild index', 'agent-wordpress-terminal')}
 			</Button>
-
-			<h3 className="awpt-section-title" style={{ marginTop: 16 }}>
-				{__('Search', 'agent-wordpress-terminal')}
-			</h3>
-			<TextControl
-				label={__('Search Knowledge', 'agent-wordpress-terminal')}
-				hideLabelFromVision
-				value={query}
-				onChange={setQuery}
-				placeholder={__('Search guidelines, notes, docs…', 'agent-wordpress-terminal')}
-				onKeyDown={(event) => {
-					if (event.key === 'Enter') {
-						void handleSearch();
-					}
-				}}
-			/>
-			<Button
-				variant="secondary"
-				onClick={() => void handleSearch()}
-				disabled={isSearching || !query.trim()}
-				style={{ marginTop: 8 }}
-			>
-				{isSearching
-					? __('Searching…', 'agent-wordpress-terminal')
-					: __('Search', 'agent-wordpress-terminal')}
-			</Button>
-
-			{results.length > 0 ? (
-				<ul className="awpt-list awpt-knowledge-results">
-					{results.map((item) => (
-						<li key={item.id}>
-							<div>
-								{item.source_kind} {sourceId(item)}: {item.label}
-							</div>
-							<div className="awpt-list-meta">{item.excerpt}</div>
-						</li>
-					))}
-				</ul>
-			) : null}
 
 			<details className="awpt-knowledge-advanced">
 				<summary>{__('Advanced document sources', 'agent-wordpress-terminal')}</summary>

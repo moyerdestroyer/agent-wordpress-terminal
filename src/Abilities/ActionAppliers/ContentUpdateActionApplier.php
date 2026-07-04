@@ -27,11 +27,12 @@ final class ContentUpdateActionApplier
     {
         $post_id = (int) ($payload['post_id'] ?? 0);
 
-        if ($post_id <= 0 || !current_user_can(capability: 'edit_post', args: $post_id)) {
-            return new \WP_Error(code: 'awpt_cannot_edit_post', message: __(
-                'You do not have permission to edit this post.',
-                'agent-wordpress-terminal',
-            ));
+        if ($post_id <= 0 || !current_user_can('edit_post', $post_id)) {
+            return new \WP_Error(
+                code: 'awpt_cannot_edit_post',
+                message: __('You do not have permission to edit this post.', 'agent-wordpress-terminal'),
+                data: ['status' => 403],
+            );
         }
 
         $update = ['ID' => $post_id];
@@ -44,17 +45,46 @@ final class ContentUpdateActionApplier
             $update['post_content'] = wp_kses_post((string) $payload['post_content']);
         }
 
-        if (1 === count($update)) {
-            return new \WP_Error(code: 'awpt_empty_action', message: __(
-                'Action has no post changes to apply.',
-                'agent-wordpress-terminal',
-            ));
+        if (array_key_exists('post_status', $payload)) {
+            $status = sanitize_key((string) $payload['post_status']);
+
+            if (!in_array($status, array_keys(get_post_statuses()), true)) {
+                return new \WP_Error(
+                    code: 'awpt_invalid_post_status',
+                    message: __('Unsupported post status.', 'agent-wordpress-terminal'),
+                    data: ['status' => 400],
+                );
+            }
+
+            $update['post_status'] = $status;
         }
 
-        $updated = wp_update_post($update, wp_error: true);
+        $meta_changes = is_array($payload['post_meta'] ?? null) ? $payload['post_meta'] : [];
 
-        if (is_wp_error($updated)) {
-            return $updated;
+        if (1 === count($update) && [] === $meta_changes) {
+            return new \WP_Error(
+                code: 'awpt_empty_action',
+                message: __('Action has no post changes to apply.', 'agent-wordpress-terminal'),
+                data: ['status' => 400],
+            );
+        }
+
+        if (count($update) > 1) {
+            $updated = wp_update_post($update, wp_error: true);
+
+            if (is_wp_error($updated)) {
+                return $updated;
+            }
+        }
+
+        foreach ($meta_changes as $key => $value) {
+            $meta_key = sanitize_key((string) $key);
+
+            if ('' === $meta_key) {
+                continue;
+            }
+
+            update_post_meta($post_id, $meta_key, $value);
         }
 
         return ['post_id' => $post_id];

@@ -211,9 +211,16 @@ Current post/page focus
 Minimum target:
 
 ```txt
-WordPress: 6.9+ experimental support
+WordPress: 6.9+
 PHP: 8.4+
 ```
+
+WordPress 7.0 (shipped March 2026) added the Connectors API and a built-in AI Client to
+Core, which AWPT treats as an optional accelerator (see "Integration Layer" below). On
+WordPress 6.9 and earlier, that same functionality is only available if the site
+separately installs a connector-enabling companion plugin (e.g. `wp-ai-client`). Either
+way, AWPT's direct-key providers work unmodified across all supported WordPress
+versions, so this is no longer "experimental" — it is the always-available baseline.
 
 ### Frontend
 
@@ -365,11 +372,27 @@ Returns preview URL and iframe metadata.
 
 ### `awpt/propose-content-update`
 
-Creates a staged proposed update, not an immediate save.
+Creates a staged proposed update, not an immediate save. Only works on a post that
+already exists.
+
+### `awpt/propose-new-post`
+
+Stages creation of a brand new post or page for explicit admin approval. Always
+created as a draft on apply; there is no agent-triggered path to publish directly.
+Optional `featured_image_id` (Media Library attachment ID, typically from
+`awpt/sideload-media`) sets the WordPress featured image on apply. A hidden staging
+draft is created at propose time so the Preview drawer can render the post before
+apply; rejecting the action trashes that staging draft.
 
 ### `awpt/apply-action`
 
 Applies a user-approved action.
+
+### `awpt/sideload-media`
+
+Downloads a remote image/video URL and imports it into the Media Library. Auto-executable
+(purely additive — creates a new attachment, never modifies existing content); embedding
+the result into a post still goes through `awpt/propose-content-update`.
 
 ## Security Requirements
 
@@ -429,14 +452,23 @@ Apply approved edits
 
 ### 4. Integration Layer
 
-Optional integrations:
+Guaranteed baseline (no connector plugin or companion AI plugin required, works on every
+supported WordPress version). Kept intentionally small — OpenRouter alone already reaches
+most other model providers for anyone who wants them, and OpenAI is included because it
+is the single most commonly pre-configured key (directly or via a WordPress Connector):
+
+```txt
+OpenRouter
+OpenAI (model selection automatic; reuses an existing WordPress Connector key if present)
+```
+
+Optional accelerators (only used when already available and configured on the site; AWPT
+never requires them):
 
 ```txt
 WordPress Core Abilities
 MCP Adapter
-OpenAI
-OpenRouter
-Local model endpoint
+WordPress Core Connectors API (WordPress 7.0+) / WP AI Client companion plugin
 CivicPress-specific tools
 Dufresne-specific tools
 ```

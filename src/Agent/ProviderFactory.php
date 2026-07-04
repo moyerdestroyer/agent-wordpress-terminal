@@ -28,10 +28,10 @@ final class ProviderFactory
     {
         $provider_id = new ConnectorSelection()->normalize_provider_option((string) get_option('awpt_provider', ''));
 
-        if ('openrouter' === $provider_id) {
-            return new OpenRouterProvider();
-        }
-
-        return new WordPressAIClientProvider($provider_id);
+        return match ($provider_id) {
+            'openrouter' => new OpenRouterProvider(),
+            'openai' => new OpenAIProvider(),
+            default => new WordPressAIClientProvider($provider_id),
+        };
     }
 }

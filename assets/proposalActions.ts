@@ -1,0 +1,118 @@
+import type { ProposedAction, ToolCall } from './types';
+
+const DEFAULT_PROPOSAL_TOOLS = [
+	'awpt/propose-content-update',
+	'awpt/propose-new-post',
+	'awpt/propose-site-settings-update',
+	'awpt/propose-theme-switch',
+] as const;
+
+function proposalTools(): Set<string> {
+	const configured = window.awptSettings?.proposalTools;
+
+	if (Array.isArray(configured) && configured.length > 0) {
+		return new Set(configured.filter((tool): tool is string => typeof tool === 'string'));
+	}
+
+	return new Set(DEFAULT_PROPOSAL_TOOLS);
+}
+
+const ACTION_STATUS_RANK: Record<ProposedAction['status'], number> = {
+	proposed: 1,
+	approved: 2,
+	rejected: 3,
+	applied: 4,
+};
+
+function actionStatusRank(status: ProposedAction['status']): number {
+	return ACTION_STATUS_RANK[status] ?? 0;
+}
+
+function mergeActionRecord(existing: ProposedAction, incoming: ProposedAction): ProposedAction {
+	return actionStatusRank(incoming.status) > actionStatusRank(existing.status)
+		? incoming
+		: existing;
+}
+
+function isProposedActionStatus(value: unknown): value is ProposedAction['status'] {
+	return (
+		value === 'proposed' || value === 'approved' || value === 'rejected' || value === 'applied'
+	);
+}
+
+export function proposalActionFromToolCall(call: ToolCall): ProposedAction | null {
+	if ((call.status ?? 'success') !== 'success' || !proposalTools().has(call.tool)) {
+		return null;
+	}
+
+	const output = call.output;
+
+	if (!output || typeof output !== 'object') {
+		return null;
+	}
+
+	const id =
+		typeof output.id === 'number' ? output.id : Number.parseInt(String(output.id ?? ''), 10);
+
+	if (!Number.isFinite(id)) {
+		return null;
+	}
+
+	return {
+		id,
+		session_id: typeof output.session_id === 'number' ? output.session_id : undefined,
+		title: typeof output.title === 'string' ? output.title : '',
+		description: typeof output.description === 'string' ? output.description : '',
+		payload:
+			output.payload && typeof output.payload === 'object'
+				? (output.payload as ProposedAction['payload'])
+				: undefined,
+		status: isProposedActionStatus(output.status) ? output.status : 'proposed',
+		created_at: typeof output.created_at === 'string' ? output.created_at : undefined,
+		updated_at: typeof output.updated_at === 'string' ? output.updated_at : undefined,
+	};
+}
+
+export function proposalActionsFromToolCalls(toolCalls: ToolCall[]): ProposedAction[] {
+	const actions: ProposedAction[] = [];
+
+	for (const call of toolCalls) {
+		const action = proposalActionFromToolCall(call);
+
+		if (action) {
+			actions.push(action);
+		}
+	}
+
+	return actions;
+}
+
+export function mergeProposalActions(
+	current: ProposedAction[],
+	incoming: ProposedAction[],
+): ProposedAction[] {
+	const merged = new Map<number, ProposedAction>();
+
+	for (const action of current) {
+		if (action.id) {
+			merged.set(action.id, action);
+		}
+	}
+
+	for (const action of incoming) {
+		if (!action.id) {
+			continue;
+		}
+
+		const existing = merged.get(action.id);
+
+		if (existing) {
+			merged.set(action.id, mergeActionRecord(existing, action));
+			continue;
+		}
+
+		merged.set(action.id, action);
+	}
+
+	return [...merged.values()];
+}

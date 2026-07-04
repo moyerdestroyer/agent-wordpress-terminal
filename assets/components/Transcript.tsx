@@ -1,7 +1,8 @@
 import { Button } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
-import type { ActionPayload, Message, ProposedAction, ToolCall } from '../types';
+import { actionDiff, actionMetadata, canPreviewAction } from '../actionDisplay';
+import type { Message, ProposedAction, ToolCall } from '../types';
 
 interface TranscriptProps {
 	messages: Message[];
@@ -36,18 +37,6 @@ function ThinkingIndicator(): JSX.Element {
 			</span>
 		</div>
 	);
-}
-
-function formatValue(value: unknown): string {
-	if (typeof value === 'string') {
-		return value;
-	}
-
-	if (value === null || value === undefined) {
-		return '';
-	}
-
-	return JSON.stringify(value);
 }
 
 function toolCallKey(call: ToolCall): string {
@@ -217,98 +206,6 @@ function InlineToolNote({ call }: { call: ToolCall }): JSX.Element {
 	);
 }
 
-function titleCase(value: string): string {
-	return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: string }> {
-	if (!payload) {
-		return [];
-	}
-
-	if (payload.operation === 'site_settings_update') {
-		return [
-			{
-				label: __('Target', 'agent-wordpress-terminal'),
-				value: __('Site settings', 'agent-wordpress-terminal'),
-			},
-			{
-				label: __('Settings', 'agent-wordpress-terminal'),
-				value: Object.keys(payload.settings_changes ?? {}).join(', '),
-			},
-		].filter((item) => item.value !== '');
-	}
-
-	if (payload.operation === 'theme_switch') {
-		return [
-			{
-				label: __('Target', 'agent-wordpress-terminal'),
-				value: __('Active theme', 'agent-wordpress-terminal'),
-			},
-			{
-				label: __('Current', 'agent-wordpress-terminal'),
-				value: payload.current_theme ?? payload.current_stylesheet ?? '',
-			},
-			{
-				label: __('New', 'agent-wordpress-terminal'),
-				value: payload.theme_name ?? payload.stylesheet ?? '',
-			},
-		].filter((item) => item.value !== '');
-	}
-
-	const postTitle = payload.original_post_title || payload.post_title || '';
-	const postType = payload.post_type
-		? titleCase(payload.post_type)
-		: __('Post/Page', 'agent-wordpress-terminal');
-	const postReference = [
-		postType,
-		payload.post_id ? `#${payload.post_id}` : '',
-		postTitle ? `- ${postTitle}` : '',
-	]
-		.filter(Boolean)
-		.join(' ');
-
-	return [
-		{
-			label: __('Target', 'agent-wordpress-terminal'),
-			value: postReference,
-		},
-		{
-			label: __('Status', 'agent-wordpress-terminal'),
-			value: payload.post_status ? titleCase(payload.post_status) : '',
-		},
-		{
-			label: __('Blocks / area', 'agent-wordpress-terminal'),
-			value: payload.affected ?? '',
-		},
-	].filter((item) => item.value !== '');
-}
-
-function actionDiff(payload?: ActionPayload): { before: string; after: string } {
-	if (!payload) {
-		return { before: '', after: '' };
-	}
-
-	if (payload.operation === 'site_settings_update') {
-		return {
-			before: formatValue(payload.original_settings),
-			after: formatValue(payload.settings_changes),
-		};
-	}
-
-	if (payload.operation === 'theme_switch') {
-		return {
-			before: [payload.current_theme, payload.current_stylesheet].filter(Boolean).join(' / '),
-			after: [payload.theme_name, payload.stylesheet].filter(Boolean).join(' / '),
-		};
-	}
-
-	return {
-		before: formatValue(payload.original_post_content),
-		after: formatValue(payload.post_content),
-	};
-}
-
 function ActionCard({
 	action,
 	onOperation,
@@ -321,6 +218,7 @@ function ActionCard({
 	const [showDiff, setShowDiff] = useState(false);
 	const canApply = action.status === 'proposed' || action.status === 'approved';
 	const canReject = action.status === 'proposed' || action.status === 'approved';
+	const canPreview = canPreviewAction(action.payload);
 	const metadata = actionMetadata(action.payload);
 	const diff = actionDiff(action.payload);
 
@@ -348,7 +246,7 @@ function ActionCard({
 				</dl>
 			) : null}
 			<div className="awpt-action-card__buttons">
-				<Button variant="secondary" onClick={() => onPreview(action)} disabled={!action.payload}>
+				<Button variant="secondary" onClick={() => onPreview(action)} disabled={!canPreview}>
 					{__('Preview', 'agent-wordpress-terminal')}
 				</Button>
 				<Button variant="secondary" onClick={() => setShowDiff((current) => !current)}>
@@ -395,7 +293,7 @@ function ActionRecord({
 				{action.status}
 			</span>
 			<span className="awpt-action-record__title">{action.title}</span>
-			{action.payload ? (
+			{action.payload && canPreviewAction(action.payload) ? (
 				<Button variant="link" onClick={() => onPreview(action)}>
 					{__('Preview', 'agent-wordpress-terminal')}
 				</Button>

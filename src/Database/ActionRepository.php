@@ -78,6 +78,25 @@ final class ActionRepository
     }
 
     /**
+     * @param array<string, mixed> $payload
+     */
+    public function update_payload(int $action_id, array $payload): void
+    {
+        $wpdb = WpDb::get();
+
+        $wpdb->update(
+            $wpdb->prefix . 'awpt_actions',
+            [
+                'payload_json' => wp_json_encode($this->sanitize_payload($payload)),
+                'updated_at' => current_time('mysql'),
+            ],
+            ['id' => $action_id],
+            format: ['%s', '%s'],
+            where_format: ['%d'],
+        );
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function get_accessible_row(int $action_id): ?array
@@ -88,8 +107,9 @@ final class ActionRepository
         $sessions = $wpdb->prefix . 'awpt_sessions';
         $row = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT a.* FROM {$actions} a INNER JOIN {$sessions} s ON s.id = a.session_id WHERE a.id = %d",
+                "SELECT a.* FROM {$actions} a INNER JOIN {$sessions} s ON s.id = a.session_id WHERE a.id = %d AND s.user_id = %d",
                 $action_id,
+                get_current_user_id(),
             ),
             output: \ARRAY_A,
         );

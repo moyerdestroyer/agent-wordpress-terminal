@@ -1,11 +1,10 @@
 import apiFetch from '@wordpress/api-fetch';
 import type {
 	ChatResponse,
-	ContextItem,
-	KnowledgeSearchItem,
 	KnowledgeSettings,
 	KnowledgeStatus,
 	McpStatus,
+	PreviewDetails,
 	ProposedAction,
 	SessionSummary,
 	ToolCall,
@@ -19,6 +18,7 @@ declare global {
 			pluginUrl: string;
 			version: string;
 			nonce: string;
+			proposalTools?: string[];
 			environment?: import('./types').EnvironmentStatus;
 			connection?: {
 				id: string;
@@ -65,6 +65,7 @@ export async function deleteSession(id: number): Promise<{ deleted: boolean; id:
 
 export async function getSession(id: number): Promise<{
 	id: number;
+	user_id?: number;
 	title: string;
 	model?: string;
 	provider?: string;
@@ -73,7 +74,6 @@ export async function getSession(id: number): Promise<{
 	updated_at: string;
 	messages: Array<{ id: number; role: string; content: string; created_at: string }>;
 	tool_calls: ToolCall[];
-	context: ContextItem[];
 	actions: ProposedAction[];
 }> {
 	return apiFetch({
@@ -100,6 +100,13 @@ export async function updateAction(
 	});
 }
 
+export async function fetchActionPreview(actionId: number): Promise<PreviewDetails> {
+	return apiFetch<PreviewDetails>({
+		path: path(`/actions/${actionId}/preview`),
+		method: 'POST',
+	});
+}
+
 export async function getKnowledgeStatus(): Promise<KnowledgeStatus> {
 	return apiFetch<KnowledgeStatus>({ path: path('/knowledge/status') });
 }
@@ -108,12 +115,6 @@ export async function rebuildKnowledge(): Promise<{ status: KnowledgeStatus }> {
 	return apiFetch<{ status: KnowledgeStatus }>({
 		path: path('/knowledge/rebuild'),
 		method: 'POST',
-	});
-}
-
-export async function searchKnowledge(query: string): Promise<{ items: KnowledgeSearchItem[] }> {
-	return apiFetch<{ items: KnowledgeSearchItem[] }>({
-		path: path(`/knowledge/search?query=${encodeURIComponent(query)}`),
 	});
 }
 

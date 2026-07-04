@@ -24,25 +24,26 @@ export interface Message {
 	created_at?: string;
 }
 
-export interface ContextItem {
-	id?: number;
-	item_type: string;
-	item_id: number | null;
-	label: string;
-	payload?: Record<string, unknown>;
-	created_at?: string;
-}
+export type ActionOperation =
+	| 'content_update'
+	| 'new_post'
+	| 'site_settings_update'
+	| 'theme_switch';
 
 export interface ActionPayload {
-	operation?: string;
+	operation?: ActionOperation;
 	post_id?: number;
 	post_type?: string;
 	post_status?: string;
+	original_post_status?: string;
 	original_post_title?: string;
 	original_post_content?: string;
 	post_title?: string;
 	post_content?: string;
+	post_meta?: Record<string, string | number | boolean>;
+	original_post_meta?: Record<string, string | number | boolean>;
 	preview_url?: string;
+	preview_autosave_id?: number;
 	affected?: string;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
@@ -128,18 +129,6 @@ export interface KnowledgeStatus {
 		core_available: boolean;
 		legacy_guidelines_available: boolean;
 	};
-}
-
-export interface KnowledgeSearchItem {
-	id: number;
-	source_kind: string;
-	source_id: string;
-	source_post_id: number | null;
-	label: string;
-	uri: string;
-	excerpt: string;
-	score: number;
-	metadata?: Record<string, unknown>;
 }
 
 export interface KnowledgeSettings {

@@ -37,6 +37,30 @@ Activate the plugin in WP admin → **Settings → Agent Terminal**.
 
 Requires WordPress 6.9+, PHP 8.4+. Abilities API must be available for tool registration.
 
+### AI provider architecture
+
+AWPT's core chat/tool-calling functionality never requires WordPress Core Connectors, the
+WP AI Client, or a companion AI plugin — those are optional accelerators for sites that
+already have them configured. The guaranteed baseline on every supported WordPress
+version is the small set of direct-key providers in `src/Agent/` (`OpenRouterProvider`,
+`OpenAIProvider`), thin subclasses of `ChatCompletionsProvider` talking to OpenAI-compatible
+chat completions endpoints. `OpenAIProvider` has no manual model field (it uses OpenAI's
+evergreen `chat-latest` alias) and transparently reuses an already-configured `openai`
+WordPress Connector key when AWPT's own `awpt_openai_api_key` option is empty
+(`ConnectorInspector::resolve_default_provider_api_key()`), so a key never has to be
+entered twice. `WordPressAIClientProvider` is a separate, fully optional adapter that only
+activates when a site has WordPress 7.0+ (Core Connectors API, shipped March 2026) or an
+`AI`/`wp-ai-client` companion plugin with a ready connector selected — every call site is
+feature-detected (`function_exists()`/`class_exists()`/`method_exists()`) and
+`ProviderFactory` falls back to the direct providers otherwise. `Admin/Page.php` excludes
+any installed Connector whose ID matches a direct provider (currently `openai`) from the
+separate "WordPress Connectors" list, so the same provider is never offered as two
+different radio options. Keep the direct-provider list intentionally small (OpenRouter +
+OpenAI) — additional native providers (Anthropic, Google, self-hosted/local) were tried
+and deliberately removed as unnecessary surface area; OpenRouter already reaches those
+models for anyone who wants them. When adding a new AI integration, prefer extending
+`ChatCompletionsProvider` over adding another Connectors-only code path.
+
 ## Commands
 
 | Task | Command |
@@ -45,6 +69,7 @@ Requires WordPress 6.9+, PHP 8.4+. Abilities API must be available for tool regi
 | PHP format | `composer run format` |
 | PHP analyze | `composer run analyze` |
 | PHP check (lint + analyze) | `composer run check` |
+| PHP tests (bootstrap-free) | `composer run test` |
 | TS/TSX lint | `npm run lint` |
 | TS/TSX fix | `npm run lint:fix` |
 | Build assets | `npm run build` |
@@ -74,9 +99,9 @@ Requires WordPress 6.9+, PHP 8.4+. Abilities API must be available for tool regi
 
 ## MVP scope (0.1)
 
-In scope: admin UI, sessions, context picker, tool registry display, read/analyze/preview abilities, slash commands, action card stubs.
+In scope: admin UI, sessions (per-admin), tool registry display, read/analyze/preview abilities, staged action cards (content updates, new posts, settings, theme switch), slash commands, knowledge auto-retrieval.
 
-Out of scope for now: full autonomous editing, multi-agent orchestration, remote browser workers.
+Out of scope for now: full autonomous editing, multi-agent orchestration, remote browser workers, context picker UI.
 
 ## When changing things
 

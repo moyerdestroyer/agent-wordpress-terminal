@@ -19,11 +19,11 @@ if (!defined('ABSPATH')) {
  */
 final class MessageRepository
 {
-    public function store_message(int $session_id, string $role, string $content, string $created_at): void
+    public function store_message(int $session_id, string $role, string $content, string $created_at): bool
     {
         $wpdb = WpDb::get();
 
-        $wpdb->insert(
+        $inserted = $wpdb->insert(
             $wpdb->prefix . 'awpt_messages',
             [
                 'session_id' => $session_id,
@@ -33,6 +33,8 @@ final class MessageRepository
             ],
             format: ['%d', '%s', '%s', '%s'],
         );
+
+        return false !== $inserted;
     }
 
     /**
@@ -62,11 +64,28 @@ final class MessageRepository
         }
     }
 
-    public function clear_transcript(int $session_id): void
+    /**
+     * Fetch the most recent user message bodies for a session, oldest first. Used to
+     * recover ground-truth URLs a model may have mistyped when reproducing them in a
+     * tool call.
+     *
+     * @return list<string>
+     */
+    public function recent_user_message_contents(int $session_id, int $limit = 5): array
     {
         $wpdb = WpDb::get();
 
-        $wpdb->delete($wpdb->prefix . 'awpt_messages', ['session_id' => $session_id], where_format: ['%d']);
-        $wpdb->delete($wpdb->prefix . 'awpt_tool_calls', ['session_id' => $session_id], where_format: ['%d']);
+        $rows = $wpdb->get_col($wpdb->prepare(
+            "SELECT content FROM {$wpdb->prefix}awpt_messages"
+            . " WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT %d",
+            $session_id,
+            $limit,
+        ));
+
+        if (!$rows) {
+            return [];
+        }
+
+        return array_values(array_reverse(array_map('strval', $rows)));
     }
 }

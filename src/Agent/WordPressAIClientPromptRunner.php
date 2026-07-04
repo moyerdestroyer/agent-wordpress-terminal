@@ -10,8 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-use AWPT\Abilities\AbilitySchemas;
-
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -47,7 +45,12 @@ final class WordPressAIClientPromptRunner
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      * @param string                           $connector_id Selected connector ID.
      * @param list<string>                     $ability_names Ability names exposed to the model.
-     * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string}
+     * @return array{
+     *     content: string,
+     *     raw_tool_calls: array<int, array<string, mixed>>,
+     *     model: string,
+     *     no_text_generation_model: bool
+     * }
      */
     public function generate(array $messages, string $connector_id, array $ability_names = []): array
     {
@@ -55,15 +58,76 @@ final class WordPressAIClientPromptRunner
         $prompt = $this->formatter->build_prompt_text($messages);
         $builder = call_user_func('wp_ai_client_prompt', $prompt);
         $builder = $this->configure_builder($builder, $system_instruction, $connector_id, $ability_names);
+
+        // Pre-flight: WordPress Core's model-matching requires a single model that
+        // supports every attached capability (text generation *and* function calling).
+        // Not every connector/model combination can do both, so check before spending a
+        // request on it, rather than only discovering the mismatch via a failed call.
+        if ([] !== $ability_names && !$this->builder_supports_text_generation($builder)) {
+            $builder = call_user_func('wp_ai_client_prompt', $prompt);
+            $builder = $this->configure_builder($builder, $system_instruction, $connector_id, []);
+            $ability_names = [];
+        }
+
         $result = $this->generate_result($builder);
 
+        // Safety net: even when the pre-flight check passes (or isn't available on this
+        // AI Client version), a single retry without abilities covers any remaining
+        // mismatch the check didn't catch.
         if ([] !== $ability_names && $this->is_text_generation_model_error($result)) {
+            $this->log_provider_error($connector_id, $result, 'pre-flight check passed but generation still failed');
             $builder = call_user_func('wp_ai_client_prompt', $prompt);
             $builder = $this->configure_builder($builder, $system_instruction, $connector_id, []);
             $result = $this->generate_result($builder);
         }
 
-        return $this->parser->parse($result);
+        if (is_wp_error($result)) {
+            $this->log_provider_error($connector_id, $result, 'final generation result');
+        }
+
+        $parsed = $this->parser->parse($result);
+        $parsed['no_text_generation_model'] = $this->is_text_generation_model_error($result);
+
+        return $parsed;
+    }
+
+    /**
+     * Whether the current builder configuration can still perform text generation.
+     *
+     * Uses the documented, cost-free `is_supported_for_text_generation()` check (no
+     * network request). Assumes support when the check itself is unavailable, relying on
+     * the post-hoc retry in generate() as the safety net.
+     */
+    private function builder_supports_text_generation(mixed $builder): bool
+    {
+        if (!is_object($builder) || !is_callable([$builder, 'is_supported_for_text_generation'])) {
+            return true;
+        }
+
+        try {
+            return (bool) $builder->is_supported_for_text_generation();
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
+    /**
+     * Log the raw WP_Error code/message for diagnosability, instead of only ever
+     * surfacing the generic, parsed error text to the end user.
+     */
+    private function log_provider_error(string $connector_id, mixed $result, string $context): void
+    {
+        if (!is_wp_error($result) || !defined('WP_DEBUG') || !\WP_DEBUG) {
+            return;
+        }
+
+        error_log(sprintf(
+            '[AWPT] WordPress AI Client error (%s, connector "%s", %s): %s',
+            $result->get_error_code(),
+            $connector_id,
+            $context,
+            $result->get_error_message(),
+        ));
     }
 
     /**
@@ -141,33 +205,7 @@ final class WordPressAIClientPromptRunner
      */
     private function build_function_declarations(array $ability_names): array
     {
-        if (!function_exists('wp_get_ability')) {
-            return [];
-        }
-
-        $declarations = [];
-
-        foreach ($ability_names as $ability_name) {
-            $ability = wp_get_ability($ability_name);
-
-            if (null === $ability || !class_exists('WP_AI_Client_Ability_Function_Resolver')) {
-                continue;
-            }
-
-            $function_name = \WP_AI_Client_Ability_Function_Resolver::ability_name_to_function_name($ability_name);
-            $raw_schema = method_exists($ability, 'get_input_schema')
-                ? $ability->get_input_schema()
-                : AbilitySchemas::empty_object_input();
-            $normalized_schema = AbilitySchemas::normalize_for_provider($raw_schema);
-
-            $declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
-                $function_name,
-                $ability->get_description(),
-                $normalized_schema,
-            );
-        }
-
-        return $declarations;
+        return new AbilityFunctionDeclarationBuilder()->build($ability_names);
     }
 
     /**

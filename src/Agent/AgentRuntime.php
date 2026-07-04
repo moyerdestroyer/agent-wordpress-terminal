@@ -57,9 +57,18 @@ final class AgentRuntime
         }
 
         if ('clear' === ($response['command'] ?? '')) {
-            $this->messages->clear_transcript($session_id);
+            $this->sessions->clear_transcript($session_id);
         } else {
-            $this->messages->store_message($session_id, 'assistant', (string) $response['content'], $now);
+            $stored = $this->messages->store_message($session_id, 'assistant', (string) $response['content'], $now);
+
+            if (!$stored) {
+                return new \WP_Error(
+                    code: 'awpt_message_store_failed',
+                    message: __('Could not store the assistant response.', 'agent-wordpress-terminal'),
+                    data: ['status' => 500],
+                );
+            }
+
             $this->messages->store_tool_calls($session_id, $response['tool_calls'] ?? [], $now);
         }
 

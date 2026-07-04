@@ -39,6 +39,13 @@ final class ContentCommandRouter
             return $this->error_response('focus', __('Content item not found.', 'agent-wordpress-terminal'));
         }
 
+        if (!current_user_can('read_post', $post_id)) {
+            return $this->error_response('focus', __(
+                'You do not have permission to focus on this content.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
         return [
             'content' => sprintf(
                 /* translators: %s: post title */

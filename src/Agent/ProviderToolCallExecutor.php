@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ProposalAbilities;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -87,15 +89,7 @@ final class ProviderToolCallExecutor
         $tool_name = $tool_registry->tool_name_for_function($function_name);
         $input = $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}'));
 
-        if (in_array(
-            $tool_name,
-            [
-                'awpt/propose-content-update',
-                'awpt/propose-site-settings-update',
-                'awpt/propose-theme-switch',
-            ],
-            true,
-        )) {
+        if (ProposalAbilities::requires_session_id($tool_name ?? '')) {
             $input['session_id'] = $session_id;
         }
 

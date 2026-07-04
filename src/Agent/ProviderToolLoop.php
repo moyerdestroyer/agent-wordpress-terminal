@@ -121,15 +121,7 @@ final class ProviderToolLoop
      */
     private function is_proposal_tool(array $tool_call): bool
     {
-        return in_array(
-            (string) ($tool_call['tool'] ?? ''),
-            [
-                'awpt/propose-content-update',
-                'awpt/propose-site-settings-update',
-                'awpt/propose-theme-switch',
-            ],
-            true,
-        );
+        return ToolRegistry::is_proposal_ability((string) ($tool_call['tool'] ?? ''));
     }
 
     /**

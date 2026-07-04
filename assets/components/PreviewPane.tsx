@@ -1,179 +1,52 @@
 import { Button } from '@wordpress/components';
-import { useEffect, useMemo, useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import type {
-	ActionPayload,
-	ContextItem,
-	PreviewDetails,
-	ProposedAction,
-	ToolCall,
-} from '../types';
+import { actionMetadata, formatValue, titleCase } from '../actionDisplay';
+import type { PreviewDetails, ProposedAction } from '../types';
 
 interface PreviewPaneProps {
 	preview: PreviewDetails | null;
-	contextItems: ContextItem[];
-	toolCalls: ToolCall[];
 	action: ProposedAction | null;
 }
 
-type PreviewTab = 'preview' | 'inspector' | 'compare';
-
-function latestToolOutput(toolCalls: ToolCall[], tool: string): Record<string, unknown> | null {
-	const call = [...toolCalls].reverse().find((item) => item.tool === tool);
-
-	return call?.output ?? null;
-}
-
-function formatValue(value: unknown): string {
-	if (typeof value === 'string') {
-		return value;
-	}
-
-	if (value === null || value === undefined) {
-		return '';
-	}
-
-	return JSON.stringify(value, null, 2);
-}
+type PreviewTab = 'preview' | 'compare';
 
 function stripBlocks(content: string): string {
 	return content.replace(/<!--[\s\S]*?-->/g, '').trim();
 }
 
-function titleCase(value: string): string {
-	return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: string }> {
-	if (!payload) {
-		return [];
-	}
-
-	if (payload.operation === 'site_settings_update') {
-		return [
-			{
-				label: __('Target', 'agent-wordpress-terminal'),
-				value: __('Site settings', 'agent-wordpress-terminal'),
-			},
-			{
-				label: __('Settings', 'agent-wordpress-terminal'),
-				value: Object.keys(payload.settings_changes ?? {}).join(', '),
-			},
-		].filter((item) => item.value !== '');
-	}
-
-	if (payload.operation === 'theme_switch') {
-		return [
-			{
-				label: __('Target', 'agent-wordpress-terminal'),
-				value: __('Active theme', 'agent-wordpress-terminal'),
-			},
-			{
-				label: __('Current', 'agent-wordpress-terminal'),
-				value: payload.current_theme ?? payload.current_stylesheet ?? '',
-			},
-			{
-				label: __('New', 'agent-wordpress-terminal'),
-				value: payload.theme_name ?? payload.stylesheet ?? '',
-			},
-		].filter((item) => item.value !== '');
-	}
-
-	const postTitle = payload.original_post_title || payload.post_title || '';
-	const postType = payload.post_type
-		? titleCase(payload.post_type)
-		: __('Post/Page', 'agent-wordpress-terminal');
-	const target = [
-		postType,
-		payload.post_id ? `#${payload.post_id}` : '',
-		postTitle ? `- ${postTitle}` : '',
-	]
-		.filter(Boolean)
-		.join(' ');
-
-	return [
-		{
-			label: __('Target', 'agent-wordpress-terminal'),
-			value: target,
-		},
-		{
-			label: __('Status', 'agent-wordpress-terminal'),
-			value: payload.post_status ? titleCase(payload.post_status) : '',
-		},
-		{
-			label: __('Blocks / area', 'agent-wordpress-terminal'),
-			value: payload.affected ?? '',
-		},
-	].filter((item) => item.value !== '');
-}
-
-function InspectorView({
-	contextItems,
-	toolCalls,
-}: {
-	contextItems: ContextItem[];
-	toolCalls: ToolCall[];
-}): JSX.Element {
-	const blockTree = latestToolOutput(toolCalls, 'awpt/read-block-tree');
-	const analysis = latestToolOutput(toolCalls, 'awpt/analyze-page');
-	const readContent = latestToolOutput(toolCalls, 'awpt/read-content');
-	const blocks = blockTree?.blocks ?? analysis?.block_tree ?? [];
-
-	return (
-		<div className="awpt-preview-panel">
-			<h3 className="awpt-section-title">{__('Evidence', 'agent-wordpress-terminal')}</h3>
-			<dl className="awpt-inspector-list">
-				<div>
-					<dt>{__('Historical context', 'agent-wordpress-terminal')}</dt>
-					<dd>{contextItems.length}</dd>
-				</div>
-				<div>
-					<dt>{__('Latest content', 'agent-wordpress-terminal')}</dt>
-					<dd>
-						{(readContent?.title as string | undefined) ?? __('None', 'agent-wordpress-terminal')}
-					</dd>
-				</div>
-				<div>
-					<dt>{__('Risk', 'agent-wordpress-terminal')}</dt>
-					<dd>
-						{(analysis?.risk_level as string | undefined) ??
-							__('Unknown', 'agent-wordpress-terminal')}
-					</dd>
-				</div>
-			</dl>
-
-			<div className="awpt-preview-detail">
-				<strong>{__('Block tree', 'agent-wordpress-terminal')}</strong>
-				{Array.isArray(blocks) && blocks.length > 0 ? (
-					<pre>{JSON.stringify(blocks, null, 2)}</pre>
-				) : (
-					<span>
-						{__(
-							'Ask the agent to analyze a page or inspect its block structure.',
-							'agent-wordpress-terminal',
-						)}
-					</span>
-				)}
-			</div>
-		</div>
-	);
-}
-
 function CompareView({ action }: { action: ProposedAction | null }): JSX.Element {
-	const originalTitle =
-		action?.payload?.original_post_title ?? action?.payload?.current_theme ?? '';
-	const newTitle = action?.payload?.post_title ?? action?.payload?.theme_name ?? originalTitle;
-	const originalContent = stripBlocks(
+	const buildCompareContent = (
+		content?: string,
+		status?: string,
+		meta?: Record<string, string | number | boolean>,
+	): string => {
+		const sections = [
+			status ? `${__('Status', 'agent-wordpress-terminal')}: ${titleCase(status)}` : '',
+			meta && Object.keys(meta).length > 0
+				? `${__('Meta', 'agent-wordpress-terminal')}:\n${formatValue(meta)}`
+				: '',
+			content ? stripBlocks(content) : '',
+		].filter(Boolean);
+
+		return sections.join('\n\n');
+	};
+
+	const originalContent = buildCompareContent(
 		action?.payload?.original_post_content ??
 			(action?.payload?.original_settings
 				? JSON.stringify(action.payload.original_settings, null, 2)
-				: (action?.payload?.current_stylesheet ?? '')),
+				: action?.payload?.current_stylesheet),
+		action?.payload?.original_post_status,
+		action?.payload?.original_post_meta,
 	);
-	const newContent = stripBlocks(
+	const newContent = buildCompareContent(
 		action?.payload?.post_content ??
 			(action?.payload?.settings_changes
 				? JSON.stringify(action.payload.settings_changes, null, 2)
-				: (action?.payload?.stylesheet ?? '')),
+				: action?.payload?.stylesheet),
+		action?.payload?.post_status,
+		action?.payload?.post_meta,
 	);
 	const metadata = actionMetadata(action?.payload);
 
@@ -194,12 +67,8 @@ function CompareView({ action }: { action: ProposedAction | null }): JSX.Element
 	return (
 		<div className="awpt-preview-panel">
 			<h3 className="awpt-section-title">{__('Before / After', 'agent-wordpress-terminal')}</h3>
-			<div className="awpt-compare-meta">
-				<strong>{action.title}</strong>
-				<span>{action.status}</span>
-			</div>
 			{metadata.length > 0 ? (
-				<dl className="awpt-compare-context">
+				<dl className="awpt-action-card__meta">
 					{metadata.map((item) => (
 						<div key={item.label}>
 							<dt>{item.label}</dt>
@@ -208,90 +77,68 @@ function CompareView({ action }: { action: ProposedAction | null }): JSX.Element
 					))}
 				</dl>
 			) : null}
-			<div className="awpt-compare-grid">
+			<div className="awpt-preview-compare">
 				<div>
 					<h4>{__('Before', 'agent-wordpress-terminal')}</h4>
-					{originalTitle ? <strong>{originalTitle}</strong> : null}
-					<pre>{formatValue(originalContent || action.payload?.original_post_content)}</pre>
+					<pre>{originalContent || __('(empty)', 'agent-wordpress-terminal')}</pre>
 				</div>
 				<div>
 					<h4>{__('After', 'agent-wordpress-terminal')}</h4>
-					{newTitle ? <strong>{newTitle}</strong> : null}
-					<pre>{formatValue(newContent || action.payload?.post_content)}</pre>
+					<pre>{newContent || __('(empty)', 'agent-wordpress-terminal')}</pre>
 				</div>
 			</div>
 		</div>
 	);
 }
 
-export function PreviewPane({
-	preview,
-	contextItems,
-	toolCalls,
-	action,
-}: PreviewPaneProps): JSX.Element {
+export function PreviewPane({ preview, action }: PreviewPaneProps): JSX.Element {
 	const [tab, setTab] = useState<PreviewTab>('preview');
-	const hasComparison = Boolean(action);
-	const iframeSrc = preview?.iframe?.src ?? preview?.preview_url ?? null;
-	const iframeTitle =
-		preview?.iframe?.title ?? preview?.title ?? __('Preview', 'agent-wordpress-terminal');
+	const iframe = preview?.iframe;
 
 	useEffect(() => {
-		if (action && !iframeSrc) {
-			setTab('compare');
-		}
-	}, [action, iframeSrc]);
+		setTab('preview');
+	}, [preview?.preview_url, action?.id]);
 
-	const tabs = useMemo(
-		() => [
-			{ key: 'preview' as const, label: __('Preview', 'agent-wordpress-terminal') },
-			{ key: 'inspector' as const, label: __('Evidence', 'agent-wordpress-terminal') },
-			{ key: 'compare' as const, label: __('Compare', 'agent-wordpress-terminal') },
-		],
-		[],
-	);
+	const title = preview?.title ?? action?.title ?? __('Preview', 'agent-wordpress-terminal');
 
 	return (
 		<div className="awpt-preview-pane">
-			<div className="awpt-preview-tabs">
-				{tabs.map((item) => (
+			<div className="awpt-preview-pane__header">
+				<h3>{title}</h3>
+				<div className="awpt-preview-pane__tabs">
 					<Button
-						key={item.key}
-						variant={tab === item.key ? 'primary' : 'secondary'}
-						onClick={() => setTab(item.key)}
-						disabled={item.key === 'compare' && !hasComparison}
+						variant={tab === 'preview' ? 'primary' : 'secondary'}
+						onClick={() => setTab('preview')}
 					>
-						{item.label}
+						{__('Preview', 'agent-wordpress-terminal')}
 					</Button>
-				))}
-			</div>
-
-			{tab === 'preview' ? (
-				<div className="awpt-preview-panel">
-					<h3 className="awpt-section-title">{__('Preview', 'agent-wordpress-terminal')}</h3>
-					{iframeSrc ? (
-						<>
-							<p className="awpt-empty" style={{ marginBottom: 8 }}>
-								{preview?.title}
-							</p>
-							<iframe className="awpt-preview-frame" src={iframeSrc} title={iframeTitle} />
-						</>
-					) : (
-						<p className="awpt-empty">
-							{__(
-								'Use /preview {id} to review a page, or Preview on a proposed action to inspect staged changes. Knowledge retrieval appears in tool evidence, not this preview frame.',
-								'agent-wordpress-terminal',
-							)}
-						</p>
-					)}
+					<Button
+						variant={tab === 'compare' ? 'primary' : 'secondary'}
+						onClick={() => setTab('compare')}
+					>
+						{__('Compare', 'agent-wordpress-terminal')}
+					</Button>
 				</div>
-			) : null}
-
-			{tab === 'inspector' ? (
-				<InspectorView contextItems={contextItems} toolCalls={toolCalls} />
-			) : null}
-
-			{tab === 'compare' ? <CompareView action={action} /> : null}
+			</div>
+			{tab === 'preview' ? (
+				iframe?.src ? (
+					<iframe
+						className="awpt-preview-pane__iframe"
+						src={iframe.src}
+						title={iframe.title}
+						height={iframe.height}
+					/>
+				) : (
+					<p className="awpt-empty">
+						{__(
+							'Choose Preview on a proposed post action to load a live preview.',
+							'agent-wordpress-terminal',
+						)}
+					</p>
+				)
+			) : (
+				<CompareView action={action} />
+			)}
 		</div>
 	);
 }

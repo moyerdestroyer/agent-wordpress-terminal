@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\Abilities\AbilitySchemas;
+use AWPT\Support\ProposalAbilities;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -35,9 +36,27 @@ final class ToolRegistry
         'awpt__search_knowledge' => 'awpt/search-knowledge',
         'awpt__read_knowledge' => 'awpt/read-knowledge',
         'awpt__propose_content_update' => 'awpt/propose-content-update',
+        'awpt__propose_new_post' => 'awpt/propose-new-post',
         'awpt__propose_site_settings_update' => 'awpt/propose-site-settings-update',
         'awpt__propose_theme_switch' => 'awpt/propose-theme-switch',
+        'awpt__sideload_media' => 'awpt/sideload-media',
     ];
+
+    /**
+     * @return list<string>
+     */
+    public static function proposal_ability_names(): array
+    {
+        return ProposalAbilities::names();
+    }
+
+    /**
+     * Whether a successful execution of this ability should surface as a staged action.
+     */
+    public static function is_proposal_ability(string $tool_name): bool
+    {
+        return ProposalAbilities::is_proposal($tool_name);
+    }
 
     /**
      * Return ability names that may run automatically during provider generation.

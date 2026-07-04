@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
+use AWPT\Abilities\ActionAppliers\NewPostActionApplier;
 use AWPT\Abilities\ActionAppliers\SiteSettingsActionApplier;
 use AWPT\Abilities\ActionAppliers\ThemeSwitchActionApplier;
 use AWPT\Database\ActionRepository;
@@ -26,17 +27,20 @@ final class ApplyAction
 {
     private ActionRepository $actions;
     private ContentUpdateActionApplier $content_updates;
+    private NewPostActionApplier $new_posts;
     private SiteSettingsActionApplier $site_settings;
     private ThemeSwitchActionApplier $theme_switches;
 
     public function __construct(
         ?ActionRepository $actions = null,
         ?ContentUpdateActionApplier $content_updates = null,
+        ?NewPostActionApplier $new_posts = null,
         ?SiteSettingsActionApplier $site_settings = null,
         ?ThemeSwitchActionApplier $theme_switches = null,
     ) {
         $this->actions = $actions ?? new ActionRepository();
         $this->content_updates = $content_updates ?? new ContentUpdateActionApplier();
+        $this->new_posts = $new_posts ?? new NewPostActionApplier();
         $this->site_settings = $site_settings ?? new SiteSettingsActionApplier();
         $this->theme_switches = $theme_switches ?? new ThemeSwitchActionApplier();
     }
@@ -88,6 +92,7 @@ final class ApplyAction
             'content_update' => (int) ($payload['post_id'] ?? 0) > 0
                 && current_user_can('edit_post', (int) ($payload['post_id'] ?? 0))
                 && current_user_can(capability: 'manage_options'),
+            'new_post' => current_user_can('edit_posts') && current_user_can(capability: 'manage_options'),
             'site_settings_update' => current_user_can('manage_options'),
             'theme_switch' => current_user_can('switch_themes') && current_user_can('manage_options'),
             default => false,
@@ -104,29 +109,33 @@ final class ApplyAction
         $action = $this->actions->get_accessible_row($action_id);
 
         if (null === $action) {
-            return new \WP_Error(code: 'awpt_action_not_found', message: __(
-                'Action not found.',
-                'agent-wordpress-terminal',
-            ));
+            return new \WP_Error(
+                code: 'awpt_action_not_found',
+                message: __('Action not found.', 'agent-wordpress-terminal'),
+                data: ['status' => 404],
+            );
         }
 
         if ('approved' !== $action['status']) {
-            return new \WP_Error(code: 'awpt_action_not_approved', message: __(
-                'Action must be approved before it can be applied.',
-                'agent-wordpress-terminal',
-            ));
+            return new \WP_Error(
+                code: 'awpt_action_not_approved',
+                message: __('Action must be approved before it can be applied.', 'agent-wordpress-terminal'),
+                data: ['status' => 409],
+            );
         }
 
         $payload = $this->actions->decode_payload($action);
 
         $result = match ((string) ($payload['operation'] ?? '')) {
             'content_update' => $this->content_updates->apply($payload),
+            'new_post' => $this->new_posts->apply($payload),
             'site_settings_update' => $this->site_settings->apply($payload),
             'theme_switch' => $this->theme_switches->apply($payload),
-            default => new \WP_Error(code: 'awpt_unsupported_action', message: __(
-                'Unsupported action operation.',
-                'agent-wordpress-terminal',
-            )),
+            default => new \WP_Error(
+                code: 'awpt_unsupported_action',
+                message: __('Unsupported action operation.', 'agent-wordpress-terminal'),
+                data: ['status' => 400],
+            ),
         };
 
         if (is_wp_error($result)) {

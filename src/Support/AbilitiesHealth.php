@@ -33,9 +33,11 @@ final class AbilitiesHealth
         'awpt/search-knowledge',
         'awpt/read-knowledge',
         'awpt/propose-content-update',
+        'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
         'awpt/apply-action',
+        'awpt/sideload-media',
     ];
 
     /**
