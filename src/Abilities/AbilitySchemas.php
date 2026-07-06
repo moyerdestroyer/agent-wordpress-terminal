@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Builds provider-safe JSON Schema fragments for ability registration.
  */
-final class AbilitySchemas
-{
+final class AbilitySchemas {
     /**
      * Schema for abilities that accept no input.
      *
      * @return array<string, mixed>
      */
-    public static function empty_object_input(): array
-    {
+    public static function empty_object_input(): array {
         return [
             'type' => 'object',
             'additionalProperties' => false,
@@ -38,8 +36,7 @@ final class AbilitySchemas
      * @param array<string, mixed> $schema Ability input schema.
      * @return array<string, mixed>
      */
-    public static function normalize_for_provider(array $schema): array
-    {
+    public static function normalize_for_provider(array $schema): array {
         if ([] === $schema) {
             return self::empty_object_input();
         }

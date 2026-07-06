@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Abilities\ActionAppliers\NewPostActionApplier;
 
-function test_new_post_action_applier(): void
-{
+function test_new_post_action_applier(): void {
     $applier = new NewPostActionApplier();
 
     // A well-formed payload creates a draft post and returns its ID and edit link.
@@ -118,7 +117,7 @@ function test_new_post_action_applier(): void
 
     // Users without edit_posts capability are denied, regardless of payload content.
     awpt_test_reset_state();
-    $GLOBALS['awpt_test_current_user_can'] = static fn (string $capability): bool => 'edit_posts' !== $capability;
+    $GLOBALS['awpt_test_current_user_can'] = static fn(string $capability): bool => 'edit_posts' !== $capability;
     $result = $applier->apply(['post_title' => 'Title', 'post_content' => 'Content']);
     Assert::true(is_wp_error($result), 'a user without edit_posts should be denied');
 

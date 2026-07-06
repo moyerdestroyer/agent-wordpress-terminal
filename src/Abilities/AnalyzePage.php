@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Returns an agent-friendly page brief.
  */
-final class AnalyzePage
-{
+final class AnalyzePage {
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         wp_register_ability('awpt/analyze-page', [
             'label' => __('Analyze Page', 'agent-wordpress-terminal'),
             'description' => __(
@@ -60,8 +58,7 @@ final class AnalyzePage
      *
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
         return $post_id > 0 && current_user_can('read_post', $post_id);
@@ -73,8 +70,7 @@ final class AnalyzePage
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $post_id = (int) ($input['id'] ?? 0);
         $post = get_post($post_id);
 
@@ -116,8 +112,7 @@ final class AnalyzePage
      * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
-    private function extract_headings(array $blocks): array
-    {
+    private function extract_headings(array $blocks): array {
         $headings = [];
 
         foreach ($blocks as $block) {
@@ -137,8 +132,7 @@ final class AnalyzePage
      * @param string $content Post content.
      * @return array<int, string>
      */
-    private function extract_shortcodes(string $content): array
-    {
+    private function extract_shortcodes(string $content): array {
         $matches = [];
         preg_match_all('/\[(\w+)/', $content, $matches);
 
@@ -151,8 +145,7 @@ final class AnalyzePage
      * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
-    private function detect_forms(array $blocks): array
-    {
+    private function detect_forms(array $blocks): array {
         $forms = [];
 
         foreach ($blocks as $block) {
@@ -174,8 +167,7 @@ final class AnalyzePage
      * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
      * @return array<int, string>
      */
-    private function detect_custom_blocks(array $blocks): array
-    {
+    private function detect_custom_blocks(array $blocks): array {
         $custom = [];
 
         foreach ($blocks as $block) {
@@ -198,8 +190,7 @@ final class AnalyzePage
      * @param array<int, string> $shortcodes Shortcodes.
      * @param array<int, string> $custom Custom blocks.
      */
-    private function assess_risk(array $forms, array $shortcodes, array $custom): string
-    {
+    private function assess_risk(array $forms, array $shortcodes, array $custom): string {
         if ([] !== $forms || count($shortcodes) > 2) {
             return 'medium';
         }
@@ -218,8 +209,7 @@ final class AnalyzePage
      * @param array<int, string>   $headings Headings found.
      * @return array<int, string>
      */
-    private function recommend_actions(string $risk_level, array $headings): array
-    {
+    private function recommend_actions(string $risk_level, array $headings): array {
         $actions = [
             __('Review block structure for layout improvements.', 'agent-wordpress-terminal'),
         ];

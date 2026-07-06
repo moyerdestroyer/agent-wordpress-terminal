@@ -20,10 +20,8 @@ if (!defined('ABSPATH')) {
 /**
  * Exposes Knowledge status, settings, and rebuild.
  */
-final class KnowledgeController
-{
-    public function register_routes(): void
-    {
+final class KnowledgeController {
+    public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/knowledge/status', [
             [
                 'methods' => \WP_REST_Server::READABLE,
@@ -54,18 +52,15 @@ final class KnowledgeController
         ]);
     }
 
-    public function can_manage(): bool
-    {
+    public function can_manage(): bool {
         return current_user_can('manage_options');
     }
 
-    public function status(): \WP_REST_Response
-    {
+    public function status(): \WP_REST_Response {
         return new \WP_REST_Response(new KnowledgeIndexer()->status(), 200);
     }
 
-    public function rebuild(): \WP_REST_Response
-    {
+    public function rebuild(): \WP_REST_Response {
         try {
             $result = new KnowledgeIndexer()->rebuild();
         } catch (\Throwable $throwable) {
@@ -82,13 +77,11 @@ final class KnowledgeController
         ]), 200);
     }
 
-    public function settings(): \WP_REST_Response
-    {
+    public function settings(): \WP_REST_Response {
         return new \WP_REST_Response($this->settings_payload(), 200);
     }
 
-    public function update_settings(\WP_REST_Request $request): \WP_REST_Response
-    {
+    public function update_settings(\WP_REST_Request $request): \WP_REST_Response {
         $roots = $request->get_param('roots');
         $max_file_size = (int) $request->get_param('max_file_size');
         $reader = new FilesystemSourceReader();
@@ -107,8 +100,7 @@ final class KnowledgeController
     /**
      * @return array<string, mixed>
      */
-    private function settings_payload(): array
-    {
+    private function settings_payload(): array {
         $reader = new FilesystemSourceReader();
 
         return [

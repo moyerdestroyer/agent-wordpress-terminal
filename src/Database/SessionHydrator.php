@@ -19,14 +19,12 @@ if (!defined('ABSPATH')) {
 /**
  * Converts raw database rows into REST-friendly session shapes.
  */
-final class SessionHydrator
-{
+final class SessionHydrator {
     /**
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
-    public function tool_calls(array $rows, bool $include_outputs = true): array
-    {
+    public function tool_calls(array $rows, bool $include_outputs = true): array {
         $hydrated = [];
 
         foreach ($rows as $tool_call) {
@@ -56,8 +54,7 @@ final class SessionHydrator
     /**
      * @param array<array-key, mixed> $output
      */
-    private function tool_output_summary(string $tool, array $output): string
-    {
+    private function tool_output_summary(string $tool, array $output): string {
         if ([] === $output) {
             return '';
         }
@@ -85,8 +82,7 @@ final class SessionHydrator
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
-    public function actions(array $rows): array
-    {
+    public function actions(array $rows): array {
         $hydrated = [];
 
         foreach ($rows as $action) {

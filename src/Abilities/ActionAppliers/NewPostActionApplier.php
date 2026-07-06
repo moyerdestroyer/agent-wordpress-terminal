@@ -22,12 +22,10 @@ if (!defined('ABSPATH')) {
  * regardless of what was proposed — publishing remains a separate, deliberate admin
  * action taken outside of AWPT.
  */
-final class NewPostActionApplier
-{
+final class NewPostActionApplier {
     private NewPostStagingDraft $staging_drafts;
 
-    public function __construct(?NewPostStagingDraft $staging_drafts = null)
-    {
+    public function __construct(?NewPostStagingDraft $staging_drafts = null) {
         $this->staging_drafts = $staging_drafts ?? new NewPostStagingDraft();
     }
 
@@ -35,8 +33,7 @@ final class NewPostActionApplier
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    public function apply(array $payload): array|\WP_Error
-    {
+    public function apply(array $payload): array|\WP_Error {
         if (!current_user_can('edit_posts')) {
             return new \WP_Error(
                 code: 'awpt_cannot_create_post',

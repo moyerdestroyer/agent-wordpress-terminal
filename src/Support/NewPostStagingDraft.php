@@ -18,16 +18,14 @@ if (!defined('ABSPATH')) {
  * New-post actions have no existing post to autosave against, so AWPT inserts a
  * marked staging draft that can be previewed before apply and trashed on reject.
  */
-final class NewPostStagingDraft
-{
+final class NewPostStagingDraft {
     public const META_KEY = '_awpt_staging_draft';
 
     /**
      * @param array<string, mixed> $payload
      * @return int|\WP_Error
      */
-    public function create(array $payload): int|\WP_Error
-    {
+    public function create(array $payload): int|\WP_Error {
         if (!current_user_can('edit_posts')) {
             return new \WP_Error(
                 code: 'awpt_cannot_create_post',
@@ -75,8 +73,7 @@ final class NewPostStagingDraft
      * @param array<string, mixed> $payload
      * @return true|\WP_Error
      */
-    public function sync(int $post_id, array $payload): true|\WP_Error
-    {
+    public function sync(int $post_id, array $payload): true|\WP_Error {
         if (!$this->is_staging_draft($post_id)) {
             return new \WP_Error(
                 code: 'awpt_invalid_staging_post',
@@ -127,8 +124,7 @@ final class NewPostStagingDraft
     /**
      * @param array<array-key, mixed> $payload
      */
-    public function discard(array $payload): void
-    {
+    public function discard(array $payload): void {
         $post_id = (int) ($payload['post_id'] ?? 0);
 
         if ($post_id <= 0 || !$this->is_staging_draft($post_id)) {
@@ -138,13 +134,11 @@ final class NewPostStagingDraft
         wp_trash_post($post_id);
     }
 
-    public function finalize(int $post_id): void
-    {
+    public function finalize(int $post_id): void {
         delete_post_meta($post_id, self::META_KEY);
     }
 
-    public function is_staging_draft(int $post_id): bool
-    {
+    public function is_staging_draft(int $post_id): bool {
         return (bool) get_post_meta($post_id, self::META_KEY, true);
     }
 
@@ -152,8 +146,7 @@ final class NewPostStagingDraft
      * Set a featured image when needed. WordPress's set_post_thumbnail() returns false when
      * the attachment is already assigned, so success is verified by reading _thumbnail_id.
      */
-    public function ensure_featured_image(int $post_id, int $attachment_id): bool
-    {
+    public function ensure_featured_image(int $post_id, int $attachment_id): bool {
         if ($attachment_id <= 0) {
             return true;
         }
@@ -170,8 +163,7 @@ final class NewPostStagingDraft
     /**
      * @param array<string, mixed> $payload
      */
-    private function apply_featured_image(int $post_id, array $payload): void
-    {
+    private function apply_featured_image(int $post_id, array $payload): void {
         $featured_image_id = (int) ($payload['featured_image_id'] ?? 0);
 
         if ($featured_image_id > 0) {

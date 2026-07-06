@@ -26,8 +26,7 @@ if (!defined('ABSPATH')) {
  * Use this instead of awpt/propose-content-update when there is no existing post to
  * edit — propose-content-update can only ever modify a post that already exists.
  */
-final class ProposeNewPost
-{
+final class ProposeNewPost {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;
@@ -45,8 +44,7 @@ final class ProposeNewPost
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/propose-new-post',
             'label' => __('Propose New Post', 'agent-wordpress-terminal'),
@@ -114,8 +112,7 @@ final class ProposeNewPost
     /**
      * @param array<string, mixed> $input
      */
-    public function can_propose(array $input): bool
-    {
+    public function can_propose(array $input): bool {
         unset($input);
 
         return current_user_can('edit_posts') && current_user_can('manage_options');
@@ -125,8 +122,7 @@ final class ProposeNewPost
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
 
         if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
@@ -211,8 +207,7 @@ final class ProposeNewPost
         return is_array($action) ? $action : [];
     }
 
-    private function validate_featured_image(int $attachment_id): ?string
-    {
+    private function validate_featured_image(int $attachment_id): ?string {
         $attachment = get_post($attachment_id);
 
         if (!$attachment instanceof \WP_Post || 'attachment' !== $attachment->post_type) {

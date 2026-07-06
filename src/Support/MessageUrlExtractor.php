@@ -18,16 +18,14 @@ if (!defined('ABSPATH')) {
  * Pure text-extraction logic, kept free of WordPress/database dependencies so it can
  * be unit tested directly.
  */
-final class MessageUrlExtractor
-{
+final class MessageUrlExtractor {
     /**
      * Extract http(s) URLs from a block of text, trimming trailing prose punctuation
      * (e.g. a period or closing parenthesis that isn't actually part of the URL).
      *
      * @return list<string>
      */
-    public function extract(string $text): array
-    {
+    public function extract(string $text): array {
         if (!preg_match_all('/https?:\/\/[^\s<>"]+/i', $text, $matches)) {
             return [];
         }

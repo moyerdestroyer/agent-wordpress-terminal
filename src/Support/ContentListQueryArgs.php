@@ -17,16 +17,14 @@ if (!defined('ABSPATH')) {
 /**
  * Constructs optimized WP_Query args for list-content.
  */
-final class ContentListQueryArgs
-{
+final class ContentListQueryArgs {
     /**
      * @param array<string, mixed> $filters
      * @param list<string> $post_types
      * @param list<string> $statuses
      * @return array<string, mixed>
      */
-    public function build(array $filters, array $post_types, array $statuses): array
-    {
+    public function build(array $filters, array $post_types, array $statuses): array {
         $args = [
             'post_type' => $post_types,
             'post_status' => $statuses,
@@ -62,8 +60,7 @@ final class ContentListQueryArgs
      * @param list<\WP_Post|int|string> $posts
      * @return list<int>
      */
-    public function post_ids_from_query(array $posts): array
-    {
+    public function post_ids_from_query(array $posts): array {
         $ids = [];
 
         foreach ($posts as $post) {
@@ -78,8 +75,7 @@ final class ContentListQueryArgs
         return array_values(array_filter($ids, static fn(int $id): bool => $id > 0));
     }
 
-    private function supports_title_only_search(): bool
-    {
+    private function supports_title_only_search(): bool {
         return class_exists('WP_Query') && version_compare(get_bloginfo('version'), '6.2', '>=');
     }
 }

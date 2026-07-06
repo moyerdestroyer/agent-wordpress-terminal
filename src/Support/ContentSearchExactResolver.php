@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves direct ID, URL, and slug matches before text search.
  */
-final class ContentSearchExactResolver
-{
+final class ContentSearchExactResolver {
     /**
      * @param list<string> $post_types
      * @return list<\WP_Post>
      */
-    public function candidates(string $query, array $post_types): array
-    {
+    public function candidates(string $query, array $post_types): array {
         return array_values(array_filter(
             [
                 $this->post_from_id($query, $post_types),
@@ -38,8 +36,7 @@ final class ContentSearchExactResolver
     /**
      * @param list<string> $post_types
      */
-    private function post_from_id(string $query, array $post_types): ?\WP_Post
-    {
+    private function post_from_id(string $query, array $post_types): ?\WP_Post {
         if (!ctype_digit($query)) {
             return null;
         }
@@ -56,8 +53,7 @@ final class ContentSearchExactResolver
     /**
      * @param list<string> $post_types
      */
-    private function post_from_url(string $query, array $post_types): ?\WP_Post
-    {
+    private function post_from_url(string $query, array $post_types): ?\WP_Post {
         if ('' === $query || !str_contains($query, '://') || !function_exists('url_to_postid')) {
             return null;
         }
@@ -74,8 +70,7 @@ final class ContentSearchExactResolver
     /**
      * @param list<string> $post_types
      */
-    private function post_from_slug(string $query, array $post_types): ?\WP_Post
-    {
+    private function post_from_slug(string $query, array $post_types): ?\WP_Post {
         $slug = $this->slug_from_query($query);
 
         if ('' === $slug || !function_exists('get_page_by_path')) {
@@ -87,8 +82,7 @@ final class ContentSearchExactResolver
         return $post instanceof \WP_Post ? $post : null;
     }
 
-    private function slug_from_query(string $query): string
-    {
+    private function slug_from_query(string $query): string {
         $query = trim($query);
 
         if ('' === $query) {
@@ -106,8 +100,7 @@ final class ContentSearchExactResolver
     /**
      * @param list<string> $post_types
      */
-    private function is_allowed_post(\WP_Post $post, array $post_types): bool
-    {
+    private function is_allowed_post(\WP_Post $post, array $post_types): bool {
         return in_array($post->post_type, $post_types, true);
     }
 }

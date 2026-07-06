@@ -17,12 +17,10 @@ if (!defined('ABSPATH')) {
 /**
  * Converts parse_blocks() arrays into compact, path-addressable summaries.
  */
-final class BlockTreeFormatter
-{
+final class BlockTreeFormatter {
     private BlockTreeArrays $arrays;
 
-    public function __construct(?BlockTreeArrays $arrays = null)
-    {
+    public function __construct(?BlockTreeArrays $arrays = null) {
         $this->arrays = $arrays ?? new BlockTreeArrays();
     }
 
@@ -30,16 +28,14 @@ final class BlockTreeFormatter
      * @param array<int, array<string, mixed>> $blocks
      * @return array<int, array<string, mixed>>
      */
-    public function normalized(array $blocks): array
-    {
+    public function normalized(array $blocks): array {
         return $this->normalize_blocks($blocks, '');
     }
 
     /**
      * @param array<int|string, array<string, mixed>> $blocks
      */
-    public function count(array $blocks): int
-    {
+    public function count(array $blocks): int {
         $count = 0;
 
         foreach ($blocks as $block) {
@@ -57,8 +53,7 @@ final class BlockTreeFormatter
     /**
      * @param array<string, mixed> $block
      */
-    public static function fingerprint(array $block): string
-    {
+    public static function fingerprint(array $block): string {
         $data = [
             'name' => is_string($block['blockName'] ?? null) ? $block['blockName'] : '',
             'attrs' => is_array($block['attrs'] ?? null) ? $block['attrs'] : [],
@@ -72,8 +67,7 @@ final class BlockTreeFormatter
      * @param array<int|string, array<string, mixed>> $blocks
      * @return array<int, array<string, mixed>>
      */
-    private function normalize_blocks(array $blocks, string $parent_path): array
-    {
+    private function normalize_blocks(array $blocks, string $parent_path): array {
         $normalized = [];
         $visible_index = 0;
 
@@ -94,8 +88,7 @@ final class BlockTreeFormatter
      * @param array<string, mixed> $block
      * @return array<string, mixed>
      */
-    private function format_block(array $block, string $path): array
-    {
+    private function format_block(array $block, string $path): array {
         $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
         $inner_html = is_string($block['innerHTML'] ?? null) ? $block['innerHTML'] : '';
 
@@ -114,8 +107,7 @@ final class BlockTreeFormatter
      * @param array<array-key, mixed> $attrs
      * @return array<string, mixed>
      */
-    private function summarize_attrs(array $attrs): array
-    {
+    private function summarize_attrs(array $attrs): array {
         $summary = [];
 
         foreach ($attrs as $key => $value) {

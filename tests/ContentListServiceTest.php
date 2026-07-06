@@ -38,8 +38,7 @@ function awpt_test_list_post(
     return $post;
 }
 
-function awpt_test_list_user(int $id, string $login, string $display_name): WP_User
-{
+function awpt_test_list_user(int $id, string $login, string $display_name): WP_User {
     $user = new WP_User();
     $user->ID = $id;
     $user->user_login = $login;
@@ -51,8 +50,7 @@ function awpt_test_list_user(int $id, string $login, string $display_name): WP_U
     return $user;
 }
 
-function test_content_list_service_counts_posts_by_status(): void
-{
+function test_content_list_service_counts_posts_by_status(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Published One', 'published-one', 'post', 'publish', '2026-01-03 12:00:00');
     awpt_test_list_post(2, 'Draft One', 'draft-one', 'post', 'draft', '2026-01-02 12:00:00');
@@ -67,8 +65,7 @@ function test_content_list_service_counts_posts_by_status(): void
     Assert::same('Published One', $result['items'][0]['title'] ?? null, 'items should be ordered by modified date');
 }
 
-function test_content_list_service_filters_by_status(): void
-{
+function test_content_list_service_filters_by_status(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Published One', 'published-one', 'post', 'publish');
     awpt_test_list_post(2, 'Draft One', 'draft-one', 'post', 'draft');
@@ -83,8 +80,7 @@ function test_content_list_service_filters_by_status(): void
     Assert::same('Draft One', $result['items'][0]['title'] ?? null, 'status filter should return draft items only');
 }
 
-function test_content_list_service_honors_read_post_capability(): void
-{
+function test_content_list_service_honors_read_post_capability(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Readable', 'readable');
     awpt_test_list_post(2, 'Private', 'private', 'post', 'private');
@@ -103,8 +99,7 @@ function test_content_list_service_honors_read_post_capability(): void
     Assert::same('Readable', $result['items'][0]['title'] ?? null, 'readable posts should remain in items');
 }
 
-function test_content_list_service_filters_by_author_and_includes_metadata(): void
-{
+function test_content_list_service_filters_by_author_and_includes_metadata(): void {
     awpt_test_reset_state();
     awpt_test_list_user(7, 'ryan', 'Ryan');
     awpt_test_list_user(8, 'alex', 'Alex');
@@ -124,8 +119,7 @@ function test_content_list_service_filters_by_author_and_includes_metadata(): vo
     Assert::same(7, $result['filters']['author_id'] ?? null, 'filters should echo resolved author ID');
 }
 
-function test_content_list_service_supports_search_sort_and_pagination(): void
-{
+function test_content_list_service_supports_search_sort_and_pagination(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Alpha Update', 'alpha-update', created: '2026-01-01 10:00:00');
     awpt_test_list_post(2, 'Beta Update', 'beta-update', created: '2026-01-03 10:00:00');
@@ -159,8 +153,7 @@ function test_content_list_service_supports_search_sort_and_pagination(): void
     Assert::same('Beta Update', $paged['items'][0]['title'] ?? null, 'pagination offset should skip first item');
 }
 
-function test_content_list_service_includes_totals_by_type_for_all(): void
-{
+function test_content_list_service_includes_totals_by_type_for_all(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Post One', 'post-one');
     awpt_test_list_post(2, 'About', 'about', 'page');
@@ -176,8 +169,7 @@ test_content_list_service_filters_by_status();
 test_content_list_service_honors_read_post_capability();
 test_content_list_service_filters_by_author_and_includes_metadata();
 test_content_list_service_supports_search_sort_and_pagination();
-function test_content_list_service_skips_totals_when_filtered(): void
-{
+function test_content_list_service_skips_totals_when_filtered(): void {
     awpt_test_reset_state();
     awpt_test_list_post(1, 'Published One', 'published-one');
     awpt_test_list_post(2, 'Draft One', 'draft-one', 'post', 'draft');

@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Whitelist and sanitization for site settings action payloads.
  */
-final class SiteSettingsWhitelist
-{
+final class SiteSettingsWhitelist {
     /**
      * @var list<string>
      */
@@ -46,8 +45,7 @@ final class SiteSettingsWhitelist
      * @param array<array-key, mixed> $raw_settings
      * @return array<string, string|int>
      */
-    public function sanitize_map(array $raw_settings): array
-    {
+    public function sanitize_map(array $raw_settings): array {
         $settings = [];
 
         foreach (array_keys($raw_settings) as $key) {
@@ -65,13 +63,11 @@ final class SiteSettingsWhitelist
         return $settings;
     }
 
-    public function is_allowed_key(string $key): bool
-    {
+    public function is_allowed_key(string $key): bool {
         return in_array($key, self::ALLOWED_KEYS, true);
     }
 
-    private function sanitize_setting(string $key, mixed $value): string|int|null
-    {
+    private function sanitize_setting(string $key, mixed $value): string|int|null {
         return match ($key) {
             'blogname', 'blogdescription', 'category_base', 'tag_base' => sanitize_text_field((string) $value),
             'blog_public',
@@ -92,20 +88,17 @@ final class SiteSettingsWhitelist
         };
     }
 
-    private function sanitize_page_id(mixed $value): int
-    {
+    private function sanitize_page_id(mixed $value): int {
         $page_id = $this->to_absint($value);
 
         return $page_id > 0 && get_post($page_id) instanceof \WP_Post ? $page_id : 0;
     }
 
-    private function to_absint(mixed $value): int
-    {
+    private function to_absint(mixed $value): int {
         return absint(is_scalar($value) ? $value : 0);
     }
 
-    private function sanitize_permalink_structure(mixed $value): ?string
-    {
+    private function sanitize_permalink_structure(mixed $value): ?string {
         $structure = sanitize_text_field((string) $value);
 
         if ('' === $structure) {
@@ -115,8 +108,7 @@ final class SiteSettingsWhitelist
         return preg_match('/^\/[A-Za-z0-9_\/%\-]+\/$/', $structure) ? $structure : null;
     }
 
-    private function truthy(mixed $value): bool
-    {
+    private function truthy(mixed $value): bool {
         return in_array($value, [true, 1, '1', 'true', 'yes', 'on'], true);
     }
 }

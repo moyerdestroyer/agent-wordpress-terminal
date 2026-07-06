@@ -60,6 +60,23 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 		].filter((item) => item.value !== '');
 	}
 
+	if (payload.operation === 'plugin_deactivate') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: __('Plugin', 'agent-wordpress-terminal'),
+			},
+			{
+				label: __('Plugin', 'agent-wordpress-terminal'),
+				value: payload.plugin_name ?? payload.plugin_slug ?? payload.plugin_file ?? '',
+			},
+			{
+				label: __('File', 'agent-wordpress-terminal'),
+				value: payload.plugin_file ?? '',
+			},
+		].filter((item) => item.value !== '');
+	}
+
 	const postTitle = payload.original_post_title || payload.post_title || '';
 	const postType = payload.post_type
 		? titleCase(payload.post_type)
@@ -138,6 +155,13 @@ export function actionDiff(payload?: ActionPayload): { before: string; after: st
 		return {
 			before: [payload.current_theme, payload.current_stylesheet].filter(Boolean).join(' / '),
 			after: [payload.theme_name, payload.stylesheet].filter(Boolean).join(' / '),
+		};
+	}
+
+	if (payload.operation === 'plugin_deactivate') {
+		return {
+			before: __('Active', 'agent-wordpress-terminal'),
+			after: __('Deactivated', 'agent-wordpress-terminal'),
 		};
 	}
 

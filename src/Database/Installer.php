@@ -17,18 +17,16 @@ if (!defined('ABSPATH')) {
 /**
  * Creates and maintains AWPT database tables.
  */
-final class Installer
-{
+final class Installer {
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '2';
+    private const SCHEMA_VERSION = '3';
 
     /**
      * Plugin activation hook.
      */
-    public static function activate(): void
-    {
+    public static function activate(): void {
         self::create_tables();
         update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
         flush_rewrite_rules();
@@ -37,8 +35,7 @@ final class Installer
     /**
      * Ensure newly added tables exist after plugin updates.
      */
-    public static function maybe_upgrade(): void
-    {
+    public static function maybe_upgrade(): void {
         if (self::SCHEMA_VERSION === (string) get_option('awpt_schema_version', '')) {
             return;
         }
@@ -50,16 +47,14 @@ final class Installer
     /**
      * Plugin deactivation hook.
      */
-    public static function deactivate(): void
-    {
+    public static function deactivate(): void {
         flush_rewrite_rules();
     }
 
     /**
      * Create custom tables.
      */
-    public static function create_tables(): void
-    {
+    public static function create_tables(): void {
         $wpdb = WpDb::get();
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -159,6 +154,23 @@ final class Installer
 			FULLTEXT KEY chunk_text (chunk_text)
 		) {$charset_collate};";
 
+        $incidents = "CREATE TABLE {$prefix}incidents (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			session_id bigint(20) unsigned NOT NULL,
+			kind varchar(30) NOT NULL DEFAULT 'php',
+			source varchar(100) NOT NULL DEFAULT '',
+			attempted_action varchar(100) NOT NULL DEFAULT '',
+			action_id bigint(20) unsigned NULL,
+			error_text longtext NOT NULL,
+			diagnosis_json longtext NULL,
+			status varchar(20) NOT NULL DEFAULT 'open',
+			created_at datetime NOT NULL,
+			resolved_at datetime NULL,
+			PRIMARY KEY  (id),
+			KEY session_id (session_id),
+			KEY status (status)
+		) {$charset_collate};";
+
         dbDelta($sessions);
         dbDelta($messages);
         dbDelta($tool_calls);
@@ -166,5 +178,6 @@ final class Installer
         dbDelta($actions);
         dbDelta($knowledge_index);
         dbDelta($knowledge_chunks);
+        dbDelta($incidents);
     }
 }

@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Normalizes post meta change maps on staged actions.
  */
-final class PostMetaPayloadSanitizer
-{
+final class PostMetaPayloadSanitizer {
     /**
      * @param array<array-key, mixed> $meta
      * @return array<string, string|int|float|bool>
      */
-    public function sanitize_map(array $meta): array
-    {
+    public function sanitize_map(array $meta): array {
         $clean = [];
 
         foreach ($meta as $key => $value) {

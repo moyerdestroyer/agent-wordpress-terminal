@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Support\StagedPostPreview;
 
-function test_staged_post_preview(): void
-{
+function test_staged_post_preview(): void {
     $preview = new StagedPostPreview();
 
     awpt_test_reset_state();

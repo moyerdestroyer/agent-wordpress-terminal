@@ -20,13 +20,11 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged installed-theme switch action.
  */
-final class ProposeThemeSwitch
-{
+final class ProposeThemeSwitch {
     private ActionRepository $actions;
     private SessionRepository $sessions;
 
-    public function __construct(?ActionRepository $actions = null, ?SessionRepository $sessions = null)
-    {
+    public function __construct(?ActionRepository $actions = null, ?SessionRepository $sessions = null) {
         $this->actions = $actions ?? new ActionRepository();
         $this->sessions = $sessions ?? new SessionRepository();
     }
@@ -34,8 +32,7 @@ final class ProposeThemeSwitch
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/propose-theme-switch',
             'label' => __('Propose Theme Switch', 'agent-wordpress-terminal'),
@@ -73,8 +70,7 @@ final class ProposeThemeSwitch
     /**
      * @param array<string, mixed> $input
      */
-    public function can_propose(array $input): bool
-    {
+    public function can_propose(array $input): bool {
         return current_user_can('switch_themes') && current_user_can('manage_options');
     }
 
@@ -82,8 +78,7 @@ final class ProposeThemeSwitch
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
         $stylesheet = sanitize_key((string) ($input['stylesheet'] ?? ''));
 

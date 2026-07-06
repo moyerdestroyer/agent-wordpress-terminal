@@ -19,10 +19,8 @@ if (!defined('ABSPATH')) {
 /**
  * Lists and browses WordPress content with filters, sorting, and inventory totals.
  */
-final class ListContent
-{
-    public function register(): void
-    {
+final class ListContent {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/list-content',
             'label' => __('List Content', 'agent-wordpress-terminal'),
@@ -114,8 +112,7 @@ final class ListContent
     /**
      * @param array<string, mixed> $input
      */
-    public function can_list(array $input): bool
-    {
+    public function can_list(array $input): bool {
         unset($input);
 
         return current_user_can('manage_options');
@@ -125,8 +122,7 @@ final class ListContent
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         return new ContentListService()->list($input);
     }
 }

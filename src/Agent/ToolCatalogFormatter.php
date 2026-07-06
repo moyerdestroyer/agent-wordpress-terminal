@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Formats registered tools for system prompts.
  */
-final class ToolCatalogFormatter
-{
+final class ToolCatalogFormatter {
     /**
      * Fallback descriptions when wp_get_ability() is unavailable.
      *
@@ -43,6 +42,12 @@ final class ToolCatalogFormatter
         'awpt/propose-new-post' => 'Stages creation of a brand new post or page for explicit admin approval. Use for new posts, not existing ones. Optional featured_image_id sets the WordPress featured image on apply.',
         'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
         'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
+        'awpt/propose-plugin-deactivate' => 'Last-resort staged deactivation when diagnosis attributes a fatal PHP error to a third-party plugin.',
+        'awpt/read-error-log' => 'Returns recent PHP error log lines from debug.log or the PHP error log.',
+        'awpt/read-plugins' => 'Returns installed plugins with activation state for troubleshooting.',
+        'awpt/read-site-health' => 'Runs WordPress Site Health checks and returns environment plus test results.',
+        'awpt/probe-url' => 'Fetches a same-site URL and extracts rendered PHP or critical error snippets.',
+        'awpt/diagnose-error' => 'Analyzes an error with log evidence, suspects, Site Health context, and remediation hints.',
         'awpt/apply-action' => 'Applies an explicitly approved AWPT staged action.',
         'awpt/sideload-media' => 'Downloads a remote image or video URL and adds it to the Media Library, returning its attachment ID and hosted URL. Automatically resolves share/preview page links (e.g. Tenor, Giphy) to their underlying direct media file.',
     ];
@@ -58,14 +63,14 @@ final class ToolCatalogFormatter
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
+        'awpt/propose-plugin-deactivate',
         'awpt/apply-action',
     ];
 
     /**
      * Build a system-prompt catalog of callable tools and secondary user shortcuts.
      */
-    public function get_system_prompt_catalog(): string
-    {
+    public function get_system_prompt_catalog(): string {
         $registry = new ToolRegistry();
         $lines = [
             'Ability names use the awpt/ prefix and are callable via function calling.',
@@ -117,8 +122,7 @@ final class ToolCatalogFormatter
     /**
      * Resolve an ability description from the registry or static fallback.
      */
-    private function describe_ability(string $ability_name): string
-    {
+    private function describe_ability(string $ability_name): string {
         if (function_exists('wp_get_ability')) {
             $ability = wp_get_ability($ability_name);
 

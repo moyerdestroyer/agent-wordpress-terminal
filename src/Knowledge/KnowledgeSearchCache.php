@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Avoids duplicate Knowledge searches within one HTTP request.
  */
-final class KnowledgeSearchCache
-{
+final class KnowledgeSearchCache {
     /**
      * @var array<string, list<array<string, mixed>>>
      */
@@ -27,8 +26,7 @@ final class KnowledgeSearchCache
     /**
      * @return list<array<string, mixed>>
      */
-    public function search(string $query, int $limit = 6): array
-    {
+    public function search(string $query, int $limit = 6): array {
         $normalized = trim($query);
 
         if ('' === $normalized) {
@@ -46,8 +44,7 @@ final class KnowledgeSearchCache
         return self::$results[$key];
     }
 
-    public function format_context_for_prompt(string $query): string
-    {
+    public function format_context_for_prompt(string $query): string {
         $normalized = trim($query);
 
         if ('' === $normalized) {

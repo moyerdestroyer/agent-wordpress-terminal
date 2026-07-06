@@ -20,16 +20,14 @@ if (!defined('ABSPATH')) {
 /**
  * Handles MCP status, discovery, and explicit tool calls.
  */
-final class McpCommandRouter
-{
+final class McpCommandRouter {
     /**
      * Handle /mcp command.
      *
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    public function dispatch(array $parts): array
-    {
+    public function dispatch(array $parts): array {
         $subcommand = strtolower($parts[1] ?? 'status');
 
         return match ($subcommand) {
@@ -53,8 +51,7 @@ final class McpCommandRouter
      *
      * @return array<string, mixed>
      */
-    private function status(): array
-    {
+    private function status(): array {
         return [
             'content' => wp_json_encode(new StatusService()->get_status(), JSON_PRETTY_PRINT),
             'tool_calls' => [],
@@ -68,8 +65,7 @@ final class McpCommandRouter
      *
      * @return array<string, mixed>
      */
-    private function tools(): array
-    {
+    private function tools(): array {
         $tools = new Adapter()->list_tools();
 
         return [
@@ -92,8 +88,7 @@ final class McpCommandRouter
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    private function call(array $parts): array
-    {
+    private function call(array $parts): array {
         $tool_name = sanitize_text_field($parts[2] ?? '');
 
         if ('' === $tool_name) {
@@ -121,8 +116,7 @@ final class McpCommandRouter
      * @param array<array-key, mixed> $input Tool input.
      * @return array<string, mixed>
      */
-    private function execute(string $tool_name, array $input): array
-    {
+    private function execute(string $tool_name, array $input): array {
         $result = new Adapter()->execute_tool($tool_name, $input);
 
         if (is_wp_error($result)) {
@@ -160,8 +154,7 @@ final class McpCommandRouter
      * @param array<int, string> $parts Command parts.
      * @return array<array-key, mixed>|\WP_Error
      */
-    private function decode_input(array $parts): array|\WP_Error
-    {
+    private function decode_input(array $parts): array|\WP_Error {
         $json_input = trim(implode(' ', array_slice($parts, 3)));
 
         if ('' === $json_input) {
@@ -185,8 +178,7 @@ final class McpCommandRouter
      *
      * @return array<string, mixed>
      */
-    private function usage(): array
-    {
+    private function usage(): array {
         return [
             'content' => __('Usage: /mcp call tool/name {"key":"value"}', 'agent-wordpress-terminal'),
             'tool_calls' => [],

@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Maps natural-language browse/list requests to list-content arguments.
  */
-final class ContentListIntentDetector
-{
-    public function should_auto_list(string $message): bool
-    {
+final class ContentListIntentDetector {
+    public function should_auto_list(string $message): bool {
         $normalized = strtolower($message);
 
         if ($this->looks_like_specific_content_lookup($normalized)) {
@@ -52,8 +50,7 @@ final class ContentListIntentDetector
     /**
      * @return array<string, mixed>
      */
-    public function arguments_for_message(string $message): array
-    {
+    public function arguments_for_message(string $message): array {
         $normalized = strtolower($message);
         $arguments = ['limit' => 20];
 
@@ -95,8 +92,7 @@ final class ContentListIntentDetector
         return $arguments;
     }
 
-    private function looks_like_specific_content_lookup(string $normalized): bool
-    {
+    private function looks_like_specific_content_lookup(string $normalized): bool {
         if (preg_match('/\b(list|show all|how many|count|recent|latest|browse|inventory)\b/', $normalized)) {
             return false;
         }

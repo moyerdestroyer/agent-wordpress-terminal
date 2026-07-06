@@ -17,16 +17,14 @@ if (!defined('ABSPATH')) {
 /**
  * Clips oversized strings and arrays in ability outputs.
  */
-final class ToolResultFieldShrinker
-{
+final class ToolResultFieldShrinker {
     private const META_VALUE_MAX_CHARS = 4_096;
 
     /**
      * @param array<string, mixed> $output
      * @return array<string, mixed>
      */
-    public function shrink(string $tool, array $output): array
-    {
+    public function shrink(string $tool, array $output): array {
         if ('awpt/read-content' === $tool) {
             $output['content'] = $this->clip_string((string) ($output['content'] ?? ''), 6_000);
             $output['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 4_000);
@@ -48,8 +46,7 @@ final class ToolResultFieldShrinker
         return $output;
     }
 
-    public function clip_string(string $value, int $max_chars): string
-    {
+    public function clip_string(string $value, int $max_chars): string {
         if (mb_strlen($value, 'UTF-8') <= $max_chars) {
             return $value;
         }
@@ -60,8 +57,7 @@ final class ToolResultFieldShrinker
     /**
      * @return list<mixed>
      */
-    public function clip_array_items(mixed $value, int $limit): array
-    {
+    public function clip_array_items(mixed $value, int $limit): array {
         if (!is_array($value)) {
             return [];
         }
@@ -72,8 +68,7 @@ final class ToolResultFieldShrinker
     /**
      * @return array<string, mixed>
      */
-    private function shrink_meta_map(mixed $meta): array
-    {
+    private function shrink_meta_map(mixed $meta): array {
         if (!is_array($meta)) {
             return [];
         }
@@ -91,8 +86,7 @@ final class ToolResultFieldShrinker
         return $trimmed;
     }
 
-    private function shrink_meta_value(mixed $value): mixed
-    {
+    private function shrink_meta_value(mixed $value): mixed {
         if (is_string($value)) {
             return $this->clip_string($value, self::META_VALUE_MAX_CHARS);
         }

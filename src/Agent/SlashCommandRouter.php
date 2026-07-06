@@ -17,16 +17,14 @@ if (!defined('ABSPATH')) {
 /**
  * Handles terminal slash commands.
  */
-final class SlashCommandRouter
-{
+final class SlashCommandRouter {
     /**
      * Route a slash command.
      *
      * @param string $message User message.
      * @return array<string, mixed>
      */
-    public function dispatch(string $message): array
-    {
+    public function dispatch(string $message): array {
         $split = preg_split('/\s+/', trim($message));
         $parts = is_array($split) ? $split : [];
         $command = strtolower($parts[0] ?? '');
@@ -61,8 +59,7 @@ final class SlashCommandRouter
      *
      * @return array<string, mixed>
      */
-    private function help(): array
-    {
+    private function help(): array {
         return [
             'content' => implode("\n", [
                 __('You can usually ask in plain language:', 'agent-wordpress-terminal'),

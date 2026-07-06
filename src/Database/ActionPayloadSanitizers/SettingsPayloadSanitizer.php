@@ -19,12 +19,10 @@ if (!defined('ABSPATH')) {
 /**
  * Sanitizes settings maps in action payloads.
  */
-final class SettingsPayloadSanitizer
-{
+final class SettingsPayloadSanitizer {
     private SiteSettingsWhitelist $whitelist;
 
-    public function __construct(?SiteSettingsWhitelist $whitelist = null)
-    {
+    public function __construct(?SiteSettingsWhitelist $whitelist = null) {
         $this->whitelist = $whitelist ?? new SiteSettingsWhitelist();
     }
 
@@ -33,8 +31,7 @@ final class SettingsPayloadSanitizer
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function sanitize(array $clean, array $payload): array
-    {
+    public function sanitize(array $clean, array $payload): array {
         if (array_key_exists('settings_changes', $payload) && is_array($payload['settings_changes'])) {
             $clean['settings_changes'] = $this->whitelist->sanitize_map($payload['settings_changes']);
         }

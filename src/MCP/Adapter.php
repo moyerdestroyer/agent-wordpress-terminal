@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Provides a small MCP discovery and execution contract for integrations.
  */
-final class Adapter
-{
+final class Adapter {
     /**
      * Return MCP tools exposed by integrations.
      *
@@ -28,8 +27,7 @@ final class Adapter
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list_tools(): array
-    {
+    public function list_tools(): array {
         $raw_tools = apply_filters('awpt_mcp_tools', []);
 
         if (!is_array($raw_tools)) {
@@ -60,8 +58,7 @@ final class Adapter
      * @param array<array-key, mixed> $input Tool input.
      * @return array<array-key, mixed>|\WP_Error
      */
-    public function execute_tool(string $tool_name, array $input): array|\WP_Error
-    {
+    public function execute_tool(string $tool_name, array $input): array|\WP_Error {
         $tool = $this->find_tool($tool_name);
 
         if (null === $tool) {
@@ -110,8 +107,7 @@ final class Adapter
      * @param string $tool_name Tool name.
      * @return array<array-key, mixed>|null
      */
-    public function find_tool(string $tool_name): ?array
-    {
+    public function find_tool(string $tool_name): ?array {
         foreach ($this->list_tools() as $tool) {
             if ($tool_name === $tool['name']) {
                 return $tool;
@@ -127,8 +123,7 @@ final class Adapter
      * @param array<string, mixed> $tool Raw tool.
      * @return array<string, mixed>|null
      */
-    private function normalize_tool(array $tool): ?array
-    {
+    private function normalize_tool(array $tool): ?array {
         $name = sanitize_text_field((string) ($tool['name'] ?? ''));
 
         if ('' === $name) {

@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Reads and writes awpt_knowledge_* tables.
  */
-final class KnowledgeIndexRepository
-{
-    public function clear_index(): void
-    {
+final class KnowledgeIndexRepository {
+    public function clear_index(): void {
         $wpdb = WpDb::get();
 
         $chunks_table = $wpdb->prefix . 'awpt_knowledge_chunks';
@@ -33,8 +31,7 @@ final class KnowledgeIndexRepository
     /**
      * @param array<string, mixed> $source
      */
-    public function insert_source(array $source, string $content, string $now): int
-    {
+    public function insert_source(array $source, string $content, string $now): int {
         $wpdb = WpDb::get();
 
         $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : [];
@@ -66,8 +63,7 @@ final class KnowledgeIndexRepository
         return (int) $wpdb->insert_id;
     }
 
-    public function insert_chunk(int $index_id, int $chunk_index, string $chunk_text, string $now): void
-    {
+    public function insert_chunk(int $index_id, int $chunk_index, string $chunk_text, string $now): void {
         $wpdb = WpDb::get();
 
         $wpdb->insert(
@@ -85,15 +81,13 @@ final class KnowledgeIndexRepository
         );
     }
 
-    public function count_sources(): int
-    {
+    public function count_sources(): int {
         $wpdb = WpDb::get();
 
         return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM %i', $wpdb->prefix . 'awpt_knowledge_index'));
     }
 
-    public function count_chunks(): int
-    {
+    public function count_chunks(): int {
         $wpdb = WpDb::get();
 
         return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM %i', $wpdb->prefix . 'awpt_knowledge_chunks'));
@@ -102,8 +96,7 @@ final class KnowledgeIndexRepository
     /**
      * @return array<string, int>
      */
-    public function count_sources_by_kind(): array
-    {
+    public function count_sources_by_kind(): array {
         $wpdb = WpDb::get();
         $rows = $wpdb->get_results(
             $wpdb->prepare(
@@ -136,8 +129,7 @@ final class KnowledgeIndexRepository
      * @param list<string> $tokens
      * @return list<array<string, mixed>>
      */
-    public function search_chunks(array $tokens): array
-    {
+    public function search_chunks(array $tokens): array {
         $tokens = array_slice($tokens, 0, 8);
 
         if ([] === $tokens) {
@@ -157,8 +149,7 @@ final class KnowledgeIndexRepository
      * @param list<string> $tokens
      * @return list<array<string, mixed>>
      */
-    private function search_chunks_fulltext(array $tokens): array
-    {
+    private function search_chunks_fulltext(array $tokens): array {
         $wpdb = WpDb::get();
         $terms = [];
 
@@ -195,8 +186,7 @@ final class KnowledgeIndexRepository
      * @param list<string> $tokens
      * @return list<array<string, mixed>>
      */
-    private function search_chunks_like(array $tokens): array
-    {
+    private function search_chunks_like(array $tokens): array {
         $wpdb = WpDb::get();
         $like_clauses = [];
         $params = [];

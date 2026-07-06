@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves the active AWPT connector from saved settings.
  */
-final class ConnectorSelection
-{
+final class ConnectorSelection {
     /**
      * Connector catalog.
      */
@@ -33,8 +32,7 @@ final class ConnectorSelection
      * @param ConnectorCatalog|null   $catalog Optional catalog for testing.
      * @param ConnectorInspector|null $inspector Optional inspector for testing.
      */
-    public function __construct(?ConnectorCatalog $catalog = null, ?ConnectorInspector $inspector = null)
-    {
+    public function __construct(?ConnectorCatalog $catalog = null, ?ConnectorInspector $inspector = null) {
         $this->catalog = $catalog ?? new ConnectorCatalog();
         $this->inspector = $inspector ?? new ConnectorInspector();
     }
@@ -42,8 +40,7 @@ final class ConnectorSelection
     /**
      * Normalize legacy provider option values.
      */
-    public function normalize_provider_option(string $provider): string
-    {
+    public function normalize_provider_option(string $provider): string {
         if ('' === $provider || 'wordpress_ai' === $provider) {
             return $this->catalog->resolve_default_provider();
         }
@@ -63,8 +60,7 @@ final class ConnectorSelection
      *     connectors_url: string
      * }
      */
-    public function active_connection_summary(): array
-    {
+    public function active_connection_summary(): array {
         $provider_id = $this->normalize_provider_option((string) get_option('awpt_provider', ''));
 
         if (in_array($provider_id, ConnectorCatalog::DIRECT_PROVIDER_IDS, true)) {
@@ -106,8 +102,7 @@ final class ConnectorSelection
      *     connectors_url: string
      * }
      */
-    private function direct_provider_summary(string $provider_id): array
-    {
+    private function direct_provider_summary(string $provider_id): array {
         $ready = $this->is_direct_provider_ready($provider_id);
 
         return [
@@ -129,8 +124,7 @@ final class ConnectorSelection
      * already configured elsewhere (env var, PHP constant, or DB option), so users
      * don't need to duplicate a key AWPT can already reuse.
      */
-    private function is_direct_provider_ready(string $provider_id): bool
-    {
+    private function is_direct_provider_ready(string $provider_id): bool {
         if ('' !== trim((string) get_option('awpt_' . $provider_id . '_api_key', ''))) {
             return true;
         }
@@ -141,8 +135,7 @@ final class ConnectorSelection
     /**
      * Not-ready status label for a direct-key provider.
      */
-    private function direct_provider_not_ready_label(): string
-    {
+    private function direct_provider_not_ready_label(): string {
         return __('Key not configured', 'agent-wordpress-terminal');
     }
 }

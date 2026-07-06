@@ -13,8 +13,7 @@ use AWPT\Agent\OpenRouterProvider;
 use AWPT\Agent\ProviderFactory;
 use AWPT\Agent\WordPressAIClientProvider;
 
-function test_provider_factory(): void
-{
+function test_provider_factory(): void {
     // No connectors installed, no direct-key provider configured: the guaranteed
     // OpenRouter baseline is selected, and it reports itself as unconfigured rather
     // than erroring out unexpectedly.

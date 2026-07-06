@@ -17,16 +17,14 @@ if (!defined('ABSPATH')) {
 /**
  * Truncates large ability outputs while preserving structured summaries.
  */
-final class ToolResultTruncator
-{
+final class ToolResultTruncator {
     private const PROVIDER_MAX_CHARS = 12_000;
     private const STORAGE_MAX_CHARS = 32_000;
 
     private ToolResultFieldShrinker $shrinker;
     private ToolResultSummaryBuilder $summary;
 
-    public function __construct(?ToolResultFieldShrinker $shrinker = null, ?ToolResultSummaryBuilder $summary = null)
-    {
+    public function __construct(?ToolResultFieldShrinker $shrinker = null, ?ToolResultSummaryBuilder $summary = null) {
         $this->shrinker = $shrinker ?? new ToolResultFieldShrinker();
         $this->summary = $summary ?? new ToolResultSummaryBuilder($this->shrinker);
     }
@@ -35,8 +33,7 @@ final class ToolResultTruncator
      * @param array<string, mixed> $output
      * @return array<string, mixed>
      */
-    public function for_provider(string $tool, array $output): array
-    {
+    public function for_provider(string $tool, array $output): array {
         return $this->truncate($tool, $output, self::PROVIDER_MAX_CHARS);
     }
 
@@ -44,8 +41,7 @@ final class ToolResultTruncator
      * @param array<string, mixed> $output
      * @return array<string, mixed>
      */
-    public function for_storage(string $tool, array $output): array
-    {
+    public function for_storage(string $tool, array $output): array {
         return $this->truncate($tool, $output, self::STORAGE_MAX_CHARS);
     }
 
@@ -53,8 +49,7 @@ final class ToolResultTruncator
      * @param array<string, mixed> $output
      * @return array<string, mixed>
      */
-    private function truncate(string $tool, array $output, int $max_chars): array
-    {
+    private function truncate(string $tool, array $output, int $max_chars): array {
         if (ToolRegistry::is_proposal_ability($tool)) {
             return $output;
         }

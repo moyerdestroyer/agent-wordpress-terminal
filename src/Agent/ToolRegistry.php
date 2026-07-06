@@ -20,8 +20,7 @@ if (!defined('ABSPATH')) {
 /**
  * Converts safe AWPT abilities into chat completion tools.
  */
-final class ToolRegistry
-{
+final class ToolRegistry {
     /**
      * Read-only abilities that may run during provider response generation.
      */
@@ -42,22 +41,26 @@ final class ToolRegistry
         'awpt__propose_new_post' => 'awpt/propose-new-post',
         'awpt__propose_site_settings_update' => 'awpt/propose-site-settings-update',
         'awpt__propose_theme_switch' => 'awpt/propose-theme-switch',
+        'awpt__propose_plugin_deactivate' => 'awpt/propose-plugin-deactivate',
         'awpt__sideload_media' => 'awpt/sideload-media',
+        'awpt__read_error_log' => 'awpt/read-error-log',
+        'awpt__read_plugins' => 'awpt/read-plugins',
+        'awpt__read_site_health' => 'awpt/read-site-health',
+        'awpt__probe_url' => 'awpt/probe-url',
+        'awpt__diagnose_error' => 'awpt/diagnose-error',
     ];
 
     /**
      * @return list<string>
      */
-    public static function proposal_ability_names(): array
-    {
+    public static function proposal_ability_names(): array {
         return ProposalAbilities::names();
     }
 
     /**
      * Whether a successful execution of this ability should surface as a staged action.
      */
-    public static function is_proposal_ability(string $tool_name): bool
-    {
+    public static function is_proposal_ability(string $tool_name): bool {
         return ProposalAbilities::is_proposal($tool_name);
     }
 
@@ -66,8 +69,7 @@ final class ToolRegistry
      *
      * @return list<string>
      */
-    public function get_auto_executable_ability_names(): array
-    {
+    public function get_auto_executable_ability_names(): array {
         return array_values(self::AUTO_TOOL_MAP);
     }
 
@@ -76,8 +78,7 @@ final class ToolRegistry
      *
      * @return array<int, array<string, mixed>>
      */
-    public function get_chat_completion_tools(): array
-    {
+    public function get_chat_completion_tools(): array {
         if (!function_exists('wp_get_abilities')) {
             return [];
         }
@@ -114,8 +115,7 @@ final class ToolRegistry
      *
      * @param string $ability_name Ability name.
      */
-    public function function_name_for_ability(string $ability_name): ?string
-    {
+    public function function_name_for_ability(string $ability_name): ?string {
         $function_name = array_search($ability_name, self::AUTO_TOOL_MAP, true);
 
         if (is_string($function_name)) {
@@ -134,8 +134,7 @@ final class ToolRegistry
      *
      * @param string $function_name Provider function name.
      */
-    public function tool_name_for_function(string $function_name): ?string
-    {
+    public function tool_name_for_function(string $function_name): ?string {
         if (array_key_exists($function_name, self::AUTO_TOOL_MAP)) {
             return self::AUTO_TOOL_MAP[$function_name];
         }
@@ -154,8 +153,7 @@ final class ToolRegistry
      *
      * @param string $tool_name Ability name.
      */
-    public function can_auto_execute(string $tool_name): bool
-    {
+    public function can_auto_execute(string $tool_name): bool {
         return in_array($tool_name, self::AUTO_TOOL_MAP, true);
     }
 
@@ -164,8 +162,7 @@ final class ToolRegistry
      *
      * @param string $tool_name Ability name.
      */
-    private function function_name_for_tool(string $tool_name): ?string
-    {
+    private function function_name_for_tool(string $tool_name): ?string {
         $function_name = array_search($tool_name, self::AUTO_TOOL_MAP, true);
 
         return is_string($function_name) ? $function_name : null;

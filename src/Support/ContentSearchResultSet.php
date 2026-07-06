@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Deduplicates and formats readable search results.
  */
-final class ContentSearchResultSet
-{
+final class ContentSearchResultSet {
     /**
      * @param array<int, array<string, mixed>> $results
      */
-    public function add(array &$results, \WP_Post $post, string $matched_by, int $limit): void
-    {
+    public function add(array &$results, \WP_Post $post, string $matched_by, int $limit): void {
         if (count($results) >= $limit || !current_user_can('read_post', $post->ID)) {
             return;
         }

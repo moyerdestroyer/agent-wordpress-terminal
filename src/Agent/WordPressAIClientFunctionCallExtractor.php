@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Normalizes WordPress AI Client function calls for ProviderRuntime.
  */
-final class WordPressAIClientFunctionCallExtractor
-{
+final class WordPressAIClientFunctionCallExtractor {
     /**
      * Extract provider tool calls in the shape expected by ProviderRuntime.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function extract(mixed $result): array
-    {
+    public function extract(mixed $result): array {
         if (!is_object($result) || !method_exists($result, 'getCandidates')) {
             return [];
         }
@@ -49,8 +47,7 @@ final class WordPressAIClientFunctionCallExtractor
      *
      * @return array<int, array<string, mixed>>
      */
-    private function extract_from_candidate(mixed $candidate): array
-    {
+    private function extract_from_candidate(mixed $candidate): array {
         if (!is_object($candidate) || !method_exists($candidate, 'getMessage')) {
             return [];
         }
@@ -79,8 +76,7 @@ final class WordPressAIClientFunctionCallExtractor
      *
      * @return array<string, mixed>|null
      */
-    private function extract_function_call_from_part(mixed $part): ?array
-    {
+    private function extract_function_call_from_part(mixed $part): ?array {
         if (!is_object($part) || !method_exists($part, 'getFunctionCall')) {
             return null;
         }
@@ -113,8 +109,7 @@ final class WordPressAIClientFunctionCallExtractor
      *
      * @param mixed $args Raw provider arguments.
      */
-    private function encode_tool_arguments(mixed $args): string
-    {
+    private function encode_tool_arguments(mixed $args): string {
         if (!is_array($args) || [] === $args) {
             return '{}';
         }

@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves supported post type filters for AWPT search.
  */
-final class ContentSearchTypes
-{
+final class ContentSearchTypes {
     /**
      * @return list<string>
      */
-    public function from_requested(string $requested): array
-    {
+    public function from_requested(string $requested): array {
         if ('' !== $requested) {
             $post_type = sanitize_key($requested);
 
@@ -38,8 +36,7 @@ final class ContentSearchTypes
         ));
     }
 
-    private function exists(string $post_type): bool
-    {
+    private function exists(string $post_type): bool {
         return '' !== $post_type && (!function_exists('post_type_exists') || post_type_exists($post_type));
     }
 }

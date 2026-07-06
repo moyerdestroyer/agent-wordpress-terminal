@@ -20,8 +20,7 @@ if (!defined('ABSPATH')) {
 /**
  * Runs natural language messages through the configured provider.
  */
-final class ProviderRuntime
-{
+final class ProviderRuntime {
     /**
      * Error code WordPressAIClientProvider returns when the connector has no model
      * that can perform text generation for the current request, even after AWPT's
@@ -35,8 +34,7 @@ final class ProviderRuntime
      * @param int $session_id Session ID.
      * @return array<string, mixed>
      */
-    public function respond(int $session_id): array
-    {
+    public function respond(int $session_id): array {
         $provider = new ProviderFactory()->make();
         $messages = new ProviderMessageBuilder()->build($session_id);
         $tool_registry = new ToolRegistry();
@@ -146,8 +144,7 @@ final class ProviderRuntime
      *
      * @return array<string, mixed>|null
      */
-    private function knowledge_trace(int $session_id): ?array
-    {
+    private function knowledge_trace(int $session_id): ?array {
         $wpdb = WpDb::get();
         $message = trim((string) $wpdb->get_var($wpdb->prepare(
             "SELECT content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT 1",

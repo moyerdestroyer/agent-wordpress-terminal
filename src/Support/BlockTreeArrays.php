@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Converts mixed parse_blocks() children into analyzer-friendly block arrays.
  */
-final class BlockTreeArrays
-{
+final class BlockTreeArrays {
     /**
      * @param array<string, mixed> $block
      * @return array<int|string, array<string, mixed>>
      */
-    public function inner_blocks(array $block): array
-    {
+    public function inner_blocks(array $block): array {
         $inner_blocks = $block['innerBlocks'] ?? [];
 
         if (!is_array($inner_blocks)) {
@@ -48,8 +46,7 @@ final class BlockTreeArrays
      * @param array<array-key, mixed> $value
      * @return array<string, mixed>
      */
-    private function string_keyed_array(array $value): array
-    {
+    private function string_keyed_array(array $value): array {
         $normalized = [];
 
         foreach ($value as $key => $item) {

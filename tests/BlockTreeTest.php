@@ -10,11 +10,11 @@ declare(strict_types=1);
 
 use AWPT\Support\BlockTree;
 
-function test_block_tree_paths_and_updates(): void
-{
+function test_block_tree_paths_and_updates(): void {
     awpt_test_reset_state();
 
-    $content = '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+    $content =
+        '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
         . '<!-- wp:image {"width":"120","id":9} --><figure>Image</figure><!-- /wp:image -->';
 
     $tree = BlockTree::from_content($content);

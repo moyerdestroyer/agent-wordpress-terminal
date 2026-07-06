@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Lists installed AI connectors and reports configuration status.
  */
-final class ConnectorCatalog
-{
+final class ConnectorCatalog {
     /**
      * Direct-key providers that AWPT supports without any WordPress connector plugin.
      *
@@ -38,24 +37,21 @@ final class ConnectorCatalog
     /**
      * @param ConnectorInspector|null $inspector Optional inspector for testing.
      */
-    public function __construct(?ConnectorInspector $inspector = null)
-    {
+    public function __construct(?ConnectorInspector $inspector = null) {
         $this->inspector = $inspector ?? new ConnectorInspector();
     }
 
     /**
      * Whether the WordPress Connectors API is available.
      */
-    public function is_available(): bool
-    {
+    public function is_available(): bool {
         return function_exists('wp_get_connectors');
     }
 
     /**
      * URL for the core Connectors settings screen.
      */
-    public function connectors_admin_url(): string
-    {
+    public function connectors_admin_url(): string {
         return admin_url('options-connectors.php');
     }
 
@@ -73,8 +69,7 @@ final class ConnectorCatalog
      *     status_label: string
      * }>
      */
-    public function list_installed_connectors(): array
-    {
+    public function list_installed_connectors(): array {
         if (!$this->is_available()) {
             return [];
         }
@@ -112,8 +107,7 @@ final class ConnectorCatalog
     /**
      * Resolve a human-readable provider label.
      */
-    public function get_provider_label(string $provider_id): string
-    {
+    public function get_provider_label(string $provider_id): string {
         $direct_label = $this->direct_provider_label($provider_id);
 
         if (null !== $direct_label) {
@@ -134,8 +128,7 @@ final class ConnectorCatalog
     /**
      * Whether the saved provider value is allowed.
      */
-    public function is_valid_provider(string $provider_id): bool
-    {
+    public function is_valid_provider(string $provider_id): bool {
         if (in_array($provider_id, self::DIRECT_PROVIDER_IDS, true)) {
             return true;
         }
@@ -160,8 +153,7 @@ final class ConnectorCatalog
     /**
      * Resolve a display label for a built-in direct-key provider.
      */
-    private function direct_provider_label(string $provider_id): ?string
-    {
+    private function direct_provider_label(string $provider_id): ?string {
         return match ($provider_id) {
             'openrouter' => __('OpenRouter', 'agent-wordpress-terminal'),
             'openai' => __('OpenAI', 'agent-wordpress-terminal'),
@@ -172,8 +164,7 @@ final class ConnectorCatalog
     /**
      * Pick the best default connector when none is saved.
      */
-    public function resolve_default_provider(): string
-    {
+    public function resolve_default_provider(): string {
         $installed = $this->list_installed_connectors();
 
         foreach ($installed as $connector) {

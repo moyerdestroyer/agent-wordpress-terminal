@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves and edits dotted block paths against parse_blocks() arrays.
  */
-final class BlockTreePathEditor
-{
+final class BlockTreePathEditor {
     /**
      * @param array<int, array<string, mixed>> $blocks
      * @return array<string, mixed>|null
      */
-    public function get_block(array $blocks, string $path): ?array
-    {
+    public function get_block(array $blocks, string $path): ?array {
         return new BlockTreePathResolver()->get_block($blocks, $path);
     }
 

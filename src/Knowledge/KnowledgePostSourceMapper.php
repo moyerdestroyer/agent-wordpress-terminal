@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Converts WP_Post objects into knowledge source arrays.
  */
-final class KnowledgePostSourceMapper
-{
+final class KnowledgePostSourceMapper {
     private const CORE_POST_TYPE = 'wp_knowledge';
     private const CORE_TAXONOMY = 'wp_knowledge_type';
     private const LEGACY_POST_TYPE = 'wp_guideline';
@@ -27,8 +26,7 @@ final class KnowledgePostSourceMapper
     /**
      * @return array<string, mixed>
      */
-    public function from_post(\WP_Post $post, string $kind, string $taxonomy): array
-    {
+    public function from_post(\WP_Post $post, string $kind, string $taxonomy): array {
         $types = '' !== $taxonomy ? wp_get_object_terms($post->ID, $taxonomy, ['fields' => 'slugs']) : [];
         $types = is_wp_error($types) || !is_array($types) ? [] : array_values(array_map('strval', $types));
         $content = $post->post_content;
@@ -55,8 +53,7 @@ final class KnowledgePostSourceMapper
         ];
     }
 
-    public function taxonomy_for_post_type(string $post_type): string
-    {
+    public function taxonomy_for_post_type(string $post_type): string {
         return match ($post_type) {
             self::CORE_POST_TYPE => self::CORE_TAXONOMY,
             self::LEGACY_POST_TYPE => self::LEGACY_TAXONOMY,
@@ -64,8 +61,7 @@ final class KnowledgePostSourceMapper
         };
     }
 
-    private function label(\WP_Post $post): string
-    {
+    private function label(\WP_Post $post): string {
         $title = get_the_title($post);
 
         if ('' !== $title) {

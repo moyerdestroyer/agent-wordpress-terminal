@@ -160,3 +160,42 @@ export async function listTools(): Promise<ToolsResponse> {
 export async function getMcpStatus(): Promise<McpStatus> {
 	return apiFetch<McpStatus>({ path: path('/mcp/status') });
 }
+
+export interface IncidentReportPayload {
+	kind?: string;
+	source?: string;
+	attempted_action?: string;
+	action_id?: number;
+	error_text: string;
+	auto_diagnose?: boolean;
+}
+
+export interface DiagnosisResponse {
+	incident_id: number;
+	content?: string;
+	tool_calls?: ToolCall[];
+	actions?: ProposedAction[];
+	diagnosis_response?: ChatResponse;
+}
+
+export async function reportIncident(
+	sessionId: number,
+	payload: IncidentReportPayload,
+): Promise<DiagnosisResponse> {
+	return apiFetch<DiagnosisResponse>({
+		path: path(`/sessions/${sessionId}/incidents`),
+		method: 'POST',
+		data: payload,
+	});
+}
+
+export async function diagnoseSession(
+	sessionId: number,
+	incidentId?: number,
+): Promise<ChatResponse & { incident_id: number }> {
+	return apiFetch({
+		path: path(`/sessions/${sessionId}/diagnose`),
+		method: 'POST',
+		data: incidentId ? { incident_id: incidentId } : {},
+	});
+}

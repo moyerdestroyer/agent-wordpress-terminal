@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Isolates dynamic calls to wp_ai_client_prompt().
  */
-final class WordPressAIClientPromptRunner
-{
+final class WordPressAIClientPromptRunner {
     /**
      * Chat prompt formatter.
      */
@@ -33,8 +32,7 @@ final class WordPressAIClientPromptRunner
      * @param ChatPromptFormatter|null           $formatter Optional formatter for testing.
      * @param WordPressAIClientResultParser|null $parser Optional parser for testing.
      */
-    public function __construct(?ChatPromptFormatter $formatter = null, ?WordPressAIClientResultParser $parser = null)
-    {
+    public function __construct(?ChatPromptFormatter $formatter = null, ?WordPressAIClientResultParser $parser = null) {
         $this->formatter = $formatter ?? new ChatPromptFormatter();
         $this->parser = $parser ?? new WordPressAIClientResultParser();
     }
@@ -52,8 +50,7 @@ final class WordPressAIClientPromptRunner
      *     no_text_generation_model: bool
      * }
      */
-    public function generate(array $messages, string $connector_id, array $ability_names = []): array
-    {
+    public function generate(array $messages, string $connector_id, array $ability_names = []): array {
         $system_instruction = $this->formatter->extract_system_instruction($messages);
         $prompt = $this->formatter->build_prompt_text($messages);
         $builder = call_user_func('wp_ai_client_prompt', $prompt);
@@ -98,8 +95,7 @@ final class WordPressAIClientPromptRunner
      * network request). Assumes support when the check itself is unavailable, relying on
      * the post-hoc retry in generate() as the safety net.
      */
-    private function builder_supports_text_generation(mixed $builder): bool
-    {
+    private function builder_supports_text_generation(mixed $builder): bool {
         if (!is_object($builder) || !is_callable([$builder, 'is_supported_for_text_generation'])) {
             return true;
         }
@@ -115,8 +111,7 @@ final class WordPressAIClientPromptRunner
      * Log the raw WP_Error code/message for diagnosability, instead of only ever
      * surfacing the generic, parsed error text to the end user.
      */
-    private function log_provider_error(string $connector_id, mixed $result, string $context): void
-    {
+    private function log_provider_error(string $connector_id, mixed $result, string $context): void {
         if (!is_wp_error($result) || !defined('WP_DEBUG') || !\WP_DEBUG) {
             return;
         }
@@ -169,8 +164,7 @@ final class WordPressAIClientPromptRunner
      *
      * @param list<string> $ability_names Ability names exposed to the model.
      */
-    private function apply_abilities(object $builder, array $ability_names): object
-    {
+    private function apply_abilities(object $builder, array $ability_names): object {
         if ([] === $ability_names) {
             return $builder;
         }
@@ -203,16 +197,14 @@ final class WordPressAIClientPromptRunner
      * @param list<string> $ability_names Ability names exposed to the model.
      * @return list<object>
      */
-    private function build_function_declarations(array $ability_names): array
-    {
+    private function build_function_declarations(array $ability_names): array {
         return new AbilityFunctionDeclarationBuilder()->build($ability_names);
     }
 
     /**
      * Generate a provider result object when available.
      */
-    private function generate_result(mixed $builder): mixed
-    {
+    private function generate_result(mixed $builder): mixed {
         if (!is_object($builder)) {
             return '';
         }
@@ -236,8 +228,7 @@ final class WordPressAIClientPromptRunner
         return '';
     }
 
-    private function is_text_generation_model_error(mixed $result): bool
-    {
+    private function is_text_generation_model_error(mixed $result): bool {
         if (!is_wp_error($result)) {
             return false;
         }

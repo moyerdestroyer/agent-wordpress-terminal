@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for post content and block trees.
  */
-final class ToolResultContentReadFormatter
-{
+final class ToolResultContentReadFormatter {
     private ToolResultArrayFormatter $arrays;
 
-    public function __construct(?ToolResultArrayFormatter $arrays = null)
-    {
+    public function __construct(?ToolResultArrayFormatter $arrays = null) {
         $this->arrays = $arrays ?? new ToolResultArrayFormatter();
     }
 
     /**
      * @param array<array-key, mixed> $output
      */
-    public function format(string $tool, array $output): string
-    {
+    public function format(string $tool, array $output): string {
         return match ($tool) {
             'awpt/read-content' => $this->format_read_content($output),
             'awpt/read-block-tree' => $this->format_read_block_tree($output),
@@ -41,8 +38,7 @@ final class ToolResultContentReadFormatter
     /**
      * @param array<array-key, mixed> $output
      */
-    private function format_read_content(array $output): string
-    {
+    private function format_read_content(array $output): string {
         $plain = trim((string) ($output['plain_text'] ?? ''));
         $lines = [sprintf(
             /* translators: 1: post ID, 2: title, 3: post type, 4: status */
@@ -67,8 +63,7 @@ final class ToolResultContentReadFormatter
     /**
      * @param array<array-key, mixed> $output
      */
-    private function format_read_block_tree(array $output): string
-    {
+    private function format_read_block_tree(array $output): string {
         $blocks = $this->flatten_blocks($this->arrays->list_items($output['blocks'] ?? []));
         $count = (int) ($output['count'] ?? count($blocks));
 
@@ -92,8 +87,7 @@ final class ToolResultContentReadFormatter
     /**
      * @param array<array-key, mixed> $block
      */
-    private function format_block_line(array $block): string
-    {
+    private function format_block_line(array $block): string {
         $excerpt = trim((string) ($block['text_excerpt'] ?? ''));
 
         return sprintf(
@@ -109,8 +103,7 @@ final class ToolResultContentReadFormatter
      * @param list<array<array-key, mixed>> $blocks
      * @return list<array<array-key, mixed>>
      */
-    private function flatten_blocks(array $blocks): array
-    {
+    private function flatten_blocks(array $blocks): array {
         $flat = [];
 
         foreach ($blocks as $block) {

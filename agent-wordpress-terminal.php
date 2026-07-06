@@ -29,8 +29,7 @@ if (!defined('ABSPATH')) {
 /**
  * Define plugin constants.
  */
-function constants(): void
-{
+function constants(): void {
     if (!defined('AWPT_PLUGIN_FILE')) {
         define('AWPT_PLUGIN_FILE', __FILE__);
     }
@@ -84,8 +83,7 @@ require_once $awpt_autoloader;
 /**
  * Plugin activation hook.
  */
-function activate(): void
-{
+function activate(): void {
     $errors = Support\Environment::requirement_errors();
 
     if ([] !== $errors) {

@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Reports WordPress, PHP, and Abilities API readiness.
  */
-final class Environment
-{
+final class Environment {
     /**
      * Return the current environment status for REST/UI consumers.
      *
      * @return array<string, mixed>
      */
-    public static function status(): array
-    {
+    public static function status(): array {
         $wordpress_version = self::wordpress_version();
         $php_supported = version_compare(PHP_VERSION, AWPT_MINIMUM_PHP_VERSION, '>=');
         $wordpress_supported = version_compare($wordpress_version, AWPT_MINIMUM_WP_VERSION, '>=');
@@ -58,8 +56,7 @@ final class Environment
     /**
      * Whether the plugin can boot safely.
      */
-    public static function meets_minimum_requirements(): bool
-    {
+    public static function meets_minimum_requirements(): bool {
         return [] === self::requirement_errors();
     }
 
@@ -68,8 +65,7 @@ final class Environment
      *
      * @return list<string>
      */
-    public static function requirement_errors(): array
-    {
+    public static function requirement_errors(): array {
         $errors = [];
 
         if (version_compare(PHP_VERSION, AWPT_MINIMUM_PHP_VERSION, '<')) {
@@ -104,8 +100,7 @@ final class Environment
     /**
      * Render admin warnings for unsupported or degraded environments.
      */
-    public static function render_admin_notices(): void
-    {
+    public static function render_admin_notices(): void {
         if (!current_user_can('manage_options')) {
             return;
         }
@@ -128,8 +123,7 @@ final class Environment
      *
      * @return list<string>
      */
-    private static function warnings(): array
-    {
+    private static function warnings(): array {
         $warnings = [];
 
         if (!AbilitiesHealth::api_functions_available()) {
@@ -154,16 +148,14 @@ final class Environment
     /**
      * Whether WordPress exposes the Abilities API and AWPT abilities registered.
      */
-    private static function abilities_available(): bool
-    {
+    private static function abilities_available(): bool {
         return AbilitiesHealth::api_functions_available() && AbilitiesHealth::is_awpt_registry_healthy();
     }
 
     /**
      * Return the current WordPress version.
      */
-    private static function wordpress_version(): string
-    {
+    private static function wordpress_version(): string {
         global $wp_version;
 
         if (is_string($wp_version) && '' !== $wp_version) {

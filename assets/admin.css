@@ -1017,6 +1017,14 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	color: var(--awpt-muted);
 }
 
+.awpt-message--incident {
+	color: var(--awpt-muted);
+	font-size: 12px;
+	border-left: 2px solid var(--awpt-border);
+	padding-left: 10px;
+	margin: 8px 0;
+}
+
 .awpt-thinking {
 	display: inline-flex;
 	align-items: baseline;

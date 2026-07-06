@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Formats chat messages for the WordPress AI Client prompt builder.
  */
-final class ChatPromptFormatter
-{
+final class ChatPromptFormatter {
     /**
      * Extract the system instruction from chat messages.
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      */
-    public function extract_system_instruction(array $messages): string
-    {
+    public function extract_system_instruction(array $messages): string {
         foreach ($messages as $message) {
             if ('system' === (string) ($message['role'] ?? '')) {
                 return $this->stringify_content($message['content'] ?? '');
@@ -40,8 +38,7 @@ final class ChatPromptFormatter
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      */
-    public function build_prompt_text(array $messages): string
-    {
+    public function build_prompt_text(array $messages): string {
         $lines = [];
 
         foreach ($messages as $message) {
@@ -89,8 +86,7 @@ final class ChatPromptFormatter
      *
      * @param mixed $content Raw content.
      */
-    private function stringify_content(mixed $content): string
-    {
+    private function stringify_content(mixed $content): string {
         if (is_string($content)) {
             return $content;
         }

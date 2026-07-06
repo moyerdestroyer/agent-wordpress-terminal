@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Registers AWPT plugin abilities.
  */
-final class RegisterAbilities
-{
+final class RegisterAbilities {
     /**
      * Hook ability registration.
      */
-    public function init(): void
-    {
+    public function init(): void {
         add_action('wp_abilities_api_categories_init', [$this, 'register_category']);
         add_action('wp_abilities_api_init', [$this, 'register_abilities']);
     }
@@ -31,8 +29,7 @@ final class RegisterAbilities
     /**
      * Register the AWPT ability category.
      */
-    public function register_category(): void
-    {
+    public function register_category(): void {
         if (!function_exists('wp_register_ability_category')) {
             return;
         }
@@ -46,8 +43,7 @@ final class RegisterAbilities
     /**
      * Register all AWPT abilities.
      */
-    public function register_abilities(): void
-    {
+    public function register_abilities(): void {
         if (!function_exists('wp_register_ability')) {
             return;
         }
@@ -68,7 +64,13 @@ final class RegisterAbilities
         new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();
+        new ProposePluginDeactivate()->register();
         new ApplyAction()->register();
         new SideloadMedia()->register();
+        new ReadErrorLog()->register();
+        new ReadPlugins()->register();
+        new ReadSiteHealth()->register();
+        new ProbeUrl()->register();
+        new DiagnoseError()->register();
     }
 }

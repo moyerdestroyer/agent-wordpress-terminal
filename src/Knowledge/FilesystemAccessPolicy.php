@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Validates read-only document roots and files.
  */
-final class FilesystemAccessPolicy
-{
+final class FilesystemAccessPolicy {
     public const DEFAULT_MAX_FILE_SIZE = 2_097_152;
 
     /**
@@ -53,15 +52,13 @@ final class FilesystemAccessPolicy
         'ini',
     ];
 
-    public function max_file_size(): int
-    {
+    public function max_file_size(): int {
         $value = (int) get_option('awpt_knowledge_max_file_size', self::DEFAULT_MAX_FILE_SIZE);
 
         return max(1024, min($value, 10_485_760));
     }
 
-    public function is_allowed_root(string $root): bool
-    {
+    public function is_allowed_root(string $root): bool {
         $content_dir = realpath(WP_CONTENT_DIR);
 
         if (!is_string($content_dir) || !str_starts_with($root, $content_dir)) {
@@ -71,8 +68,7 @@ final class FilesystemAccessPolicy
         return !preg_match('~/(plugins|themes|mu-plugins)(/|$)~', $root);
     }
 
-    public function can_read_file(string $path, string $root): bool
-    {
+    public function can_read_file(string $path, string $root): bool {
         $real = realpath($path);
 
         if (!is_string($real) || !str_starts_with($real, trailingslashit($root))) {
@@ -86,8 +82,7 @@ final class FilesystemAccessPolicy
         return $this->extension_is_readable($real) && $this->size_is_readable($real);
     }
 
-    private function extension_is_readable(string $path): bool
-    {
+    private function extension_is_readable(string $path): bool {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         if (in_array($extension, self::BLOCKED_EXTENSIONS, strict: true)) {
@@ -97,8 +92,7 @@ final class FilesystemAccessPolicy
         return in_array($extension, self::TEXT_EXTENSIONS, strict: true);
     }
 
-    private function size_is_readable(string $path): bool
-    {
+    private function size_is_readable(string $path): bool {
         $size = filesize($path);
 
         return is_int($size) && $size > 0 && $size <= $this->max_file_size() && is_readable($path);

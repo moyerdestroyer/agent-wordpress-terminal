@@ -23,11 +23,12 @@ if (!defined('OBJECT')) {
 /**
  * Resets all in-memory WordPress test state. Call at the start of every test case.
  */
-function awpt_test_reset_state(): void
-{
+function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_options'] = [];
     $GLOBALS['awpt_test_connectors'] = [];
     $GLOBALS['awpt_test_active_plugins'] = [];
+    $GLOBALS['awpt_test_plugins'] = [];
+    $GLOBALS['awpt_test_deactivated_plugins'] = [];
     $GLOBALS['awpt_test_env'] = [];
     $GLOBALS['awpt_test_current_user_can'] = null;
     $GLOBALS['awpt_test_post_meta_updates'] = [];
@@ -45,15 +46,13 @@ function awpt_test_reset_state(): void
 awpt_test_reset_state();
 
 if (!function_exists('get_option')) {
-    function get_option(string $name, mixed $default = false): mixed
-    {
+    function get_option(string $name, mixed $default = false): mixed {
         return $GLOBALS['awpt_test_options'][$name] ?? $default;
     }
 }
 
 if (!function_exists('update_option')) {
-    function update_option(string $name, mixed $value): bool
-    {
+    function update_option(string $name, mixed $value): bool {
         $GLOBALS['awpt_test_options'][$name] = $value;
 
         return true;
@@ -61,8 +60,7 @@ if (!function_exists('update_option')) {
 }
 
 if (!function_exists('__')) {
-    function __(string $text, string $domain = 'default'): string
-    {
+    function __(string $text, string $domain = 'default'): string {
         unset($domain);
 
         return $text;
@@ -70,15 +68,13 @@ if (!function_exists('__')) {
 }
 
 if (!function_exists('esc_html__')) {
-    function esc_html__(string $text, string $domain = 'default'): string
-    {
+    function esc_html__(string $text, string $domain = 'default'): string {
         return __($text, $domain);
     }
 }
 
 if (!function_exists('sanitize_key')) {
-    function sanitize_key(string $key): string
-    {
+    function sanitize_key(string $key): string {
         $key = strtolower($key);
 
         return (string) preg_replace('/[^a-z0-9_\-]/', '', $key);
@@ -86,46 +82,74 @@ if (!function_exists('sanitize_key')) {
 }
 
 if (!function_exists('sanitize_text_field')) {
-    function sanitize_text_field(string $value): string
-    {
+    function sanitize_text_field(string $value): string {
         return trim($value);
     }
 }
 
 if (!function_exists('sanitize_html_class')) {
-    function sanitize_html_class(string $value): string
-    {
+    function sanitize_html_class(string $value): string {
         return (string) preg_replace('/[^A-Za-z0-9_-]/', '', $value);
     }
 }
 
 if (!function_exists('admin_url')) {
-    function admin_url(string $path = ''): string
-    {
+    function admin_url(string $path = ''): string {
         return 'https://example.test/wp-admin/' . $path;
     }
 }
 
 if (!function_exists('is_multisite')) {
-    function is_multisite(): bool
-    {
+    function is_multisite(): bool {
         return false;
     }
 }
 
 if (!function_exists('is_plugin_active')) {
-    function is_plugin_active(string $plugin_file): bool
-    {
+    function is_plugin_active(string $plugin_file): bool {
         return in_array($plugin_file, $GLOBALS['awpt_test_active_plugins'], true);
     }
 }
 
 if (!function_exists('is_plugin_active_for_network')) {
-    function is_plugin_active_for_network(string $plugin_file): bool
-    {
+    function is_plugin_active_for_network(string $plugin_file): bool {
         unset($plugin_file);
 
         return false;
+    }
+}
+
+if (!function_exists('is_plugin_active_for_network')) {
+    function is_plugin_active_for_network(string $plugin_file): bool {
+        unset($plugin_file);
+
+        return false;
+    }
+}
+
+if (!function_exists('get_plugins')) {
+    /**
+     * @return array<string, array<string, string>>
+     */
+    function get_plugins(): array {
+        return $GLOBALS['awpt_test_plugins'];
+    }
+}
+
+if (!function_exists('deactivate_plugins')) {
+    /**
+     * @param list<string>|string $plugins
+     */
+    function deactivate_plugins(array|string $plugins): void {
+        $plugins = is_array($plugins) ? $plugins : [$plugins];
+
+        foreach ($plugins as $plugin) {
+            $GLOBALS['awpt_test_deactivated_plugins'][] = $plugin;
+            $GLOBALS['awpt_test_active_plugins'] = array_values(array_filter(
+                $GLOBALS['awpt_test_active_plugins'],
+                static fn(string $active): bool => $active !== $plugin,
+            ));
+        }
     }
 }
 
@@ -133,8 +157,7 @@ if (!function_exists('wp_get_connectors')) {
     /**
      * @return array<string, array<string, mixed>>
      */
-    function wp_get_connectors(): array
-    {
+    function wp_get_connectors(): array {
         return $GLOBALS['awpt_test_connectors'];
     }
 }
@@ -143,15 +166,13 @@ if (!function_exists('wp_get_connector')) {
     /**
      * @return array<string, mixed>|null
      */
-    function wp_get_connector(string $provider_id): ?array
-    {
+    function wp_get_connector(string $provider_id): ?array {
         return $GLOBALS['awpt_test_connectors'][$provider_id] ?? null;
     }
 }
 
 if (!function_exists('wp_is_connector_registered')) {
-    function wp_is_connector_registered(string $provider_id): bool
-    {
+    function wp_is_connector_registered(string $provider_id): bool {
         return array_key_exists($provider_id, $GLOBALS['awpt_test_connectors']);
     }
 }
@@ -165,8 +186,7 @@ if (!function_exists('current_user_can')) {
      *
      * @param mixed ...$args
      */
-    function current_user_can(string $capability, mixed ...$args): bool
-    {
+    function current_user_can(string $capability, mixed ...$args): bool {
         $handler = $GLOBALS['awpt_test_current_user_can'] ?? null;
 
         if (is_callable($handler)) {
@@ -181,8 +201,7 @@ if (!function_exists('wp_update_post')) {
     /**
      * @param array<string, mixed> $postarr
      */
-    function wp_update_post(array $postarr, bool $wp_error = false): int|WP_Error
-    {
+    function wp_update_post(array $postarr, bool $wp_error = false): int|WP_Error {
         unset($wp_error);
 
         $post_id = (int) ($postarr['ID'] ?? 0);
@@ -208,8 +227,7 @@ if (!function_exists('wp_insert_post')) {
     /**
      * @param array<string, mixed> $postarr
      */
-    function wp_insert_post(array $postarr, bool $wp_error = false): int|WP_Error
-    {
+    function wp_insert_post(array $postarr, bool $wp_error = false): int|WP_Error {
         unset($wp_error);
 
         $post_id = $GLOBALS['awpt_test_next_post_id'] ?? 42;
@@ -226,8 +244,7 @@ if (!function_exists('wp_insert_post')) {
 }
 
 if (!function_exists('get_edit_post_link')) {
-    function get_edit_post_link(int $post_id, string $context = 'display'): string
-    {
+    function get_edit_post_link(int $post_id, string $context = 'display'): string {
         unset($context);
 
         return 'https://example.test/wp-admin/post.php?post=' . $post_id . '&action=edit';
@@ -235,29 +252,25 @@ if (!function_exists('get_edit_post_link')) {
 }
 
 if (!function_exists('get_current_user_id')) {
-    function get_current_user_id(): int
-    {
+    function get_current_user_id(): int {
         return $GLOBALS['awpt_test_current_user_id'] ?? 1;
     }
 }
 
 if (!function_exists('wp_kses_post')) {
-    function wp_kses_post(string $content): string
-    {
+    function wp_kses_post(string $content): string {
         return $content;
     }
 }
 
 if (!function_exists('wp_strip_all_tags')) {
-    function wp_strip_all_tags(string $text): string
-    {
+    function wp_strip_all_tags(string $text): string {
         return trim(strip_tags($text));
     }
 }
 
 if (!function_exists('sanitize_title')) {
-    function sanitize_title(string $title): string
-    {
+    function sanitize_title(string $title): string {
         $title = strtolower(trim($title));
         $title = (string) preg_replace('/[^a-z0-9]+/', '-', $title);
 
@@ -266,23 +279,24 @@ if (!function_exists('sanitize_title')) {
 }
 
 if (!function_exists('wp_parse_url')) {
-    function wp_parse_url(string $url, int $component = -1): mixed
-    {
+    function wp_parse_url(string $url, int $component = -1): mixed {
         return parse_url($url, $component);
     }
 }
 
 if (!function_exists('url_to_postid')) {
-    function url_to_postid(string $url): int
-    {
+    function url_to_postid(string $url): int {
         return (int) ($GLOBALS['awpt_test_url_to_postid'][$url] ?? 0);
     }
 }
 
 if (!function_exists('post_type_exists')) {
-    function post_type_exists(string $post_type): bool
-    {
-        return in_array($post_type, ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'], true);
+    function post_type_exists(string $post_type): bool {
+        return in_array(
+            $post_type,
+            ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'],
+            true,
+        );
     }
 }
 
@@ -290,8 +304,7 @@ if (!function_exists('get_page_by_path')) {
     /**
      * @param list<string>|string $post_type
      */
-    function get_page_by_path(string $page_path, string $output = OBJECT, array|string $post_type = 'page'): ?WP_Post
-    {
+    function get_page_by_path(string $page_path, string $output = OBJECT, array|string $post_type = 'page'): ?WP_Post {
         unset($output);
 
         $post_types = is_array($post_type) ? $post_type : [$post_type];
@@ -314,17 +327,20 @@ if (!function_exists('parse_blocks')) {
     /**
      * @return array<int, array<string, mixed>>
      */
-    function parse_blocks(string $content): array
-    {
+    function parse_blocks(string $content): array {
         $pattern = '/<!--\s+wp:([a-z0-9_\/-]+)(?:\s+(\{.*?\}))?\s+-->(.*?)<!--\s+\/wp:\1\s+-->/s';
 
         if (!preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
-            return '' === trim($content) ? [] : [[
-                'blockName' => null,
-                'attrs' => [],
-                'innerBlocks' => [],
-                'innerHTML' => $content,
-            ]];
+            return (
+                '' === trim($content)
+                    ? []
+                    : [[
+                        'blockName' => null,
+                        'attrs' => [],
+                        'innerBlocks' => [],
+                        'innerHTML' => $content,
+                    ]]
+            );
         }
 
         $blocks = [];
@@ -355,8 +371,7 @@ if (!function_exists('serialize_blocks')) {
     /**
      * @param array<int|string, array<string, mixed>> $blocks
      */
-    function serialize_blocks(array $blocks): string
-    {
+    function serialize_blocks(array $blocks): string {
         $content = '';
 
         foreach ($blocks as $block) {
@@ -383,8 +398,7 @@ if (!function_exists('get_post_statuses')) {
     /**
      * @return array<string, string>
      */
-    function get_post_statuses(): array
-    {
+    function get_post_statuses(): array {
         return [
             'publish' => 'Published',
             'draft' => 'Draft',
@@ -396,8 +410,7 @@ if (!function_exists('get_post_statuses')) {
 }
 
 if (!function_exists('update_post_meta')) {
-    function update_post_meta(int $post_id, string $meta_key, mixed $meta_value): bool
-    {
+    function update_post_meta(int $post_id, string $meta_key, mixed $meta_value): bool {
         $GLOBALS['awpt_test_post_meta_updates'][$post_id][$meta_key] = $meta_value;
 
         return true;
@@ -405,8 +418,7 @@ if (!function_exists('update_post_meta')) {
 }
 
 if (!function_exists('apply_filters')) {
-    function apply_filters(string $hook_name, mixed $value, mixed ...$args): mixed
-    {
+    function apply_filters(string $hook_name, mixed $value, mixed ...$args): mixed {
         unset($hook_name, $args);
 
         return $value;
@@ -414,8 +426,7 @@ if (!function_exists('apply_filters')) {
 }
 
 if (!function_exists('wp_json_encode')) {
-    function wp_json_encode(mixed $data): string|false
-    {
+    function wp_json_encode(mixed $data): string|false {
         return json_encode($data);
     }
 }
@@ -424,46 +435,39 @@ if (!class_exists('WP_Error')) {
     /**
      * Minimal WP_Error stand-in sufficient for provider error handling tests.
      */
-    class WP_Error
-    {
+    class WP_Error {
         private string $code;
         private string $message;
         private mixed $data;
 
-        public function __construct(string $code = '', string $message = '', mixed $data = '')
-        {
+        public function __construct(string $code = '', string $message = '', mixed $data = '') {
             $this->code = $code;
             $this->message = $message;
             $this->data = $data;
         }
 
-        public function get_error_code(): string
-        {
+        public function get_error_code(): string {
             return $this->code;
         }
 
-        public function get_error_message(): string
-        {
+        public function get_error_message(): string {
             return $this->message;
         }
 
-        public function get_error_data(): mixed
-        {
+        public function get_error_data(): mixed {
             return $this->data;
         }
     }
 }
 
 if (!function_exists('is_wp_error')) {
-    function is_wp_error(mixed $thing): bool
-    {
+    function is_wp_error(mixed $thing): bool {
         return $thing instanceof WP_Error;
     }
 }
 
 if (!class_exists('WP_Post')) {
-    class WP_Post
-    {
+    class WP_Post {
         public int $ID = 0;
         public string $post_type = 'post';
         public string $post_status = 'draft';
@@ -478,8 +482,7 @@ if (!class_exists('WP_Post')) {
 }
 
 if (!class_exists('WP_User')) {
-    class WP_User
-    {
+    class WP_User {
         public int $ID = 0;
         public string $user_login = '';
         public string $user_nicename = '';
@@ -489,8 +492,7 @@ if (!class_exists('WP_User')) {
 }
 
 if (!function_exists('get_userdata')) {
-    function get_userdata(int $user_id): ?WP_User
-    {
+    function get_userdata(int $user_id): ?WP_User {
         $user = $GLOBALS['awpt_test_users'][$user_id] ?? null;
 
         return $user instanceof WP_User ? $user : null;
@@ -498,8 +500,7 @@ if (!function_exists('get_userdata')) {
 }
 
 if (!function_exists('get_user_by')) {
-    function get_user_by(string $field, string $value): ?WP_User
-    {
+    function get_user_by(string $field, string $value): ?WP_User {
         foreach ($GLOBALS['awpt_test_users'] as $user) {
             if (!$user instanceof WP_User) {
                 continue;
@@ -522,8 +523,7 @@ if (!function_exists('get_user_by')) {
 }
 
 if (!function_exists('wp_trim_words')) {
-    function wp_trim_words(string $text, int $num_words = 55, string $more = '…'): string
-    {
+    function wp_trim_words(string $text, int $num_words = 55, string $more = '…'): string {
         $words = preg_split('/\s+/', trim($text)) ?: [];
 
         if (count($words) <= $num_words) {
@@ -535,26 +535,25 @@ if (!function_exists('wp_trim_words')) {
 }
 
 if (!function_exists('get_post')) {
-    function get_post(int $post_id): ?WP_Post
-    {
+    function get_post(int $post_id): ?WP_Post {
         return $GLOBALS['awpt_test_posts'][$post_id] ?? null;
     }
 }
 
 if (!function_exists('wp_attachment_is_image')) {
-    function wp_attachment_is_image(int $attachment_id): bool
-    {
+    function wp_attachment_is_image(int $attachment_id): bool {
         $attachment = get_post($attachment_id);
 
-        return $attachment instanceof WP_Post
+        return (
+            $attachment instanceof WP_Post
             && 'attachment' === $attachment->post_type
-            && ($GLOBALS['awpt_test_attachment_is_image'][$attachment_id] ?? false);
+            && ($GLOBALS['awpt_test_attachment_is_image'][$attachment_id] ?? false)
+        );
     }
 }
 
 if (!function_exists('get_post_thumbnail_id')) {
-    function get_post_thumbnail_id(int $post_id): int
-    {
+    function get_post_thumbnail_id(int $post_id): int {
         $thumbnail_id = $GLOBALS['awpt_test_post_thumbnails'][$post_id] ?? 0;
 
         return is_int($thumbnail_id) ? $thumbnail_id : (int) $thumbnail_id;
@@ -562,8 +561,7 @@ if (!function_exists('get_post_thumbnail_id')) {
 }
 
 if (!function_exists('set_post_thumbnail')) {
-    function set_post_thumbnail(int $post_id, int $attachment_id): bool
-    {
+    function set_post_thumbnail(int $post_id, int $attachment_id): bool {
         if (!($GLOBALS['awpt_test_set_post_thumbnail_result'] ?? true)) {
             return false;
         }
@@ -582,8 +580,7 @@ if (!function_exists('set_post_thumbnail')) {
 }
 
 if (!function_exists('get_post_meta')) {
-    function get_post_meta(int $post_id, string $key = '', bool $single = false): mixed
-    {
+    function get_post_meta(int $post_id, string $key = '', bool $single = false): mixed {
         unset($single);
 
         return $GLOBALS['awpt_test_post_meta_updates'][$post_id][$key] ?? '';
@@ -591,8 +588,7 @@ if (!function_exists('get_post_meta')) {
 }
 
 if (!function_exists('delete_post_meta')) {
-    function delete_post_meta(int $post_id, string $meta_key): bool
-    {
+    function delete_post_meta(int $post_id, string $meta_key): bool {
         unset($GLOBALS['awpt_test_post_meta_updates'][$post_id][$meta_key]);
 
         return true;
@@ -600,8 +596,7 @@ if (!function_exists('delete_post_meta')) {
 }
 
 if (!function_exists('get_the_title')) {
-    function get_the_title(int|WP_Post $post): string
-    {
+    function get_the_title(int|WP_Post $post): string {
         if ($post instanceof WP_Post) {
             return $post->post_title;
         }
@@ -613,8 +608,7 @@ if (!function_exists('get_the_title')) {
 }
 
 if (!function_exists('get_preview_post_link')) {
-    function get_preview_post_link(int|WP_Post $post): string
-    {
+    function get_preview_post_link(int|WP_Post $post): string {
         $post_id = $post instanceof WP_Post ? $post->ID : $post;
 
         return 'https://example.test/?p=' . $post_id . '&preview=true';
@@ -622,8 +616,7 @@ if (!function_exists('get_preview_post_link')) {
 }
 
 if (!function_exists('get_permalink')) {
-    function get_permalink(int|WP_Post $post): string
-    {
+    function get_permalink(int|WP_Post $post): string {
         $post_id = $post instanceof WP_Post ? $post->ID : $post;
 
         return 'https://example.test/?p=' . $post_id;
@@ -631,8 +624,7 @@ if (!function_exists('get_permalink')) {
 }
 
 if (!function_exists('wp_count_posts')) {
-    function wp_count_posts(string $post_type = 'post', string $perm = ''): object
-    {
+    function wp_count_posts(string $post_type = 'post', string $perm = ''): object {
         unset($perm);
 
         $counts = (object) [
@@ -662,8 +654,7 @@ if (!function_exists('wp_count_posts')) {
 }
 
 if (!class_exists('WP_Query')) {
-    class WP_Query
-    {
+    class WP_Query {
         /** @var list<WP_Post> */
         public array $posts = [];
 
@@ -672,8 +663,7 @@ if (!class_exists('WP_Query')) {
         /**
          * @param array<string, mixed> $args
          */
-        public function __construct(array $args = [])
-        {
+        public function __construct(array $args = []) {
             if ([] === $args) {
                 return;
             }
@@ -714,20 +704,17 @@ if (!class_exists('WP_Query')) {
                 $matches[] = $post;
             }
 
-            usort(
-                $matches,
-                static function (WP_Post $left, WP_Post $right) use ($orderby, $order): int {
-                    $value = match ($orderby) {
-                        'date' => strcmp($left->post_date_gmt, $right->post_date_gmt),
-                        'title' => strcmp($left->post_title, $right->post_title),
-                        'author' => $left->post_author <=> $right->post_author,
-                        'type' => strcmp($left->post_type, $right->post_type),
-                        default => strcmp($left->post_modified_gmt, $right->post_modified_gmt),
-                    };
+            usort($matches, static function (WP_Post $left, WP_Post $right) use ($orderby, $order): int {
+                $value = match ($orderby) {
+                    'date' => strcmp($left->post_date_gmt, $right->post_date_gmt),
+                    'title' => strcmp($left->post_title, $right->post_title),
+                    'author' => $left->post_author <=> $right->post_author,
+                    'type' => strcmp($left->post_type, $right->post_type),
+                    default => strcmp($left->post_modified_gmt, $right->post_modified_gmt),
+                };
 
-                    return 'ASC' === $order ? $value : -$value;
-                },
-            );
+                return 'ASC' === $order ? $value : -$value;
+            });
 
             $this->found_posts = count($matches);
             $sliced = array_slice($matches, $offset, $limit);
@@ -744,8 +731,7 @@ if (!class_exists('WP_Query')) {
 }
 
 if (!function_exists('get_bloginfo')) {
-    function get_bloginfo(string $show = ''): string
-    {
+    function get_bloginfo(string $show = ''): string {
         if ('version' === $show) {
             return '6.9';
         }
@@ -755,8 +741,7 @@ if (!function_exists('get_bloginfo')) {
 }
 
 if (!function_exists('wp_trash_post')) {
-    function wp_trash_post(int $post_id): int|false
-    {
+    function wp_trash_post(int $post_id): int|false {
         $GLOBALS['awpt_test_trashed_posts'][] = $post_id;
 
         return $post_id;

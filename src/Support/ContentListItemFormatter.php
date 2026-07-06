@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Formats readable list items from WP_Post objects.
  */
-final class ContentListItemFormatter
-{
+final class ContentListItemFormatter {
     private ContentListAuthorResolver $authors;
 
-    public function __construct(?ContentListAuthorResolver $authors = null)
-    {
+    public function __construct(?ContentListAuthorResolver $authors = null) {
         $this->authors = $authors ?? new ContentListAuthorResolver();
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function from_post(\WP_Post $post): array
-    {
+    public function from_post(\WP_Post $post): array {
         $author_id = (int) $post->post_author;
 
         return [
@@ -49,8 +46,7 @@ final class ContentListItemFormatter
         ];
     }
 
-    private function excerpt(\WP_Post $post): string
-    {
+    private function excerpt(\WP_Post $post): string {
         return trim($post->post_excerpt);
     }
 }

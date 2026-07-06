@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Applies a staged installed-theme switch.
  */
-final class ThemeSwitchActionApplier
-{
+final class ThemeSwitchActionApplier {
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    public function apply(array $payload): array|\WP_Error
-    {
+    public function apply(array $payload): array|\WP_Error {
         if (!current_user_can('switch_themes')) {
             return new \WP_Error(
                 'awpt_cannot_switch_themes',

@@ -19,12 +19,10 @@ if (!defined('ABSPATH')) {
 /**
  * Updates whitelisted WordPress options from a staged action payload.
  */
-final class SiteSettingsActionApplier
-{
+final class SiteSettingsActionApplier {
     private SiteSettingsWhitelist $whitelist;
 
-    public function __construct(?SiteSettingsWhitelist $whitelist = null)
-    {
+    public function __construct(?SiteSettingsWhitelist $whitelist = null) {
         $this->whitelist = $whitelist ?? new SiteSettingsWhitelist();
     }
 
@@ -32,8 +30,7 @@ final class SiteSettingsActionApplier
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    public function apply(array $payload): array|\WP_Error
-    {
+    public function apply(array $payload): array|\WP_Error {
         $changes = is_array($payload['settings_changes'] ?? null) ? $payload['settings_changes'] : [];
 
         if ([] === $changes) {
@@ -70,8 +67,7 @@ final class SiteSettingsActionApplier
         return ['settings' => $updated];
     }
 
-    private function update_option(string $option, mixed $value): void
-    {
+    private function update_option(string $option, mixed $value): void {
         if ('permalink_structure' !== $option) {
             update_option($option, $value);
             return;

@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Determines whether a post meta key may be included in read-content output.
  */
-final class PostMetaKeyPolicy
-{
-    public function is_exposed(string $key): bool
-    {
+final class PostMetaKeyPolicy {
+    public function is_exposed(string $key): bool {
         if (in_array($key, ['_edit_lock', '_edit_last'], true)) {
             return false;
         }
@@ -42,8 +40,7 @@ final class PostMetaKeyPolicy
         return !$this->contains_sensitive_term(strtolower($key));
     }
 
-    private function contains_sensitive_term(string $lower): bool
-    {
+    private function contains_sensitive_term(string $lower): bool {
         foreach ([
             'password',
             'secret',

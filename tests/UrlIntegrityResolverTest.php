@@ -15,8 +15,7 @@ declare(strict_types=1);
 
 use AWPT\Support\UrlIntegrityResolver;
 
-function test_url_integrity_resolver(): void
-{
+function test_url_integrity_resolver(): void {
     $resolver = new UrlIntegrityResolver();
 
     $real_url =

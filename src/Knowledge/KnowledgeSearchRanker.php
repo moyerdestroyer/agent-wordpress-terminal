@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Scores and formats indexed Knowledge search rows.
  */
-final class KnowledgeSearchRanker
-{
+final class KnowledgeSearchRanker {
     /**
      * @return list<string>
      */
-    public function tokens(string $query): array
-    {
+    public function tokens(string $query): array {
         $raw = preg_split('/[^\pL\pN_]+/u', strtolower($query));
         $tokens = [];
 
@@ -43,8 +41,7 @@ final class KnowledgeSearchRanker
      * @param list<string>         $tokens Query tokens.
      * @return array<string, mixed>|null
      */
-    public function format_result(array $row, array $tokens): ?array
-    {
+    public function format_result(array $row, array $tokens): ?array {
         $score = $this->score((string) ($row['chunk_text'] ?? ''), (string) ($row['label'] ?? ''), $tokens);
 
         if ($score <= 0) {
@@ -69,8 +66,7 @@ final class KnowledgeSearchRanker
     /**
      * @param list<string> $tokens Query tokens.
      */
-    private function score(string $text, string $label, array $tokens): int
-    {
+    private function score(string $text, string $label, array $tokens): int {
         $haystack = strtolower($label . ' ' . $text);
         $score = 0;
 
@@ -88,8 +84,7 @@ final class KnowledgeSearchRanker
     /**
      * @param list<string> $tokens Query tokens.
      */
-    private function excerpt(string $text, array $tokens): string
-    {
+    private function excerpt(string $text, array $tokens): string {
         $stripped = preg_replace('/\s+/', ' ', wp_strip_all_tags($text));
         $plain = trim(is_string($stripped) ? $stripped : $text);
         $lower = strtolower($plain);
@@ -110,8 +105,7 @@ final class KnowledgeSearchRanker
     /**
      * @param list<string> $tokens Query tokens.
      */
-    private function first_token_position(string $text, array $tokens): int
-    {
+    private function first_token_position(string $text, array $tokens): int {
         foreach ($tokens as $token) {
             if (!str_contains($text, $token)) {
                 continue;

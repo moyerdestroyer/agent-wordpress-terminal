@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Database;
 
 use AWPT\Database\ActionPayloadSanitizers\ContentPayloadSanitizer;
+use AWPT\Database\ActionPayloadSanitizers\PluginPayloadSanitizer;
 use AWPT\Database\ActionPayloadSanitizers\SettingsPayloadSanitizer;
 use AWPT\Database\ActionPayloadSanitizers\ThemePayloadSanitizer;
 use AWPT\Support\ActionOperations;
@@ -22,28 +23,29 @@ if (!defined('ABSPATH')) {
 /**
  * Normalizes action payloads before storage.
  */
-final class ActionPayloadSanitizer
-{
+final class ActionPayloadSanitizer {
     private ContentPayloadSanitizer $content;
     private SettingsPayloadSanitizer $settings;
     private ThemePayloadSanitizer $theme;
+    private PluginPayloadSanitizer $plugins;
 
     public function __construct(
         ?ContentPayloadSanitizer $content = null,
         ?SettingsPayloadSanitizer $settings = null,
         ?ThemePayloadSanitizer $theme = null,
+        ?PluginPayloadSanitizer $plugins = null,
     ) {
         $this->content = $content ?? new ContentPayloadSanitizer();
         $this->settings = $settings ?? new SettingsPayloadSanitizer();
         $this->theme = $theme ?? new ThemePayloadSanitizer();
+        $this->plugins = $plugins ?? new PluginPayloadSanitizer();
     }
 
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function sanitize(array $payload): array
-    {
+    public function sanitize(array $payload): array {
         $operation = sanitize_key((string) ($payload['operation'] ?? ''));
 
         if (!ActionOperations::is_valid($operation)) {
@@ -66,12 +68,12 @@ final class ActionPayloadSanitizer
         }
 
         $clean = $this->settings->sanitize($clean, $payload);
+        $clean = $this->theme->sanitize($clean, $payload);
 
-        return $this->theme->sanitize($clean, $payload);
+        return $this->plugins->sanitize($clean, $payload);
     }
 
-    private function to_absint(mixed $value): int
-    {
+    private function to_absint(mixed $value): int {
         return absint(is_scalar($value) ? $value : 0);
     }
 }

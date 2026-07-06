@@ -22,13 +22,11 @@ if (!defined('ABSPATH')) {
 /**
  * Manages staged proposed actions.
  */
-final class ActionsController extends RestController
-{
+final class ActionsController extends RestController {
     private ActionRepository $actions;
     private StagedPostPreview $preview;
 
-    public function __construct(?ActionRepository $actions = null, ?StagedPostPreview $preview = null)
-    {
+    public function __construct(?ActionRepository $actions = null, ?StagedPostPreview $preview = null) {
         $this->actions = $actions ?? new ActionRepository();
         $this->preview = $preview ?? new StagedPostPreview();
     }
@@ -36,8 +34,7 @@ final class ActionsController extends RestController
     /**
      * Register routes.
      */
-    public function register_routes(): void
-    {
+    public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/actions/(?P<id>\d+)/preview', [
             [
                 'methods' => \WP_REST_Server::CREATABLE,
@@ -66,8 +63,7 @@ final class ActionsController extends RestController
     /**
      * Build a frontend preview URL for a staged content update.
      */
-    public function preview_action(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function preview_action(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $action = $this->actions->get_accessible_row(RequestParams::int($request, 'id'));
 
         if (null === $action) {
@@ -117,8 +113,7 @@ final class ActionsController extends RestController
     /**
      * Approve, reject, or apply an action.
      */
-    public function update_action(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function update_action(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $action_id = RequestParams::int($request, 'id');
         $operation = sanitize_key(RequestParams::string($request, 'operation'));
         $action = $this->actions->get_accessible_row($action_id);

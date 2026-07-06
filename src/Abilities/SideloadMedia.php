@@ -26,8 +26,7 @@ if (!defined('ABSPATH')) {
  * attachment into a post still goes through the normal
  * propose-content-update → approve → apply flow.
  */
-final class SideloadMedia
-{
+final class SideloadMedia {
     private MediaSideloadValidator $validator;
     private OpenGraphMediaUrlExtractor $og_extractor;
     private MessageUrlExtractor $message_url_extractor;
@@ -51,8 +50,7 @@ final class SideloadMedia
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/sideload-media',
             'label' => __('Import Media from URL', 'agent-wordpress-terminal'),
@@ -103,8 +101,7 @@ final class SideloadMedia
     /**
      * @param array<string, mixed> $input
      */
-    public function can_sideload(array $input): bool
-    {
+    public function can_sideload(array $input): bool {
         unset($input);
 
         return current_user_can('upload_files') && current_user_can('manage_options');
@@ -114,8 +111,7 @@ final class SideloadMedia
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $url = trim((string) ($input['url'] ?? ''));
         $url = $this->recover_url_if_corrupted($url, (int) ($input['session_id'] ?? 0));
         $validation_error = $this->validator->validate_url($url);
@@ -173,8 +169,7 @@ final class SideloadMedia
      *
      * @return array{0: string, 1: string}|\WP_Error Tuple of [temp file path, resolved URL].
      */
-    private function download_media(string $url): array|\WP_Error
-    {
+    private function download_media(string $url): array|\WP_Error {
         // download_url() uses wp_safe_remote_get() internally, which already rejects
         // requests to private/reserved IP ranges (basic SSRF protection) for us.
         $tmp_file = download_url($url, 30);
@@ -235,8 +230,7 @@ final class SideloadMedia
      *
      * @return array{0: string, 1: string}|\WP_Error Tuple of [temp file path, resolved URL].
      */
-    private function resolve_share_page(string $html_tmp_file, string $original_url): array|\WP_Error
-    {
+    private function resolve_share_page(string $html_tmp_file, string $original_url): array|\WP_Error {
         $html = (string) file_get_contents($html_tmp_file, false, null, 0, 500_000);
         wp_delete_file($html_tmp_file);
 
@@ -290,8 +284,7 @@ final class SideloadMedia
      * messages when the model's URL is a punctuation-corrupted match for one of them,
      * rather than trusting the model's regenerated copy.
      */
-    private function recover_url_if_corrupted(string $url, int $session_id): string
-    {
+    private function recover_url_if_corrupted(string $url, int $session_id): string {
         if ('' === $url || $session_id <= 0) {
             return $url;
         }
@@ -312,8 +305,7 @@ final class SideloadMedia
     /**
      * Derive a safe local file name for the sideloaded file.
      */
-    private function sideload_file_name(string $url): string
-    {
+    private function sideload_file_name(string $url): string {
         $name = wp_basename((string) parse_url($url, PHP_URL_PATH));
 
         if ('' === $name) {

@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Some WordPress AI connectors return ability calls as plain text instead of structured function calls.
  */
-final class EmbeddedToolCallExtractor
-{
+final class EmbeddedToolCallExtractor {
     /**
      * Extract embedded tool calls and return cleaned assistant text.
      *
      * @return array{raw_tool_calls: array<int, array<string, mixed>>, content: string}
      */
-    public function extract(string $content): array
-    {
+    public function extract(string $content): array {
         $raw_tool_calls = [];
         $cleaned = $content;
 
@@ -43,8 +41,7 @@ final class EmbeddedToolCallExtractor
      *
      * @return array<int, array<string, mixed>>
      */
-    private function extract_json_tool_calls(string $content, string &$cleaned): array
-    {
+    private function extract_json_tool_calls(string $content, string &$cleaned): array {
         $raw_tool_calls = [];
 
         $matches = [];
@@ -80,8 +77,7 @@ final class EmbeddedToolCallExtractor
      *
      * @return array<int, array<string, mixed>>
      */
-    private function extract_ability_tags(string $content, string &$cleaned): array
-    {
+    private function extract_ability_tags(string $content, string &$cleaned): array {
         $raw_tool_calls = [];
 
         $matches = [];
@@ -109,8 +105,7 @@ final class EmbeddedToolCallExtractor
      * @param array<string, mixed> $arguments Tool arguments.
      * @return array<string, mixed>|null
      */
-    private function normalize_call(string $name, array $arguments): ?array
-    {
+    private function normalize_call(string $name, array $arguments): ?array {
         $registry = new ToolRegistry();
         $function_name = $registry->function_name_for_ability($name);
 

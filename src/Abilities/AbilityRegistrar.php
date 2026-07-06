@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Registers AWPT abilities with consistent schema shape.
  */
-final class AbilityRegistrar
-{
+final class AbilityRegistrar {
     /**
      * @param array{
      *     name: string,
@@ -31,8 +30,7 @@ final class AbilityRegistrar
      *     annotations?: array<string, bool>
      * } $config
      */
-    public static function register(array $config): void
-    {
+    public static function register(array $config): void {
         $annotations = $config['annotations'] ?? [
             'readonly' => true,
             'destructive' => false,

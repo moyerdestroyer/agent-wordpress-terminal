@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Support\SessionTitleSuggester;
 
-function test_session_title_suggester(): void
-{
+function test_session_title_suggester(): void {
     $suggester = new SessionTitleSuggester();
 
     awpt_test_reset_state();

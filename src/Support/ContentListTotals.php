@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Computes site-wide totals for content listing responses.
  */
-final class ContentListTotals
-{
+final class ContentListTotals {
     /**
      * @var list<string>
      */
@@ -26,8 +25,7 @@ final class ContentListTotals
 
     private ContentSearchTypes $types;
 
-    public function __construct(?ContentSearchTypes $types = null)
-    {
+    public function __construct(?ContentSearchTypes $types = null) {
         $this->types = $types ?? new ContentSearchTypes();
     }
 
@@ -35,8 +33,7 @@ final class ContentListTotals
      * @param list<string> $post_types
      * @return array<string, int>
      */
-    public function by_status(array $post_types): array
-    {
+    public function by_status(array $post_types): array {
         if (!function_exists('wp_count_posts')) {
             return [];
         }
@@ -57,8 +54,7 @@ final class ContentListTotals
     /**
      * @return array<string, int>
      */
-    public function by_type(): array
-    {
+    public function by_type(): array {
         return $this->inventory()['by_type'];
     }
 
@@ -66,8 +62,7 @@ final class ContentListTotals
      * @param list<string> $post_types
      * @return array{by_status: array<string, int>, by_type: array<string, int>}
      */
-    public function inventory(?array $post_types = null): array
-    {
+    public function inventory(?array $post_types = null): array {
         if (!function_exists('wp_count_posts')) {
             return [
                 'by_status' => [],

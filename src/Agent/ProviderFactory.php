@@ -19,13 +19,11 @@ if (!defined('ABSPATH')) {
 /**
  * Creates configured agent providers.
  */
-final class ProviderFactory
-{
+final class ProviderFactory {
     /**
      * Create the configured provider.
      */
-    public function make(): ProviderInterface
-    {
+    public function make(): ProviderInterface {
         $provider_id = new ConnectorSelection()->normalize_provider_option((string) get_option('awpt_provider', ''));
 
         return match ($provider_id) {

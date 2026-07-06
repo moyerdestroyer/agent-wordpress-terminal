@@ -12,6 +12,7 @@ namespace AWPT\Abilities;
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
 use AWPT\Abilities\ActionAppliers\NewPostActionApplier;
+use AWPT\Abilities\ActionAppliers\PluginDeactivateActionApplier;
 use AWPT\Abilities\ActionAppliers\SiteSettingsActionApplier;
 use AWPT\Abilities\ActionAppliers\ThemeSwitchActionApplier;
 use AWPT\Database\ActionRepository;
@@ -23,8 +24,7 @@ if (!defined('ABSPATH')) {
 /**
  * Applies an approved staged action.
  */
-final class ApplyAction
-{
+final class ApplyAction {
     private ActionRepository $actions;
     private ContentUpdateActionApplier $content_updates;
     private NewPostActionApplier $new_posts;
@@ -48,8 +48,7 @@ final class ApplyAction
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/apply-action',
             'label' => __('Apply Action', 'agent-wordpress-terminal'),
@@ -78,8 +77,7 @@ final class ApplyAction
     /**
      * @param array<string, mixed> $input
      */
-    public function can_apply(array $input): bool
-    {
+    public function can_apply(array $input): bool {
         $action = $this->actions->get_accessible_row((int) ($input['action_id'] ?? 0));
 
         if (null === $action || 'approved' !== $action['status']) {
@@ -98,6 +96,7 @@ final class ApplyAction
             'new_post' => current_user_can('edit_posts') && current_user_can(capability: 'manage_options'),
             'site_settings_update' => current_user_can('manage_options'),
             'theme_switch' => current_user_can('switch_themes') && current_user_can('manage_options'),
+            'plugin_deactivate' => current_user_can('activate_plugins') && current_user_can('manage_options'),
             default => false,
         };
     }
@@ -106,8 +105,7 @@ final class ApplyAction
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $action_id = (int) ($input['action_id'] ?? 0);
         $action = $this->actions->get_accessible_row($action_id);
 
@@ -134,6 +132,7 @@ final class ApplyAction
             'new_post' => $this->new_posts->apply($payload),
             'site_settings_update' => $this->site_settings->apply($payload),
             'theme_switch' => $this->theme_switches->apply($payload),
+            'plugin_deactivate' => new PluginDeactivateActionApplier()->apply($payload),
             default => new \WP_Error(
                 code: 'awpt_unsupported_action',
                 message: __('Unsupported action operation.', 'agent-wordpress-terminal'),

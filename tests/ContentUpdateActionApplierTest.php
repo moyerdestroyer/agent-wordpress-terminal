@@ -17,8 +17,7 @@ declare(strict_types=1);
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
 
-function test_content_update_action_applier(): void
-{
+function test_content_update_action_applier(): void {
     $applier = new ContentUpdateActionApplier();
 
     // Simulates a real WordPress capability check: only allowed to edit post 42
@@ -50,7 +49,7 @@ function test_content_update_action_applier(): void
 
     // Missing post_id is rejected outright, regardless of capability.
     awpt_test_reset_state();
-    $GLOBALS['awpt_test_current_user_can'] = static fn (): bool => true;
+    $GLOBALS['awpt_test_current_user_can'] = static fn(): bool => true;
     $result = $applier->apply(['post_title' => 'Updated title']);
     Assert::true(is_wp_error($result), 'apply() should fail without a post_id even if the user can edit posts');
 
@@ -75,7 +74,8 @@ function test_content_update_action_applier(): void
     $GLOBALS['awpt_test_current_user_can'] = $can_edit_post_42;
     $post = new WP_Post();
     $post->ID = 42;
-    $post->post_content = '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+    $post->post_content =
+        '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
         . '<!-- wp:image {"width":"120","id":9} --><figure>Image</figure><!-- /wp:image -->';
     $GLOBALS['awpt_test_posts'][42] = $post;
     $fingerprint = AWPT\Support\BlockTree::from_content($post->post_content)->normalized()[1]['fingerprint'] ?? '';

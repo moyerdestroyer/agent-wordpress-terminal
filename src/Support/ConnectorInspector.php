@@ -17,16 +17,14 @@ if (!defined('ABSPATH')) {
 /**
  * Inspects installed connector plugins and credential state.
  */
-final class ConnectorInspector
-{
+final class ConnectorInspector {
     /**
      * Resolve a connector display name from registry data.
      *
      * @param string               $connector_id Connector ID.
      * @param array<string, mixed> $data Connector registry data.
      */
-    public function connector_name_from_data(string $connector_id, array $data): string
-    {
+    public function connector_name_from_data(string $connector_id, array $data): string {
         if (is_string($data['name'] ?? null) && '' !== $data['name']) {
             return $data['name'];
         }
@@ -39,8 +37,7 @@ final class ConnectorInspector
      *
      * @param array<string, mixed> $data Connector registry data.
      */
-    public function is_installed(array $data): bool
-    {
+    public function is_installed(array $data): bool {
         $plugin_file = $this->plugin_file_from_data($data);
 
         if ('' === $plugin_file) {
@@ -61,8 +58,7 @@ final class ConnectorInspector
      * @param array<string, mixed> $data Connector registry data.
      * @return array{active: bool, authenticated: bool, ready: bool, status: string, status_label: string}
      */
-    public function build_status(string $connector_id, array $data): array
-    {
+    public function build_status(string $connector_id, array $data): array {
         $active = $this->is_active($data);
         $authenticated = $this->has_authentication($connector_id, $data);
         $ready = $active && $authenticated;
@@ -104,8 +100,7 @@ final class ConnectorInspector
      *
      * @param array<string, mixed> $data Connector registry data.
      */
-    private function is_active(array $data): bool
-    {
+    private function is_active(array $data): bool {
         $plugin = $data['plugin'] ?? null;
         $is_active_callback = is_array($plugin) ? $plugin['is_active'] ?? null : null;
 
@@ -144,8 +139,7 @@ final class ConnectorInspector
      * @param string               $connector_id Connector ID.
      * @param array<string, mixed> $data Connector registry data.
      */
-    private function has_authentication(string $connector_id, array $data): bool
-    {
+    private function has_authentication(string $connector_id, array $data): bool {
         $authentication = $data['authentication'] ?? null;
 
         if (!is_array($authentication)) {
@@ -175,8 +169,7 @@ final class ConnectorInspector
      * would read/write, so AWPT can reuse a key the site owner already configured
      * elsewhere instead of asking them to paste it in twice.
      */
-    public function resolve_default_provider_api_key(string $provider_id): string
-    {
+    public function resolve_default_provider_api_key(string $provider_id): string {
         return $this->resolve_api_key($provider_id, ['method' => 'api_key']);
     }
 
@@ -186,8 +179,7 @@ final class ConnectorInspector
      * @param string                  $connector_id Connector ID.
      * @param array<array-key, mixed> $authentication Connector authentication metadata.
      */
-    private function resolve_api_key(string $connector_id, array $authentication): string
-    {
+    private function resolve_api_key(string $connector_id, array $authentication): string {
         $default_name = strtoupper($connector_id) . '_API_KEY';
 
         $env_var_name = is_string($authentication['env_var_name'] ?? null) && '' !== $authentication['env_var_name']
@@ -224,8 +216,7 @@ final class ConnectorInspector
      *
      * @param array<string, mixed> $data Connector registry data.
      */
-    private function plugin_file_from_data(array $data): string
-    {
+    private function plugin_file_from_data(array $data): string {
         $plugin = $data['plugin'] ?? null;
 
         if (!is_array($plugin) || !is_string($plugin['file'] ?? null)) {

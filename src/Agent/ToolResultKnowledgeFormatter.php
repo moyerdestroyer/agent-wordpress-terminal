@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for automatic Knowledge context.
  */
-final class ToolResultKnowledgeFormatter
-{
+final class ToolResultKnowledgeFormatter {
     private ToolResultArrayFormatter $arrays;
 
-    public function __construct(?ToolResultArrayFormatter $arrays = null)
-    {
+    public function __construct(?ToolResultArrayFormatter $arrays = null) {
         $this->arrays = $arrays ?? new ToolResultArrayFormatter();
     }
 
     /**
      * @param array<array-key, mixed> $output
      */
-    public function format(array $output): string
-    {
+    public function format(array $output): string {
         $results = $this->arrays->list_items($output['results'] ?? []);
 
         if ([] === $results) {

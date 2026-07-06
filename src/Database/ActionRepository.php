@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Reads and writes awpt_actions.
  */
-final class ActionRepository
-{
+final class ActionRepository {
     /**
      * @param array<string, mixed> $payload
      * @return int|null Inserted action ID.
@@ -56,8 +55,7 @@ final class ActionRepository
         return (int) $wpdb->insert_id;
     }
 
-    public function update_status(int $action_id, string $status): void
-    {
+    public function update_status(int $action_id, string $status): void {
         $wpdb = WpDb::get();
 
         $wpdb->update(
@@ -72,16 +70,14 @@ final class ActionRepository
         );
     }
 
-    public function mark_applied(int $action_id): void
-    {
+    public function mark_applied(int $action_id): void {
         $this->update_status($action_id, 'applied');
     }
 
     /**
      * @param array<string, mixed> $payload
      */
-    public function update_payload(int $action_id, array $payload): void
-    {
+    public function update_payload(int $action_id, array $payload): void {
         $wpdb = WpDb::get();
 
         $wpdb->update(
@@ -99,8 +95,7 @@ final class ActionRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function get_accessible_row(int $action_id): ?array
-    {
+    public function get_accessible_row(int $action_id): ?array {
         $wpdb = WpDb::get();
 
         $actions = $wpdb->prefix . 'awpt_actions';
@@ -120,8 +115,7 @@ final class ActionRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function format_action(int $action_id): ?array
-    {
+    public function format_action(int $action_id): ?array {
         $row = $this->get_accessible_row($action_id);
 
         if (null === $row) {
@@ -144,8 +138,7 @@ final class ActionRepository
      * @param array<string, mixed> $action
      * @return array<string, mixed>
      */
-    public function decode_payload(array $action): array
-    {
+    public function decode_payload(array $action): array {
         return Json::decode_array((string) ($action['payload_json'] ?? ''));
     }
 
@@ -153,8 +146,7 @@ final class ActionRepository
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function sanitize_payload(array $payload): array
-    {
+    public function sanitize_payload(array $payload): array {
         return new ActionPayloadSanitizer()->sanitize($payload);
     }
 }

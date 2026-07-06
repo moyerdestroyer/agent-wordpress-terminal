@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Lists readable WordPress content with filters, sorting, and inventory totals.
  */
-final class ContentListService
-{
+final class ContentListService {
     private ContentSearchTypes $types;
     private ContentListFilters $filters;
     private ContentListQueryArgs $query_args;
@@ -26,8 +25,7 @@ final class ContentListService
     private ContentListItemFormatter $items;
     private ContentListPostLoader $loader;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->types = new ContentSearchTypes();
         $this->filters = new ContentListFilters();
         $this->query_args = new ContentListQueryArgs();
@@ -40,8 +38,7 @@ final class ContentListService
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function list(array $input): array
-    {
+    public function list(array $input): array {
         $filters = $this->filters->from_input($input);
         $post_type = (string) $filters['post_type'];
         $status = (string) $filters['status'];
@@ -91,8 +88,7 @@ final class ContentListService
     /**
      * @return list<string>
      */
-    private function resolve_post_types(string $requested): array
-    {
+    private function resolve_post_types(string $requested): array {
         if ('all' === $requested) {
             return $this->types->from_requested('');
         }
@@ -113,8 +109,7 @@ final class ContentListService
     /**
      * @param list<string> $post_types
      */
-    private function should_include_type_totals(string $requested_type, array $post_types): bool
-    {
+    private function should_include_type_totals(string $requested_type, array $post_types): bool {
         return 'all' === $requested_type || count($post_types) > 1;
     }
 
@@ -123,8 +118,7 @@ final class ContentListService
      * @param list<string> $post_types
      * @return array<string, mixed>
      */
-    private function empty_result(array $filters, array $post_types): array
-    {
+    private function empty_result(array $filters, array $post_types): array {
         return [
             'post_type' => (string) $filters['post_type'],
             'post_types' => $post_types,

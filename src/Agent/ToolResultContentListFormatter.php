@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for content listing results.
  */
-final class ToolResultContentListFormatter
-{
+final class ToolResultContentListFormatter {
     private ToolResultArrayFormatter $arrays;
 
-    public function __construct(?ToolResultArrayFormatter $arrays = null)
-    {
+    public function __construct(?ToolResultArrayFormatter $arrays = null) {
         $this->arrays = $arrays ?? new ToolResultArrayFormatter();
     }
 
     /**
      * @param array<array-key, mixed> $output
      */
-    public function format(array $output): string
-    {
+    public function format(array $output): string {
         $items = $this->arrays->list_items($output['items'] ?? []);
         $filters = is_array($output['filters'] ?? null) ? $output['filters'] : [];
         $lines = new ToolResultContentListSummary()->header_lines($output);
@@ -51,8 +48,7 @@ final class ToolResultContentListFormatter
      * @param array<array-key, mixed> $filters
      * @return list<string>
      */
-    private function item_lines(array $items, array $filters, array $output): array
-    {
+    private function item_lines(array $items, array $filters, array $output): array {
         $lines = [
             sprintf(
                 /* translators: 1: number of listed items, 2: sort field, 3: sort direction */
@@ -81,8 +77,7 @@ final class ToolResultContentListFormatter
     /**
      * @param array<array-key, mixed> $item
      */
-    private function format_item_line(array $item): string
-    {
+    private function format_item_line(array $item): string {
         $author = trim((string) ($item['author'] ?? ''));
 
         if ('' !== $author) {

@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Stores transcript messages and tool calls.
  */
-final class MessageRepository
-{
-    public function store_message(int $session_id, string $role, string $content, string $created_at): bool
-    {
+final class MessageRepository {
+    public function store_message(int $session_id, string $role, string $content, string $created_at): bool {
         $wpdb = WpDb::get();
 
         $inserted = $wpdb->insert(
@@ -40,8 +38,7 @@ final class MessageRepository
     /**
      * @param array<int, mixed> $tool_calls
      */
-    public function store_tool_calls(int $session_id, array $tool_calls, string $created_at): void
-    {
+    public function store_tool_calls(int $session_id, array $tool_calls, string $created_at): void {
         $wpdb = WpDb::get();
 
         foreach ($tool_calls as $tool_call) {
@@ -71,8 +68,7 @@ final class MessageRepository
      *
      * @return list<string>
      */
-    public function recent_user_message_contents(int $session_id, int $limit = 5): array
-    {
+    public function recent_user_message_contents(int $session_id, int $limit = 5): array {
         $wpdb = WpDb::get();
 
         $rows = $wpdb->get_col($wpdb->prepare(

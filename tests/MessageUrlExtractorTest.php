@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Support\MessageUrlExtractor;
 
-function test_message_url_extractor(): void
-{
+function test_message_url_extractor(): void {
     $extractor = new MessageUrlExtractor();
 
     Assert::same(
@@ -45,10 +44,12 @@ function test_message_url_extractor(): void
     );
 
     Assert::same(
-        ['https://static.wikia.nocookie.net/marveldatabase/images/7/72/Wanda_Wilson_%28Earth-19647%29_from_Deadpool_Team-Up_Vol_3_4_001.jpg'],
+        [
+            'https://static.wikia.nocookie.net/marveldatabase/images/7/72/Wanda_Wilson_%28Earth-19647%29_from_Deadpool_Team-Up_Vol_3_4_001.jpg',
+        ],
         $extractor->extract(
             'Use this image: https://static.wikia.nocookie.net/marveldatabase/images/7/72/'
-                . 'Wanda_Wilson_%28Earth-19647%29_from_Deadpool_Team-Up_Vol_3_4_001.jpg',
+            . 'Wanda_Wilson_%28Earth-19647%29_from_Deadpool_Team-Up_Vol_3_4_001.jpg',
         ),
         'a real-world percent-encoded URL with parentheses should be extracted whole',
     );

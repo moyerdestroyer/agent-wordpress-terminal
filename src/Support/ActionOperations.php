@@ -17,13 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Canonical operation values stored on staged action payloads.
  */
-final class ActionOperations
-{
+final class ActionOperations {
     public const CONTENT_UPDATE = 'content_update';
     public const BLOCK_ATTRS_UPDATE = 'block_attrs_update';
     public const NEW_POST = 'new_post';
     public const SITE_SETTINGS_UPDATE = 'site_settings_update';
     public const THEME_SWITCH = 'theme_switch';
+    public const PLUGIN_DEACTIVATE = 'plugin_deactivate';
 
     /**
      * @var list<string>
@@ -34,6 +34,7 @@ final class ActionOperations
         self::NEW_POST,
         self::SITE_SETTINGS_UPDATE,
         self::THEME_SWITCH,
+        self::PLUGIN_DEACTIVATE,
     ];
 
     /**
@@ -47,13 +48,11 @@ final class ActionOperations
         self::NEW_POST,
     ];
 
-    public static function is_valid(string $operation): bool
-    {
+    public static function is_valid(string $operation): bool {
         return in_array($operation, self::ALL, true);
     }
 
-    public static function is_previewable(string $operation): bool
-    {
+    public static function is_previewable(string $operation): bool {
         return in_array($operation, self::PREVIEWABLE, true);
     }
 }

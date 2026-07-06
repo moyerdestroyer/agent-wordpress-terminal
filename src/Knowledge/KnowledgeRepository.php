@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Reads Core Knowledge and compatible legacy guideline sources.
  */
-final class KnowledgeRepository
-{
+final class KnowledgeRepository {
     public const SITE_CONTENT_INDEX_CAP = 500;
 
     private const CORE_POST_TYPE = 'wp_knowledge';
@@ -42,8 +41,7 @@ final class KnowledgeRepository
      *
      * @return array{mode: string, label: string, core_available: bool, legacy_guidelines_available: bool}
      */
-    public function status(): array
-    {
+    public function status(): array {
         $core = post_type_exists(self::CORE_POST_TYPE);
         $legacy = post_type_exists(self::LEGACY_POST_TYPE);
 
@@ -71,8 +69,7 @@ final class KnowledgeRepository
      *
      * @return list<array<string, mixed>>
      */
-    public function list_sources(): array
-    {
+    public function list_sources(): array {
         if (post_type_exists(self::CORE_POST_TYPE)) {
             return $this->list_post_sources(self::CORE_POST_TYPE, self::CORE_TAXONOMY, 'core_knowledge');
         }
@@ -89,8 +86,7 @@ final class KnowledgeRepository
      *
      * @return list<array<string, mixed>>
      */
-    public function list_site_content_sources(): array
-    {
+    public function list_site_content_sources(): array {
         $post_types = $this->site_content_types->installed();
 
         if ([] === $post_types) {
@@ -103,8 +99,7 @@ final class KnowledgeRepository
     /**
      * @return array{cap: int, eligible: int}
      */
-    public function site_content_index_stats(): array
-    {
+    public function site_content_index_stats(): array {
         return $this->site_content_types->index_stats(self::SITE_CONTENT_INDEX_CAP);
     }
 
@@ -113,8 +108,7 @@ final class KnowledgeRepository
      *
      * @return array<string, mixed>|\WP_Error
      */
-    public function read_knowledge_post(int $post_id): array|\WP_Error
-    {
+    public function read_knowledge_post(int $post_id): array|\WP_Error {
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post || !current_user_can('read_post', $post_id)) {
@@ -139,8 +133,7 @@ final class KnowledgeRepository
     /**
      * Format applicable guidelines for provider prompt injection.
      */
-    public function format_guidelines_for_prompt(): string
-    {
+    public function format_guidelines_for_prompt(): string {
         $sources = array_values(array_filter(
             $this->list_sources(),
             static fn(array $source): bool => (
@@ -178,8 +171,7 @@ final class KnowledgeRepository
      * @param string|list<string> $post_type Post type(s).
      * @return list<array<string, mixed>>
      */
-    private function list_post_sources(string|array $post_type, string $taxonomy, string $kind): array
-    {
+    private function list_post_sources(string|array $post_type, string $taxonomy, string $kind): array {
         $query = new \WP_Query([
             'post_type' => $post_type,
             'post_status' => ['publish', 'draft', 'pending', 'private'],

@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Builds summary/header lines for list-content tool output.
  */
-final class ToolResultContentListSummary
-{
+final class ToolResultContentListSummary {
     /**
      * @param array<array-key, mixed> $output
      * @return list<string>
      */
-    public function header_lines(array $output): array
-    {
+    public function header_lines(array $output): array {
         $filters = is_array($output['filters'] ?? null) ? $output['filters'] : [];
         $post_type = (string) ($output['post_type'] ?? 'post');
         $type_label = 'all' === $post_type
@@ -62,8 +60,7 @@ final class ToolResultContentListSummary
     /**
      * @return array<string, int>
      */
-    private function normalize_int_map(mixed $value): array
-    {
+    private function normalize_int_map(mixed $value): array {
         if (!is_array($value)) {
             return [];
         }
@@ -84,8 +81,7 @@ final class ToolResultContentListSummary
     /**
      * @param array<string, int> $totals_by_status
      */
-    private function status_breakdown_suffix(array $totals_by_status): string
-    {
+    private function status_breakdown_suffix(array $totals_by_status): string {
         if ([] === $totals_by_status) {
             return '';
         }
@@ -102,8 +98,7 @@ final class ToolResultContentListSummary
     /**
      * @param array<array-key, mixed> $filters
      */
-    private function format_active_filters(array $filters): string
-    {
+    private function format_active_filters(array $filters): string {
         $parts = [];
 
         if ('' !== (string) ($filters['search'] ?? '')) {
@@ -152,8 +147,7 @@ final class ToolResultContentListSummary
     /**
      * @param array<string, int> $totals_by_type
      */
-    private function format_type_totals(array $totals_by_type): string
-    {
+    private function format_type_totals(array $totals_by_type): string {
         $parts = [];
 
         foreach ($totals_by_type as $type => $count) {

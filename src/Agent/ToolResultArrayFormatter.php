@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Converts mixed tool output fragments into safe display primitives.
  */
-final class ToolResultArrayFormatter
-{
+final class ToolResultArrayFormatter {
     /**
      * @return list<array<array-key, mixed>>
      */
-    public function list_items(mixed $value): array
-    {
+    public function list_items(mixed $value): array {
         if (!is_array($value)) {
             return [];
         }
@@ -41,8 +39,7 @@ final class ToolResultArrayFormatter
         return $items;
     }
 
-    public function excerpt(string $text, int $limit): string
-    {
+    public function excerpt(string $text, int $limit): string {
         $text = trim((string) preg_replace('/\s+/', ' ', $text));
 
         if (mb_strlen($text, 'UTF-8') <= $limit) {

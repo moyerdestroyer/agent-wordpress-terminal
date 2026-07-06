@@ -10,6 +10,7 @@ import {
 	listAwptTools,
 	listSessions,
 	listTools,
+	reportIncident,
 	sendMessage,
 	updateAction,
 	updateSession,
@@ -54,6 +55,44 @@ function focusMeta(session: SessionSummary): string {
 	return [titleCase(session.focus.type), titleCase(session.focus.status), session.focus.slug]
 		.filter(Boolean)
 		.join(' · ');
+}
+
+function mergeDiagnosisIntoState(
+	turnAt: string,
+	diagnosis: {
+		content?: string;
+		tool_calls?: ToolCall[];
+		actions?: ProposedAction[];
+	},
+	setMessages: (updater: (current: Message[]) => Message[]) => void,
+	setToolCalls: (updater: (current: ToolCall[]) => ToolCall[]) => void,
+	setActions: (updater: (current: ProposedAction[]) => ProposedAction[]) => void,
+): void {
+	if (diagnosis.content?.trim()) {
+		setMessages((current) => [
+			...current,
+			{
+				role: 'incident',
+				content: __('Incident auto-diagnosis started.', 'agent-wordpress-terminal'),
+				created_at: turnAt,
+			},
+			{ role: 'assistant', content: diagnosis.content, created_at: turnAt },
+		]);
+	}
+
+	if (diagnosis.tool_calls?.length) {
+		const turnToolCalls = diagnosis.tool_calls.map((call) => ({ ...call, created_at: turnAt }));
+		setToolCalls((current) => [...current, ...turnToolCalls]);
+		const proposalActions = proposalActionsFromToolCalls(turnToolCalls);
+
+		if (proposalActions.length > 0) {
+			setActions((current) => mergeProposalActions(current, proposalActions));
+		}
+	}
+
+	if (diagnosis.actions?.length) {
+		setActions((current) => mergeProposalActions(current, diagnosis.actions ?? []));
+	}
 }
 
 export function Terminal(): JSX.Element {
@@ -123,6 +162,62 @@ export function Terminal(): JSX.Element {
 
 		void loadFullTools();
 	}, [sidebarTab, toolsLoadedFully]);
+
+	useEffect(() => {
+		if (!activeSessionId) {
+			return;
+		}
+
+		const reportClientError = (errorText: string, source: string): void => {
+			if (!errorText.trim()) {
+				return;
+			}
+
+			void reportIncident(activeSessionId, {
+				kind: 'js',
+				source,
+				error_text: errorText,
+				auto_diagnose: true,
+			})
+				.then((response) => {
+					const diagnosis = response.diagnosis_response;
+
+					if (!diagnosis) {
+						return;
+					}
+
+					const turnAt = new Date().toISOString();
+					mergeDiagnosisIntoState(turnAt, diagnosis, setMessages, setToolCalls, setActions);
+				})
+				.catch(() => {});
+		};
+
+		const onError = (event: ErrorEvent): void => {
+			const parts = [event.message, event.filename ? `at ${event.filename}:${event.lineno}` : '']
+				.filter(Boolean)
+				.join(' ');
+			reportClientError(parts, 'awpt-admin');
+		};
+
+		const onRejection = (event: PromiseRejectionEvent): void => {
+			const reason = event.reason;
+			const message =
+				reason instanceof Error
+					? reason.message
+					: typeof reason === 'string'
+						? reason
+						: 'Unhandled promise rejection';
+			reportClientError(message, 'awpt-admin-unhandledrejection');
+		};
+
+		window.addEventListener('error', onError);
+		window.addEventListener('unhandledrejection', onRejection);
+
+		return () => {
+			window.removeEventListener('error', onError);
+			window.removeEventListener('unhandledrejection', onRejection);
+		};
+	}, [activeSessionId]);
 
 	const loadSession = async (sessionId: number): Promise<void> => {
 		const session = await getSession(sessionId);
@@ -366,6 +461,39 @@ export function Terminal(): JSX.Element {
 		clearWorkspace();
 	};
 
+	const reportActionFailure = async (
+		action: ProposedAction,
+		kind: 'apply_failure' | 'preview_failure',
+		messageText: string,
+	): Promise<void> => {
+		if (!activeSessionId || !action.id) {
+			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+			return;
+		}
+
+		try {
+			const response = await reportIncident(activeSessionId, {
+				kind,
+				source: 'actions',
+				attempted_action: kind === 'preview_failure' ? 'preview' : 'apply',
+				action_id: action.id,
+				error_text: messageText,
+				auto_diagnose: true,
+			});
+			const diagnosis = response.diagnosis_response;
+			const turnAt = new Date().toISOString();
+
+			if (diagnosis) {
+				mergeDiagnosisIntoState(turnAt, diagnosis, setMessages, setToolCalls, setActions);
+				return;
+			}
+		} catch {
+			// Fall back to a plain assistant error line.
+		}
+
+		setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+	};
+
 	const handleActionOperation = async (
 		action: ProposedAction,
 		operation: 'approve' | 'reject' | 'apply',
@@ -391,7 +519,7 @@ export function Terminal(): JSX.Element {
 				messageText = error.message;
 			}
 
-			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+			void reportActionFailure(action, 'apply_failure', messageText);
 		}
 	};
 
@@ -426,7 +554,7 @@ export function Terminal(): JSX.Element {
 					}
 
 					setPreview(null);
-					setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+					void reportActionFailure(action, 'preview_failure', messageText);
 					return;
 				}
 			}

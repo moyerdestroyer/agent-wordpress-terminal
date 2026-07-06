@@ -19,20 +19,17 @@ if (!defined('ABSPATH')) {
 /**
  * Returns readable post/page content for agent analysis.
  */
-final class ReadContent
-{
+final class ReadContent {
     private ReadablePostMeta $meta;
 
-    public function __construct(?ReadablePostMeta $meta = null)
-    {
+    public function __construct(?ReadablePostMeta $meta = null) {
         $this->meta = $meta ?? new ReadablePostMeta();
     }
 
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         wp_register_ability('awpt/read-content', [
             'label' => __('Read Content', 'agent-wordpress-terminal'),
             'description' => __('Returns readable post or page content and metadata.', 'agent-wordpress-terminal'),
@@ -75,8 +72,7 @@ final class ReadContent
      *
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
         return $post_id > 0 && current_user_can('read_post', $post_id);
@@ -88,8 +84,7 @@ final class ReadContent
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $post_id = (int) ($input['id'] ?? 0);
         $post = get_post($post_id);
 

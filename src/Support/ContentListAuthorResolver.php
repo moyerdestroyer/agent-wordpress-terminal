@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves author filters and display names for content listings.
  */
-final class ContentListAuthorResolver
-{
-    public function resolve_id(string $author): int
-    {
+final class ContentListAuthorResolver {
+    public function resolve_id(string $author): int {
         if ('' === $author) {
             return 0;
         }
@@ -44,8 +42,7 @@ final class ContentListAuthorResolver
         return 0;
     }
 
-    public function display_name(int $author_id): string
-    {
+    public function display_name(int $author_id): string {
         if ($author_id <= 0 || !function_exists('get_userdata')) {
             return '';
         }

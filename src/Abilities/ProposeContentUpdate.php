@@ -23,8 +23,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged content update action without saving the post.
  */
-final class ProposeContentUpdate
-{
+final class ProposeContentUpdate {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;
@@ -42,8 +41,7 @@ final class ProposeContentUpdate
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/propose-content-update',
             'label' => __('Propose Content Update', 'agent-wordpress-terminal'),
@@ -117,8 +115,7 @@ final class ProposeContentUpdate
     /**
      * @param array<string, mixed> $input
      */
-    public function can_propose(array $input): bool
-    {
+    public function can_propose(array $input): bool {
         $post_id = (int) ($input['post_id'] ?? 0);
 
         return (
@@ -132,8 +129,7 @@ final class ProposeContentUpdate
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
         $post_id = (int) ($input['post_id'] ?? 0);
         $post = get_post($post_id);
@@ -241,8 +237,7 @@ final class ProposeContentUpdate
         return is_array($action) ? $action : [];
     }
 
-    private function sanitize_meta_value(mixed $value): string|int|float|bool
-    {
+    private function sanitize_meta_value(mixed $value): string|int|float|bool {
         if (is_bool($value)) {
             return $value;
         }

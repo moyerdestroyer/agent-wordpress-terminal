@@ -16,8 +16,7 @@ use AWPT\Support\ConnectorInspector;
  * checked via env var, then PHP constant, then DB option (see the WordPress Core
  * "Introducing the Connectors API in WordPress 7.0" dev note).
  */
-function test_connector_inspector(): void
-{
+function test_connector_inspector(): void {
     $inspector = new ConnectorInspector();
 
     // `none` authentication is always ready, regardless of any stored credentials.
@@ -92,7 +91,7 @@ function test_connector_inspector(): void
     $status = $inspector->build_status('callback_active', [
         'type' => 'ai_provider',
         'authentication' => ['method' => 'none'],
-        'plugin' => ['is_active' => static fn (): bool => false],
+        'plugin' => ['is_active' => static fn(): bool => false],
     ]);
     Assert::false($status['active'], 'connector should be inactive when its plugin.is_active callback returns false');
     Assert::same('inactive', $status['status'], 'inactive connector status should be "inactive"');

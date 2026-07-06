@@ -30,7 +30,7 @@ export interface SessionSummary {
 
 export interface Message {
 	id?: number;
-	role: 'user' | 'assistant' | 'system' | 'tool';
+	role: 'user' | 'assistant' | 'system' | 'tool' | 'incident';
 	content: string;
 	created_at?: string;
 }
@@ -40,7 +40,8 @@ export type ActionOperation =
 	| 'block_attrs_update'
 	| 'new_post'
 	| 'site_settings_update'
-	| 'theme_switch';
+	| 'theme_switch'
+	| 'plugin_deactivate';
 
 export interface ActionPayload {
 	operation?: ActionOperation;
@@ -67,6 +68,10 @@ export interface ActionPayload {
 	theme_name?: string;
 	current_stylesheet?: string;
 	current_theme?: string;
+	plugin_file?: string;
+	plugin_slug?: string;
+	plugin_name?: string;
+	was_active?: boolean;
 }
 
 export interface PreviewDetails {

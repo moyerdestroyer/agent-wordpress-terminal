@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Returns admin-visible user summaries for agent analysis.
  */
-final class ReadUsers
-{
+final class ReadUsers {
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         wp_register_ability('awpt/read-users', [
             'label' => __('Read Users', 'agent-wordpress-terminal'),
             'description' => __(
@@ -76,8 +74,7 @@ final class ReadUsers
      *
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         return current_user_can('list_users');
     }
 
@@ -87,8 +84,7 @@ final class ReadUsers
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         $limit = max(1, min(100, (int) ($input['limit'] ?? 20)));
         $role = sanitize_key((string) ($input['role'] ?? ''));
         $search = sanitize_text_field((string) ($input['search'] ?? ''));
@@ -125,8 +121,7 @@ final class ReadUsers
      * @param \WP_User $user User object.
      * @return array<string, mixed>
      */
-    private function normalize_user(\WP_User $user): array
-    {
+    private function normalize_user(\WP_User $user): array {
         return [
             'id' => (int) $user->ID,
             'login' => $user->user_login,
@@ -142,8 +137,7 @@ final class ReadUsers
      *
      * @return array<array-key, int>
      */
-    private function role_counts(): array
-    {
+    private function role_counts(): array {
         $counts = count_users();
         $roles = $counts['avail_roles'];
 

@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Builds and normalizes filters for content listing queries.
  */
-final class ContentListFilters
-{
+final class ContentListFilters {
     /**
      * @var list<string>
      */
@@ -31,8 +30,7 @@ final class ContentListFilters
 
     private ContentListAuthorResolver $authors;
 
-    public function __construct(?ContentListAuthorResolver $authors = null)
-    {
+    public function __construct(?ContentListAuthorResolver $authors = null) {
         $this->authors = $authors ?? new ContentListAuthorResolver();
     }
 
@@ -40,8 +38,7 @@ final class ContentListFilters
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function from_input(array $input): array
-    {
+    public function from_input(array $input): array {
         $author = sanitize_text_field((string) ($input['author'] ?? ''));
         $search = sanitize_text_field((string) ($input['search'] ?? ''));
         $offset = max(0, (int) ($input['offset'] ?? 0));
@@ -49,10 +46,7 @@ final class ContentListFilters
             $input['include_totals'] ?? null,
             '' === $author && '' === $search && 0 === $offset,
         );
-        $include_total = $this->resolve_include_flag(
-            $input['include_total'] ?? null,
-            '' === $author && '' === $search,
-        );
+        $include_total = $this->resolve_include_flag($input['include_total'] ?? null, '' === $author && '' === $search);
 
         return [
             'post_type' => sanitize_key((string) ($input['post_type'] ?? 'post')),
@@ -72,8 +66,7 @@ final class ContentListFilters
     /**
      * @return list<string>
      */
-    public function resolve_statuses(string $status_filter): array
-    {
+    public function resolve_statuses(string $status_filter): array {
         if ('' === $status_filter || !in_array($status_filter, self::STATUSES, true)) {
             return self::STATUSES;
         }
@@ -81,8 +74,7 @@ final class ContentListFilters
         return [$status_filter];
     }
 
-    private function resolve_include_flag(mixed $requested, bool $default): bool
-    {
+    private function resolve_include_flag(mixed $requested, bool $default): bool {
         if (is_bool($requested)) {
             return $requested;
         }
@@ -106,15 +98,13 @@ final class ContentListFilters
         return $default;
     }
 
-    private function resolve_orderby(string $requested): string
-    {
+    private function resolve_orderby(string $requested): string {
         $requested = sanitize_key($requested);
 
         return in_array($requested, self::ORDERBY_FIELDS, true) ? $requested : 'modified';
     }
 
-    private function resolve_order(string $requested): string
-    {
+    private function resolve_order(string $requested): string {
         return 'ASC' === strtoupper($requested) ? 'ASC' : 'DESC';
     }
 }

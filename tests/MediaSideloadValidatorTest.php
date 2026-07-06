@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Abilities\MediaSideloadValidator;
 
-function test_media_sideload_validator(): void
-{
+function test_media_sideload_validator(): void {
     $validator = new MediaSideloadValidator();
 
     Assert::same(
@@ -32,10 +31,7 @@ function test_media_sideload_validator(): void
         'extension matching should be case-insensitive for direct media URLs',
     );
 
-    Assert::true(
-        null !== $validator->validate_url(''),
-        'an empty URL should be rejected',
-    );
+    Assert::true(null !== $validator->validate_url(''), 'an empty URL should be rejected');
 
     Assert::true(
         null !== $validator->validate_url('ftp://example.com/bear.gif'),

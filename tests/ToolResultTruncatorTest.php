@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Agent\ToolResultTruncator;
 
-function test_tool_result_truncator_clips_large_read_content_output(): void
-{
+function test_tool_result_truncator_clips_large_read_content_output(): void {
     $truncator = new ToolResultTruncator();
     $output = [
         'id' => 42,
@@ -29,8 +28,7 @@ function test_tool_result_truncator_clips_large_read_content_output(): void
     Assert::same('About', $provider['title'] ?? null, 'truncated output should keep title');
 }
 
-function test_tool_result_truncator_keeps_proposal_outputs(): void
-{
+function test_tool_result_truncator_keeps_proposal_outputs(): void {
     $truncator = new ToolResultTruncator();
     $output = [
         'action_id' => 9,

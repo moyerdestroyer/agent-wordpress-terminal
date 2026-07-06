@@ -19,13 +19,11 @@ if (!defined('ABSPATH')) {
 /**
  * Searches AWPT's local Knowledge index.
  */
-final class KnowledgeSearchService
-{
+final class KnowledgeSearchService {
     private KnowledgeSearchRanker $ranker;
     private KnowledgeIndexRepository $index;
 
-    public function __construct(?KnowledgeSearchRanker $ranker = null, ?KnowledgeIndexRepository $index = null)
-    {
+    public function __construct(?KnowledgeSearchRanker $ranker = null, ?KnowledgeIndexRepository $index = null) {
         $this->ranker = $ranker ?? new KnowledgeSearchRanker();
         $this->index = $index ?? new KnowledgeIndexRepository();
     }
@@ -33,8 +31,7 @@ final class KnowledgeSearchService
     /**
      * @return list<array<string, mixed>>
      */
-    public function search(string $query, int $limit = 6): array
-    {
+    public function search(string $query, int $limit = 6): array {
         $tokens = $this->ranker->tokens(trim($query));
 
         if ([] === $tokens) {
@@ -48,8 +45,7 @@ final class KnowledgeSearchService
         return array_slice($ranked, 0, max(1, min($limit, 12)));
     }
 
-    public function format_context_for_prompt(string $query): string
-    {
+    public function format_context_for_prompt(string $query): string {
         $results = $this->search($query, 5);
 
         if ([] === $results) {
@@ -77,8 +73,7 @@ final class KnowledgeSearchService
      * @param list<string>               $tokens
      * @return list<array<string, mixed>>
      */
-    private function rank_rows(array $rows, array $tokens): array
-    {
+    private function rank_rows(array $rows, array $tokens): array {
         $ranked = [];
 
         foreach ($rows as $row) {

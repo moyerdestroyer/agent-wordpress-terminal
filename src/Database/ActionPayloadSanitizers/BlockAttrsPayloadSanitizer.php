@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Normalizes arbitrary block attribute maps before action storage.
  */
-final class BlockAttrsPayloadSanitizer
-{
+final class BlockAttrsPayloadSanitizer {
     /**
      * @param array<array-key, mixed> $attrs
      * @return array<string, mixed>
      */
-    public function sanitize_map(array $attrs): array
-    {
+    public function sanitize_map(array $attrs): array {
         $clean = [];
 
         foreach ($attrs as $key => $value) {
@@ -38,8 +36,7 @@ final class BlockAttrsPayloadSanitizer
         return $clean;
     }
 
-    private function sanitize_value(mixed $value): mixed
-    {
+    private function sanitize_value(mixed $value): mixed {
         if (is_array($value)) {
             return $this->sanitize_array_value($value);
         }
@@ -55,8 +52,7 @@ final class BlockAttrsPayloadSanitizer
      * @param array<array-key, mixed> $value
      * @return array<array-key, mixed>
      */
-    private function sanitize_array_value(array $value): array
-    {
+    private function sanitize_array_value(array $value): array {
         $clean = [];
 
         foreach ($value as $key => $item) {

@@ -21,8 +21,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged site settings update action.
  */
-final class ProposeSiteSettingsUpdate
-{
+final class ProposeSiteSettingsUpdate {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private SiteSettingsWhitelist $whitelist;
@@ -40,8 +39,7 @@ final class ProposeSiteSettingsUpdate
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/propose-site-settings-update',
             'label' => __('Propose Site Settings Update', 'agent-wordpress-terminal'),
@@ -79,8 +77,7 @@ final class ProposeSiteSettingsUpdate
     /**
      * @param array<string, mixed> $input
      */
-    public function can_propose(array $input): bool
-    {
+    public function can_propose(array $input): bool {
         unset($input);
 
         return current_user_can('manage_options');
@@ -90,8 +87,7 @@ final class ProposeSiteSettingsUpdate
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
 
         if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {

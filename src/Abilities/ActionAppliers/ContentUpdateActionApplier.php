@@ -20,12 +20,10 @@ if (!defined('ABSPATH')) {
 /**
  * Applies a staged post/page content update action.
  */
-final class ContentUpdateActionApplier
-{
+final class ContentUpdateActionApplier {
     private BlockAttrsUpdateActionApplier $block_attrs;
 
-    public function __construct(?BlockAttrsUpdateActionApplier $block_attrs = null)
-    {
+    public function __construct(?BlockAttrsUpdateActionApplier $block_attrs = null) {
         $this->block_attrs = $block_attrs ?? new BlockAttrsUpdateActionApplier();
     }
 
@@ -33,8 +31,7 @@ final class ContentUpdateActionApplier
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    public function apply(array $payload): array|\WP_Error
-    {
+    public function apply(array $payload): array|\WP_Error {
         $post_id = (int) ($payload['post_id'] ?? 0);
 
         if ($post_id <= 0 || !current_user_can('edit_post', $post_id)) {

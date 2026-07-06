@@ -21,16 +21,14 @@ if (!defined('ABSPATH')) {
  * declarations, used both when actually prompting the model and when pre-flight
  * checking whether a connector supports function calling at all.
  */
-final class AbilityFunctionDeclarationBuilder
-{
+final class AbilityFunctionDeclarationBuilder {
     /**
      * Build provider-safe function declarations for AWPT abilities.
      *
      * @param list<string> $ability_names Ability names exposed to the model.
      * @return list<object>
      */
-    public function build(array $ability_names): array
-    {
+    public function build(array $ability_names): array {
         if (!function_exists('wp_get_ability') || !class_exists('WP_AI_Client_Ability_Function_Resolver')) {
             return [];
         }

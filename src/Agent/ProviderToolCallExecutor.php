@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Runs safe AWPT abilities requested by provider tool calls.
  */
-final class ProviderToolCallExecutor
-{
+final class ProviderToolCallExecutor {
     /**
      * Execute provider-requested read-only tools.
      *
@@ -28,8 +27,7 @@ final class ProviderToolCallExecutor
      * @param ToolRegistry $tool_registry Tool registry.
      * @return array{tool_calls: array<int, array<string, mixed>>, messages: array<int, array<string, mixed>>}
      */
-    public function execute(mixed $raw_tool_calls, ToolRegistry $tool_registry, int $session_id): array
-    {
+    public function execute(mixed $raw_tool_calls, ToolRegistry $tool_registry, int $session_id): array {
         if (!is_array($raw_tool_calls)) {
             return [
                 'tool_calls' => [],
@@ -62,8 +60,7 @@ final class ProviderToolCallExecutor
      * @param array<string, mixed> $result Provider result.
      * @return array<string, mixed>
      */
-    public function assistant_tool_call_message(array $result): array
-    {
+    public function assistant_tool_call_message(array $result): array {
         $message = is_array($result['message'] ?? null) ? $result['message'] : [];
 
         return [
@@ -81,8 +78,11 @@ final class ProviderToolCallExecutor
      * @param int                  $session_id Current AWPT session ID.
      * @return array{tool_call: array<string, mixed>, message: array<string, mixed>}
      */
-    private function execute_single_tool_call(array $raw_tool_call, ToolRegistry $tool_registry, int $session_id): array
-    {
+    private function execute_single_tool_call(
+        array $raw_tool_call,
+        ToolRegistry $tool_registry,
+        int $session_id,
+    ): array {
         $provider_call_id = (string) ($raw_tool_call['id'] ?? '');
         $function = is_array($raw_tool_call['function'] ?? null) ? $raw_tool_call['function'] : [];
         $function_name = (string) ($function['name'] ?? '');
@@ -151,7 +151,20 @@ final class ProviderToolCallExecutor
 
         $result = new ToolExecutor()->execute($tool_name, $input);
 
-        return is_wp_error($result) ? ['failed', ['error' => $result->get_error_message()]] : ['success', $result];
+        if (is_wp_error($result)) {
+            $attribution = new \AWPT\Support\Diagnostics\ErrorPathAttributor()->from_text($result->get_error_message());
+
+            return [
+                'failed',
+                [
+                    'error' => $result->get_error_message(),
+                    'error_code' => $result->get_error_code(),
+                    'attribution' => $attribution,
+                ],
+            ];
+        }
+
+        return ['success', $result];
     }
 
     /**
@@ -160,8 +173,7 @@ final class ProviderToolCallExecutor
      * @param string $arguments Raw JSON arguments.
      * @return array<array-key, mixed>
      */
-    private function decode_tool_arguments(string $arguments): array
-    {
+    private function decode_tool_arguments(string $arguments): array {
         $decoded = json_decode($arguments, true);
 
         return is_array($decoded) ? $decoded : [];
@@ -170,8 +182,7 @@ final class ProviderToolCallExecutor
     /**
      * @param array<array-key, mixed> $value Raw array.
      */
-    private function is_string_keyed_array(array $value): bool
-    {
+    private function is_string_keyed_array(array $value): bool {
         foreach (array_keys($value) as $key) {
             if (!is_string($key)) {
                 return false;

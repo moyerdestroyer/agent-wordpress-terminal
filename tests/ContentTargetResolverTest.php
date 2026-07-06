@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Support\ContentTargetResolver;
 
-function awpt_test_post(int $id, string $title, string $slug, string $type = 'page'): WP_Post
-{
+function awpt_test_post(int $id, string $title, string $slug, string $type = 'page'): WP_Post {
     $post = new WP_Post();
     $post->ID = $id;
     $post->post_title = $title;
@@ -23,8 +22,7 @@ function awpt_test_post(int $id, string $title, string $slug, string $type = 'pa
     return $post;
 }
 
-function test_content_target_resolver_exact_references(): void
-{
+function test_content_target_resolver_exact_references(): void {
     awpt_test_reset_state();
     awpt_test_post(42, 'About', 'about');
     awpt_test_post(43, 'Marketing Template', 'marketing-template', 'wp_template');

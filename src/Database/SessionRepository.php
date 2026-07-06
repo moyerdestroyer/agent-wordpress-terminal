@@ -20,20 +20,17 @@ if (!defined('ABSPATH')) {
 /**
  * Reads and writes awpt_sessions and related session detail.
  */
-final class SessionRepository
-{
+final class SessionRepository {
     private SessionHydrator $hydrator;
 
-    public function __construct(?SessionHydrator $hydrator = null)
-    {
+    public function __construct(?SessionHydrator $hydrator = null) {
         $this->hydrator = $hydrator ?? new SessionHydrator();
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    public function list_summaries(): array
-    {
+    public function list_summaries(): array {
         $wpdb = WpDb::get();
 
         $table = $wpdb->prefix . 'awpt_sessions';
@@ -51,8 +48,7 @@ final class SessionRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function find_detail(int $session_id, int $messages_limit = 50, bool $include_tool_outputs = false): ?array
-    {
+    public function find_detail(int $session_id, int $messages_limit = 50, bool $include_tool_outputs = false): ?array {
         $messages_limit = max(1, min(200, $messages_limit));
         $wpdb = WpDb::get();
 
@@ -110,8 +106,7 @@ final class SessionRepository
     /**
      * @return array<string, mixed>
      */
-    public function create(string $title): array
-    {
+    public function create(string $title): array {
         $wpdb = WpDb::get();
 
         $now = current_time('mysql');
@@ -145,8 +140,7 @@ final class SessionRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function update_title(int $session_id, string $title): ?array
-    {
+    public function update_title(int $session_id, string $title): ?array {
         $wpdb = WpDb::get();
 
         $now = current_time('mysql');
@@ -173,8 +167,7 @@ final class SessionRepository
      * @param array<string, mixed> $fields
      * @param list<string>         $formats
      */
-    public function update_fields(int $session_id, array $fields, array $formats): void
-    {
+    public function update_fields(int $session_id, array $fields, array $formats): void {
         if (!$this->exists($session_id)) {
             return;
         }
@@ -193,8 +186,7 @@ final class SessionRepository
         );
     }
 
-    public function delete(int $session_id): void
-    {
+    public function delete(int $session_id): void {
         if (!$this->exists($session_id)) {
             return;
         }
@@ -217,8 +209,7 @@ final class SessionRepository
         );
     }
 
-    public function clear_transcript(int $session_id): void
-    {
+    public function clear_transcript(int $session_id): void {
         if (!$this->exists($session_id)) {
             return;
         }
@@ -232,8 +223,7 @@ final class SessionRepository
         $wpdb->delete($wpdb->prefix . 'awpt_actions', ['session_id' => $session_id], where_format: ['%d']);
     }
 
-    public function exists(int $session_id): bool
-    {
+    public function exists(int $session_id): bool {
         $wpdb = WpDb::get();
 
         $found = $wpdb->get_var($wpdb->prepare(
@@ -248,8 +238,7 @@ final class SessionRepository
     /**
      * @return array<string, mixed>
      */
-    public function get_summary(int $session_id): array
-    {
+    public function get_summary(int $session_id): array {
         $wpdb = WpDb::get();
 
         $table = $wpdb->prefix . 'awpt_sessions';
@@ -265,8 +254,7 @@ final class SessionRepository
         return is_array($row) ? $this->with_focus_summary($row) : [];
     }
 
-    private function current_user_id(): int
-    {
+    private function current_user_id(): int {
         return get_current_user_id();
     }
 
@@ -274,8 +262,7 @@ final class SessionRepository
      * @param list<array<string, mixed>> $sessions
      * @return list<array<string, mixed>>
      */
-    private function with_focus_summaries(array $sessions): array
-    {
+    private function with_focus_summaries(array $sessions): array {
         return array_map($this->with_focus_summary(...), $sessions);
     }
 
@@ -283,8 +270,7 @@ final class SessionRepository
      * @param array<string, mixed> $session
      * @return array<string, mixed>
      */
-    private function with_focus_summary(array $session): array
-    {
+    private function with_focus_summary(array $session): array {
         $post_id = (int) ($session['focus_post_id'] ?? 0);
         $session['focus'] = null;
 
@@ -311,8 +297,7 @@ final class SessionRepository
         return $session;
     }
 
-    private function discard_preview_resources_for_session(int $session_id): void
-    {
+    private function discard_preview_resources_for_session(int $session_id): void {
         $wpdb = WpDb::get();
         $preview = new StagedPostPreview();
         $rows = $wpdb->get_results(

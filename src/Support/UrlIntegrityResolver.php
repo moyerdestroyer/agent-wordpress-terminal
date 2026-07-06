@@ -26,8 +26,7 @@ if (!defined('ABSPATH')) {
  * Pure string logic with no WordPress/database dependency, so it can be unit tested
  * directly.
  */
-final class UrlIntegrityResolver
-{
+final class UrlIntegrityResolver {
     /**
      * Resolve a candidate URL to a verified original from `$known_urls`, if one of
      * them normalizes to the same value. Returns the candidate unchanged otherwise
@@ -35,8 +34,7 @@ final class UrlIntegrityResolver
      *
      * @param list<string> $known_urls
      */
-    public function resolve(string $candidate_url, array $known_urls): string
-    {
+    public function resolve(string $candidate_url, array $known_urls): string {
         $normalized_candidate = $this->normalize($candidate_url);
 
         foreach ($known_urls as $known_url) {
@@ -56,8 +54,7 @@ final class UrlIntegrityResolver
      * Normalize a URL for fuzzy comparison: decode percent-encoding, then strip
      * everything except letters and digits.
      */
-    private function normalize(string $url): string
-    {
+    private function normalize(string $url): string {
         $decoded = rawurldecode($url);
 
         return strtolower((string) preg_replace('/[^a-z0-9]/i', '', $decoded));

@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Builds concise session titles from the first meaningful prompt.
  */
-final class SessionTitleSuggester
-{
+final class SessionTitleSuggester {
     /**
      * @param array<string, mixed> $session
      */
-    public function suggest(string $message, array $session): ?string
-    {
+    public function suggest(string $message, array $session): ?string {
         if (!$this->is_default_title((string) ($session['title'] ?? ''))) {
             return null;
         }
@@ -40,15 +38,13 @@ final class SessionTitleSuggester
         return mb_substr($title, 0, 80, 'UTF-8');
     }
 
-    private function is_default_title(string $title): bool
-    {
+    private function is_default_title(string $title): bool {
         $normalized = strtolower(trim($title));
 
         return '' === $normalized || in_array($normalized, ['new session', 'untitled session'], true);
     }
 
-    private function message_title(string $message): ?string
-    {
+    private function message_title(string $message): ?string {
         $message = trim($message);
 
         if ('' === $message || str_starts_with($message, '/')) {
@@ -70,8 +66,7 @@ final class SessionTitleSuggester
         return $this->title_case(trim(implode(' ', $words)));
     }
 
-    private function remove_polite_prefix(string $message): string
-    {
+    private function remove_polite_prefix(string $message): string {
         $cleaned = preg_replace(
             '/^(please\s+|can you\s+|could you\s+|would you\s+|help me\s+|i need you to\s+)/i',
             '',
@@ -81,8 +76,7 @@ final class SessionTitleSuggester
         return trim(is_string($cleaned) ? $cleaned : $message);
     }
 
-    private function focus_title(int $post_id, string $base): ?string
-    {
+    private function focus_title(int $post_id, string $base): ?string {
         if ($post_id <= 0) {
             return null;
         }
@@ -102,8 +96,7 @@ final class SessionTitleSuggester
         return mb_substr($title, 0, 32, 'UTF-8');
     }
 
-    private function title_case(string $title): string
-    {
+    private function title_case(string $title): string {
         $words = preg_split('/\s+/', $title);
 
         if (!is_array($words)) {
@@ -113,8 +106,7 @@ final class SessionTitleSuggester
         return implode(' ', array_map([$this, 'title_word'], $words));
     }
 
-    private function title_word(string $word): string
-    {
+    private function title_word(string $word): string {
         if (strtoupper($word) === $word && strlen($word) > 1) {
             return $word;
         }

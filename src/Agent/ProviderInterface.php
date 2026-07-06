@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Contract for LLM providers.
  */
-interface ProviderInterface
-{
+interface ProviderInterface {
     /**
      * Send a chat completion request.
      *

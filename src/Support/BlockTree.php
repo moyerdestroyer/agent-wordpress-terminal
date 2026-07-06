@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Wraps parse_blocks() output with typed accessors.
  */
-final class BlockTree
-{
+final class BlockTree {
     /**
      * @param array<int, array<string, mixed>> $blocks
      */
@@ -29,8 +28,7 @@ final class BlockTree
     /**
      * Parse post content into a block tree.
      */
-    public static function from_content(string $content): self
-    {
+    public static function from_content(string $content): self {
         $blocks = parse_blocks($content);
         $normalized = [];
 
@@ -44,8 +42,7 @@ final class BlockTree
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function blocks(): array
-    {
+    public function blocks(): array {
         return $this->blocks;
     }
 
@@ -54,16 +51,14 @@ final class BlockTree
      *
      * @return array<int, array<string, mixed>>
      */
-    public function normalized(): array
-    {
+    public function normalized(): array {
         return new BlockTreeFormatter()->normalized($this->blocks);
     }
 
     /**
      * Count named blocks recursively.
      */
-    public function count(): int
-    {
+    public function count(): int {
         return new BlockTreeFormatter()->count($this->blocks);
     }
 
@@ -72,8 +67,7 @@ final class BlockTree
      *
      * @return array<string, mixed>|null
      */
-    public function get_block(string $path): ?array
-    {
+    public function get_block(string $path): ?array {
         return new BlockTreePathEditor()->get_block($this->blocks, $path);
     }
 
@@ -83,8 +77,7 @@ final class BlockTree
      * @param array<string, mixed> $attrs
      * @return array{content: string, block: array<string, mixed>}|\WP_Error
      */
-    public function update_attrs(string $path, array $attrs, string $expected_fingerprint = ''): array|\WP_Error
-    {
+    public function update_attrs(string $path, array $attrs, string $expected_fingerprint = ''): array|\WP_Error {
         return new BlockTreePathEditor()->update_attrs($this->blocks, $path, $attrs, $expected_fingerprint);
     }
 
@@ -93,8 +86,7 @@ final class BlockTree
      *
      * @param array<string, mixed> $block
      */
-    public static function has_block_name(array $block): bool
-    {
+    public static function has_block_name(array $block): bool {
         $name = $block['blockName'] ?? '';
 
         return is_string($name) && '' !== $name;
@@ -103,8 +95,7 @@ final class BlockTree
     /**
      * @param array<string, mixed> $block
      */
-    public static function fingerprint(array $block): string
-    {
+    public static function fingerprint(array $block): string {
         return BlockTreeFormatter::fingerprint($block);
     }
 }

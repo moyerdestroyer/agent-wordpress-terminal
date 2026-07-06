@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Narrows array-key maps at mixed boundaries.
  */
-final class ArrayKey
-{
+final class ArrayKey {
     /**
      * @param array<array-key, mixed> $row
      * @return array<string, mixed>
      */
-    public static function string_map(array $row): array
-    {
+    public static function string_map(array $row): array {
         $mapped = [];
 
         foreach ($row as $key => $value) {

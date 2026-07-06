@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Uses WordPress Core's AI Client and Connectors infrastructure when available.
  */
-final class WordPressAIClientProvider implements ProviderInterface
-{
+final class WordPressAIClientProvider implements ProviderInterface {
     /**
      * Selected connector ID.
      */
@@ -29,8 +28,7 @@ final class WordPressAIClientProvider implements ProviderInterface
     /**
      * @param string $connector_id Connector registry ID.
      */
-    public function __construct(string $connector_id)
-    {
+    public function __construct(string $connector_id) {
         $this->connector_id = sanitize_key($connector_id);
     }
 
@@ -41,8 +39,7 @@ final class WordPressAIClientProvider implements ProviderInterface
      * @param array<int, array<string, mixed>> $tools Available tools.
      * @return array<string, mixed>|\WP_Error
      */
-    public function complete(array $messages, array $tools = []): array|\WP_Error
-    {
+    public function complete(array $messages, array $tools = []): array|\WP_Error {
         unset($tools);
 
         if (!function_exists('wp_ai_client_prompt')) {
@@ -118,8 +115,7 @@ final class WordPressAIClientProvider implements ProviderInterface
     /**
      * Provider identifier.
      */
-    public function get_name(): string
-    {
+    public function get_name(): string {
         return new ConnectorCatalog()->get_provider_label($this->connector_id);
     }
 
@@ -128,8 +124,7 @@ final class WordPressAIClientProvider implements ProviderInterface
      *
      * @return array<string, mixed>
      */
-    private function response(string $content): array
-    {
+    private function response(string $content): array {
         return [
             'content' => $content,
             'raw_tool_calls' => [],

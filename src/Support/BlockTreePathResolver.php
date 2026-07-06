@@ -17,12 +17,10 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves dotted block paths against parse_blocks() arrays.
  */
-final class BlockTreePathResolver
-{
+final class BlockTreePathResolver {
     private BlockTreeArrays $arrays;
 
-    public function __construct(?BlockTreeArrays $arrays = null)
-    {
+    public function __construct(?BlockTreeArrays $arrays = null) {
         $this->arrays = $arrays ?? new BlockTreeArrays();
     }
 
@@ -30,8 +28,7 @@ final class BlockTreePathResolver
      * @param array<int, array<string, mixed>> $blocks
      * @return array<string, mixed>|null
      */
-    public function get_block(array $blocks, string $path): ?array
-    {
+    public function get_block(array $blocks, string $path): ?array {
         $segments = $this->path_segments($path);
 
         if ([] === $segments) {
@@ -44,8 +41,7 @@ final class BlockTreePathResolver
     /**
      * @return list<int>
      */
-    private function path_segments(string $path): array
-    {
+    private function path_segments(string $path): array {
         $path = trim($path);
 
         if ('' === $path || !preg_match('/^\d+(?:\.\d+)*$/', $path)) {
@@ -60,8 +56,7 @@ final class BlockTreePathResolver
      * @param list<int>                               $segments
      * @return array<string, mixed>|null
      */
-    private function get_block_at_segments(array $blocks, array $segments): ?array
-    {
+    private function get_block_at_segments(array $blocks, array $segments): ?array {
         $target = array_shift($segments);
 
         if (null === $target) {

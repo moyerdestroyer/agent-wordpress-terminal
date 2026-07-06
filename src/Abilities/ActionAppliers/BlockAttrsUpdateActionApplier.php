@@ -19,14 +19,12 @@ if (!defined('ABSPATH')) {
 /**
  * Rebuilds post content for a staged Gutenberg block attribute operation.
  */
-final class BlockAttrsUpdateActionApplier
-{
+final class BlockAttrsUpdateActionApplier {
     /**
      * @param array<string, mixed> $payload
      * @return string|\WP_Error
      */
-    public function content_from_payload(int $post_id, array $payload): string|\WP_Error
-    {
+    public function content_from_payload(int $post_id, array $payload): string|\WP_Error {
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -64,8 +62,7 @@ final class BlockAttrsUpdateActionApplier
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function attrs_from_payload(array $payload): array
-    {
+    private function attrs_from_payload(array $payload): array {
         if (!is_array($payload['attrs'] ?? null)) {
             return [];
         }

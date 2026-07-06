@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Creates and cleans up preview autosaves for existing posts.
  */
-final class ContentUpdatePreviewAutosave
-{
+final class ContentUpdatePreviewAutosave {
     /**
      * @param array<array-key, mixed> $payload
      */
-    public function discard(array $payload): void
-    {
+    public function discard(array $payload): void {
         $autosave_id = (int) ($payload['preview_autosave_id'] ?? 0);
 
         if ($autosave_id <= 0 || !get_post($autosave_id) instanceof \WP_Post) {
@@ -38,8 +36,7 @@ final class ContentUpdatePreviewAutosave
      * @param array<string, mixed> $payload
      * @return int|\WP_Error
      */
-    public function create(array $autosave, array $payload): int|\WP_Error
-    {
+    public function create(array $autosave, array $payload): int|\WP_Error {
         if (!function_exists('wp_create_post_autosave')) {
             require_once ABSPATH . 'wp-admin/includes/post.php';
         }
@@ -58,8 +55,7 @@ final class ContentUpdatePreviewAutosave
     /**
      * @param array<string, mixed> $payload
      */
-    private function apply_staged_meta(int $autosave_id, array $payload): void
-    {
+    private function apply_staged_meta(int $autosave_id, array $payload): void {
         if (!array_key_exists('post_meta', $payload) || !is_array($payload['post_meta'])) {
             return;
         }

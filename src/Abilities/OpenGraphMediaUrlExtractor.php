@@ -24,8 +24,7 @@ if (!defined('ABSPATH')) {
  * Pure string-in/string-out logic with no WordPress or network dependency, so it can be
  * unit tested directly.
  */
-final class OpenGraphMediaUrlExtractor
-{
+final class OpenGraphMediaUrlExtractor {
     /**
      * Meta tag properties to check, in preference order. `og:image` is checked before
      * `og:video` because a page offering both usually represents the same clip, and a
@@ -45,8 +44,7 @@ final class OpenGraphMediaUrlExtractor
      * Whether a chunk of downloaded content looks like an HTML document rather than a
      * binary media file.
      */
-    public function looks_like_html(string $content): bool
-    {
+    public function looks_like_html(string $content): bool {
         return (bool) preg_match('/<!doctype\s+html|<html[\s>]/i', ltrim($content));
     }
 
@@ -54,8 +52,7 @@ final class OpenGraphMediaUrlExtractor
      * Extract the first matching Open Graph / Twitter Card media URL from an HTML
      * document, or null if none of the known properties are present.
      */
-    public function extract(string $html): ?string
-    {
+    public function extract(string $html): ?string {
         foreach (self::PROPERTIES as $property) {
             $url = $this->find_meta_content($html, $property);
 
@@ -71,8 +68,7 @@ final class OpenGraphMediaUrlExtractor
      * Find a `<meta property|name="..." content="...">` tag's content, tolerating
      * either attribute order.
      */
-    private function find_meta_content(string $html, string $property): ?string
-    {
+    private function find_meta_content(string $html, string $property): ?string {
         $escaped = preg_quote($property, '/');
 
         $patterns = [

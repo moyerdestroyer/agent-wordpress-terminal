@@ -25,6 +25,9 @@ literal-separator = true
 
 [formatter]
 preset = "default"
+function-brace-style = "same-line"
+method-brace-style = "same-line"
+classlike-brace-style = "same-line"
 
 [linter]
 integrations = ["wordpress"]

@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Turns an ID, URL, slug, or title query into an exact/ambiguous/missing result.
  */
-final class ContentTargetResolver
-{
+final class ContentTargetResolver {
     private ContentSearchService $search;
 
-    public function __construct(?ContentSearchService $search = null)
-    {
+    public function __construct(?ContentSearchService $search = null) {
         $this->search = $search ?? new ContentSearchService();
     }
 
     /**
      * @return array{status: 'resolved'|'ambiguous'|'missing', query: string, post_id?: int, result?: array<array-key, mixed>, results?: list<array<array-key, mixed>>}
      */
-    public function resolve(string $query, string $post_type = '', int $limit = 5): array
-    {
+    public function resolve(string $query, string $post_type = '', int $limit = 5): array {
         $query = trim($query);
 
         if ('' === $query) {
@@ -78,8 +75,7 @@ final class ContentTargetResolver
     /**
      * @return list<array<array-key, mixed>>
      */
-    private function list_results(mixed $value): array
-    {
+    private function list_results(mixed $value): array {
         if (!is_array($value)) {
             return [];
         }

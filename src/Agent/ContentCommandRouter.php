@@ -19,16 +19,14 @@ if (!defined('ABSPATH')) {
 /**
  * Handles focused post/page slash commands.
  */
-final class ContentCommandRouter
-{
+final class ContentCommandRouter {
     /**
      * Handle /focus command.
      *
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    public function focus(array $parts): array
-    {
+    public function focus(array $parts): array {
         $query = trim(implode(' ', array_slice($parts, 1)));
         $resolved = new ContentTargetResolver()->resolve($query);
 
@@ -77,8 +75,7 @@ final class ContentCommandRouter
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    public function preview(array $parts): array
-    {
+    public function preview(array $parts): array {
         $query = trim(implode(' ', array_slice($parts, 1)));
         $resolved = new ContentTargetResolver()->resolve($query);
 
@@ -126,8 +123,7 @@ final class ContentCommandRouter
      * @param list<array<array-key, mixed>> $results
      * @return array<string, mixed>
      */
-    private function ambiguous_response(string $command, array $results): array
-    {
+    private function ambiguous_response(string $command, array $results): array {
         $lines = [__(
             'I found multiple matching content items. Use a specific ID, URL, or slug:',
             'agent-wordpress-terminal',
@@ -159,8 +155,7 @@ final class ContentCommandRouter
      * @param string $message Usage message.
      * @return array<string, mixed>
      */
-    private function usage(string $command, string $message): array
-    {
+    private function usage(string $command, string $message): array {
         return $this->error_response($command, $message);
     }
 
@@ -171,8 +166,7 @@ final class ContentCommandRouter
      * @param string $message Error message.
      * @return array<string, mixed>
      */
-    private function error_response(string $command, string $message): array
-    {
+    private function error_response(string $command, string $message): array {
         return [
             'content' => $message,
             'tool_calls' => [],
@@ -188,8 +182,7 @@ final class ContentCommandRouter
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>|\WP_Error
      */
-    private function execute_tool(string $tool_name, array $input): array|\WP_Error
-    {
+    private function execute_tool(string $tool_name, array $input): array|\WP_Error {
         return new ToolExecutor()->execute($tool_name, $input);
     }
 }

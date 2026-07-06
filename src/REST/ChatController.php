@@ -19,13 +19,11 @@ if (!defined('ABSPATH')) {
 /**
  * Handles chat messages for agent sessions.
  */
-final class ChatController
-{
+final class ChatController {
     /**
      * Register routes.
      */
-    public function register_routes(): void
-    {
+    public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/sessions/(?P<session_id>\d+)/chat', [
             [
                 'methods' => \WP_REST_Server::CREATABLE,
@@ -45,8 +43,7 @@ final class ChatController
     /**
      * Permission check.
      */
-    public function can_manage(): bool
-    {
+    public function can_manage(): bool {
         return current_user_can('manage_options');
     }
 
@@ -56,8 +53,7 @@ final class ChatController
      * @param \WP_REST_Request $request Request object.
      * @return \WP_REST_Response|\WP_Error
      */
-    public function send_message(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function send_message(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $session_id = (int) $request->get_param('session_id');
         $message = (string) $request->get_param('message');
 

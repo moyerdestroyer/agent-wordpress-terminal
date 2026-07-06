@@ -19,10 +19,8 @@ if (!defined('ABSPATH')) {
 /**
  * Finds editable/readable WordPress content by natural identifiers.
  */
-final class SearchContent
-{
-    public function register(): void
-    {
+final class SearchContent {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/search-content',
             'label' => __('Search Content', 'agent-wordpress-terminal'),
@@ -67,8 +65,7 @@ final class SearchContent
     /**
      * @param array<string, mixed> $input
      */
-    public function can_search(array $input): bool
-    {
+    public function can_search(array $input): bool {
         unset($input);
 
         return current_user_can('manage_options');
@@ -78,8 +75,7 @@ final class SearchContent
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         return new ContentSearchService()->search($input);
     }
 }

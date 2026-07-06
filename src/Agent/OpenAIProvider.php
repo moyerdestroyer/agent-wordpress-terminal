@@ -23,8 +23,7 @@ if (!defined('ABSPATH')) {
  * itself keeps pointed at its current recommended chat model) — there is no manual
  * model field to configure.
  */
-final class OpenAIProvider extends ChatCompletionsProvider
-{
+final class OpenAIProvider extends ChatCompletionsProvider {
     /**
      * OpenAI's evergreen chat alias; always points at OpenAI's current recommended
      * chat-completions model, so AWPT never has to track specific model versions.
@@ -34,16 +33,14 @@ final class OpenAIProvider extends ChatCompletionsProvider
     /**
      * Get provider name.
      */
-    public function get_name(): string
-    {
+    public function get_name(): string {
         return 'OpenAI';
     }
 
     /**
      * Provider endpoint.
      */
-    protected function get_endpoint(): string
-    {
+    protected function get_endpoint(): string {
         return 'https://api.openai.com/v1/chat/completions';
     }
 
@@ -55,8 +52,7 @@ final class OpenAIProvider extends ChatCompletionsProvider
      * constant, or database option), so the user never has to enter the same key
      * twice.
      */
-    protected function get_api_key(): string
-    {
+    protected function get_api_key(): string {
         $own_key = trim((string) get_option('awpt_openai_api_key', ''));
 
         if ('' !== $own_key) {
@@ -69,8 +65,7 @@ final class OpenAIProvider extends ChatCompletionsProvider
     /**
      * Missing key message.
      */
-    protected function get_missing_key_message(): string
-    {
+    protected function get_missing_key_message(): string {
         return __(
             'No OpenAI API key found. Add one in AWPT AI connection settings, or configure the OpenAI connector under Settings > Connectors.',
             'agent-wordpress-terminal',
@@ -80,8 +75,7 @@ final class OpenAIProvider extends ChatCompletionsProvider
     /**
      * Provider model identifier. Always automatic; not user-configurable.
      */
-    protected function get_model(): string
-    {
+    protected function get_model(): string {
         /**
          * Filters the OpenAI model AWPT uses.
          *

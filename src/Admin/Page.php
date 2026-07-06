@@ -25,8 +25,7 @@ if (!defined('ABSPATH')) {
 /**
  * Registers the AWPT admin terminal page.
  */
-final class Page
-{
+final class Page {
     /**
      * Admin page slug.
      */
@@ -57,8 +56,7 @@ final class Page
     /**
      * Hook admin integration.
      */
-    public function init(): void
-    {
+    public function init(): void {
         add_action('admin_menu', [$this, 'register_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
@@ -67,8 +65,7 @@ final class Page
     /**
      * Register the settings submenu page.
      */
-    public function register_menu(): void
-    {
+    public function register_menu(): void {
         add_options_page(
             __('Agent Terminal', 'agent-wordpress-terminal'),
             __('Agent Terminal', 'agent-wordpress-terminal'),
@@ -81,8 +78,7 @@ final class Page
     /**
      * Register AI connection settings.
      */
-    public function register_settings(): void
-    {
+    public function register_settings(): void {
         register_setting('awpt_settings', 'awpt_provider', [
             'type' => 'string',
             'sanitize_callback' => [$this, 'sanitize_provider'],
@@ -97,8 +93,7 @@ final class Page
     /**
      * Register a secret (API key) option using the shared clear/keep sanitize contract.
      */
-    private function register_secret_setting(string $option): void
-    {
+    private function register_secret_setting(string $option): void {
         register_setting('awpt_settings', $option, [
             'type' => 'string',
             'sanitize_callback' => fn(mixed $value): string => $this->sanitize_secret(
@@ -115,8 +110,7 @@ final class Page
      *
      * @param string $hook_suffix Current admin page hook suffix.
      */
-    public function enqueue_assets(string $hook_suffix): void
-    {
+    public function enqueue_assets(string $hook_suffix): void {
         if ('settings_page_' . self::SLUG !== $hook_suffix) {
             return;
         }
@@ -143,8 +137,7 @@ final class Page
     /**
      * Render the admin mount point.
      */
-    public function render_page(): void
-    {
+    public function render_page(): void {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You do not have permission to access this page.', 'agent-wordpress-terminal'));
         }
@@ -316,8 +309,7 @@ final class Page
      *
      * @param array{label: string, description: string, key_option: string, key_label: string} $meta
      */
-    private function render_direct_provider_rows(string $provider_id, array $meta, string $selected_provider): void
-    {
+    private function render_direct_provider_rows(string $provider_id, array $meta, string $selected_provider): void {
         $ready =
             '' !== (string) get_option($meta['key_option'], '')
             || '' !== new ConnectorInspector()->resolve_default_provider_api_key($provider_id);
@@ -361,8 +353,7 @@ final class Page
     /**
      * Render a password field row with a "clear saved key" checkbox.
      */
-    private function render_secret_field(string $option, string $label): void
-    { ?>
+    private function render_secret_field(string $option, string $label): void { ?>
         <tr>
             <th scope="row">
                 <label for="<?php echo esc_attr($option); ?>"><?php echo esc_html($label); ?></label>
@@ -392,8 +383,7 @@ final class Page
      *
      * @param mixed $value Raw value.
      */
-    public function sanitize_provider(mixed $value): string
-    {
+    public function sanitize_provider(mixed $value): string {
         $provider = sanitize_key((string) $value);
         $catalog = new ConnectorCatalog();
 
@@ -407,8 +397,7 @@ final class Page
     /**
      * Return placeholder text for secret inputs without exposing the stored value.
      */
-    private function secret_placeholder(string $option): string
-    {
+    private function secret_placeholder(string $option): string {
         return '' === (string) get_option($option, '')
             ? __('Enter API key', 'agent-wordpress-terminal')
             : __('Saved; leave blank to keep', 'agent-wordpress-terminal');
@@ -421,8 +410,7 @@ final class Page
      * @param string $option Option name.
      * @param string $clear_field Clear checkbox field name.
      */
-    private function sanitize_secret(mixed $value, string $option, string $clear_field): string
-    {
+    private function sanitize_secret(mixed $value, string $option, string $clear_field): string {
         $raw_clear = $_POST[$clear_field] ?? '';
         $raw_clear = is_array($raw_clear) ? '' : $raw_clear;
         $clear = '1' === sanitize_text_field(wp_unslash($raw_clear));

@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Handles /knowledge commands.
  */
-final class KnowledgeCommandRouter
-{
+final class KnowledgeCommandRouter {
     /**
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    public function dispatch(array $parts): array
-    {
+    public function dispatch(array $parts): array {
         $action = strtolower($parts[1] ?? 'search');
 
         return match ($action) {
@@ -38,8 +36,7 @@ final class KnowledgeCommandRouter
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    private function search(array $parts): array
-    {
+    private function search(array $parts): array {
         $query = trim(implode(' ', array_slice($parts, 2)));
 
         if ('' === $query) {
@@ -89,8 +86,7 @@ final class KnowledgeCommandRouter
      * @param array<int, string> $parts Command parts.
      * @return array<string, mixed>
      */
-    private function read(array $parts): array
-    {
+    private function read(array $parts): array {
         $post_id = (int) ($parts[2] ?? 0);
 
         if ($post_id <= 0) {
@@ -125,8 +121,7 @@ final class KnowledgeCommandRouter
     /**
      * @return array<string, mixed>
      */
-    private function usage(): array
-    {
+    private function usage(): array {
         return [
             'content' => __('Usage: /knowledge search brand voice or /knowledge read 123', 'agent-wordpress-terminal'),
             'tool_calls' => [],
@@ -138,8 +133,7 @@ final class KnowledgeCommandRouter
     /**
      * @return array<string, mixed>
      */
-    private function error_response(string $command, string $message): array
-    {
+    private function error_response(string $command, string $message): array {
         return [
             'content' => $message,
             'tool_calls' => [],

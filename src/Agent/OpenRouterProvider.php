@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * OpenRouter API provider.
  */
-final class OpenRouterProvider extends ChatCompletionsProvider
-{
+final class OpenRouterProvider extends ChatCompletionsProvider {
     /**
      * Default OpenRouter model when no explicit model is configured.
      */
@@ -27,32 +26,28 @@ final class OpenRouterProvider extends ChatCompletionsProvider
     /**
      * Get provider name.
      */
-    public function get_name(): string
-    {
+    public function get_name(): string {
         return 'OpenRouter';
     }
 
     /**
      * Provider endpoint.
      */
-    protected function get_endpoint(): string
-    {
+    protected function get_endpoint(): string {
         return 'https://openrouter.ai/api/v1/chat/completions';
     }
 
     /**
      * Provider API key.
      */
-    protected function get_api_key(): string
-    {
+    protected function get_api_key(): string {
         return trim((string) get_option('awpt_openrouter_api_key', ''));
     }
 
     /**
      * Missing key message.
      */
-    protected function get_missing_key_message(): string
-    {
+    protected function get_missing_key_message(): string {
         return __(
             'OpenRouter API key is not configured. Add it in AWPT AI connection settings.',
             'agent-wordpress-terminal',
@@ -62,8 +57,7 @@ final class OpenRouterProvider extends ChatCompletionsProvider
     /**
      * Provider model identifier.
      */
-    protected function get_model(): string
-    {
+    protected function get_model(): string {
         return self::DEFAULT_MODEL;
     }
 
@@ -73,8 +67,7 @@ final class OpenRouterProvider extends ChatCompletionsProvider
      * @param string $api_key API key.
      * @return array<string, string>
      */
-    protected function get_headers(#[\SensitiveParameter] string $api_key): array
-    {
+    protected function get_headers(#[\SensitiveParameter] string $api_key): array {
         return array_merge(parent::get_headers($api_key), [
             'HTTP-Referer' => home_url('/'),
             'X-Title' => get_bloginfo('name'),

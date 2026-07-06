@@ -19,10 +19,8 @@ if (!defined('ABSPATH')) {
 /**
  * Searches indexed Knowledge and read-only site sources.
  */
-final class SearchKnowledge
-{
-    public function register(): void
-    {
+final class SearchKnowledge {
+    public function register(): void {
         wp_register_ability('awpt/search-knowledge', [
             'label' => __('Search Knowledge', 'agent-wordpress-terminal'),
             'description' => __(
@@ -65,8 +63,7 @@ final class SearchKnowledge
     /**
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_search(array $input): bool
-    {
+    public function can_search(array $input): bool {
         return current_user_can('manage_options') && '' !== trim((string) ($input['query'] ?? ''));
     }
 
@@ -74,8 +71,7 @@ final class SearchKnowledge
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         $items = new KnowledgeSearchService()->search((string) ($input['query'] ?? ''), (int) ($input['limit'] ?? 6));
 
         return [

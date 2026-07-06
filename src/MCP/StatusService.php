@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Reports MCP adapter connection status.
  */
-final class StatusService
-{
+final class StatusService {
     /**
      * Get MCP status for the terminal header.
      *
      * @return array<string, mixed>
      */
-    public function get_status(): array
-    {
+    public function get_status(): array {
         $connected = (bool) apply_filters('awpt_mcp_connected', false);
         $server = (string) apply_filters('awpt_mcp_server_url', '');
         $tool_count = count(new Adapter()->list_tools());

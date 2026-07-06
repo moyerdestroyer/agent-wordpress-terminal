@@ -19,15 +19,13 @@ if (!defined('ABSPATH')) {
 /**
  * Handles slash commands for tool discovery.
  */
-final class ToolCommandRouter
-{
+final class ToolCommandRouter {
     /**
      * Handle /tools command.
      *
      * @return array<string, mixed>
      */
-    public function tools(): array
-    {
+    public function tools(): array {
         return [
             'content' => $this->format_groups($this->groups()),
             'tool_calls' => [],
@@ -41,8 +39,7 @@ final class ToolCommandRouter
      *
      * @return array<string, array<int, string>>
      */
-    private function groups(): array
-    {
+    private function groups(): array {
         $core_label = __('Core Abilities', 'agent-wordpress-terminal');
         $plugin_label = __('Plugin Abilities', 'agent-wordpress-terminal');
         $mcp_label = __('MCP Tools', 'agent-wordpress-terminal');
@@ -79,8 +76,7 @@ final class ToolCommandRouter
      *
      * @param array<string, array<int, string>> $groups Grouped tool names.
      */
-    private function format_groups(array $groups): string
-    {
+    private function format_groups(array $groups): string {
         $lines = [];
 
         foreach ($groups as $label => $names) {

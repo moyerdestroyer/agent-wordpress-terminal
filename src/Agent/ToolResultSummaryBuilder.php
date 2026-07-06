@@ -17,12 +17,10 @@ if (!defined('ABSPATH')) {
 /**
  * Produces a structured summary when full tool output exceeds size limits.
  */
-final class ToolResultSummaryBuilder
-{
+final class ToolResultSummaryBuilder {
     private ToolResultFieldShrinker $shrinker;
 
-    public function __construct(?ToolResultFieldShrinker $shrinker = null)
-    {
+    public function __construct(?ToolResultFieldShrinker $shrinker = null) {
         $this->shrinker = $shrinker ?? new ToolResultFieldShrinker();
     }
 
@@ -30,8 +28,7 @@ final class ToolResultSummaryBuilder
      * @param array<string, mixed> $output
      * @return array<string, mixed>
      */
-    public function build(string $tool, array $output, int $original_bytes): array
-    {
+    public function build(string $tool, array $output, int $original_bytes): array {
         $summary = [
             'tool' => $tool,
             'summary' => __('Tool output was truncated for size.', 'agent-wordpress-terminal'),

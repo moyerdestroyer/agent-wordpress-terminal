@@ -10,8 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Agent\ToolRegistry;
 
-function test_tool_registry_proposal_abilities(): void
-{
+function test_tool_registry_proposal_abilities(): void {
     $names = ToolRegistry::proposal_ability_names();
 
     Assert::true(

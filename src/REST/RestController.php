@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Shared REST permission helpers.
  */
-abstract class RestController
-{
+abstract class RestController {
     /**
      * Permission check for admin endpoints.
      */
-    public function can_manage(): bool
-    {
+    public function can_manage(): bool {
         return current_user_can(capability: 'manage_options');
     }
 }

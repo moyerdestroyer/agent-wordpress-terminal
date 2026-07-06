@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for site settings output.
  */
-final class ToolResultSettingsFormatter
-{
+final class ToolResultSettingsFormatter {
     /**
      * @param array<array-key, mixed> $output Tool output.
      */
-    public function format(array $output): string
-    {
+    public function format(array $output): string {
         $site = is_array($output['site'] ?? null) ? $output['site'] : [];
         $theme = is_array($output['theme'] ?? null) ? $output['theme'] : [];
         $discussion = is_array($output['discussion'] ?? null) ? $output['discussion'] : [];
@@ -64,8 +62,7 @@ final class ToolResultSettingsFormatter
      * @param array<array-key, mixed> $theme
      * @return list<string>
      */
-    private function theme_lines(array $theme): array
-    {
+    private function theme_lines(array $theme): array {
         $lines = [sprintf(
             /* translators: %s: theme name */
             __('- Active theme: %s', 'agent-wordpress-terminal'),

@@ -20,13 +20,11 @@ if (!defined('ABSPATH')) {
  * generate text once AWPT's function declarations are attached — surfacing the same
  * mismatch that would otherwise only be discovered via a failed chat request.
  */
-final class ConnectorToolSupportChecker
-{
+final class ConnectorToolSupportChecker {
     /**
      * Whether the WordPress AI Client is available to check at all.
      */
-    public function is_available(): bool
-    {
+    public function is_available(): bool {
         return function_exists('wp_ai_client_prompt');
     }
 
@@ -36,8 +34,7 @@ final class ConnectorToolSupportChecker
      * Defaults to `true` (assume support) whenever this can't be determined, so a
      * missing or partial AI Client implementation never produces a false warning.
      */
-    public function supports_tools(string $connector_id): bool
-    {
+    public function supports_tools(string $connector_id): bool {
         if (!$this->is_available()) {
             return false;
         }
@@ -66,8 +63,7 @@ final class ConnectorToolSupportChecker
     /**
      * Attach AWPT's auto-executable ability tools to a prompt builder.
      */
-    private function attach_tools(object $builder): object
-    {
+    private function attach_tools(object $builder): object {
         $ability_names = new ToolRegistry()->get_auto_executable_ability_names();
         $declarations = new AbilityFunctionDeclarationBuilder()->build($ability_names);
 

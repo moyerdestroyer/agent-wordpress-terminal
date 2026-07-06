@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Verifies that AWPT abilities registered successfully.
  */
-final class AbilitiesHealth
-{
+final class AbilitiesHealth {
     /**
      * Ability names AWPT expects to register.
      */
@@ -39,15 +38,20 @@ final class AbilitiesHealth
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
+        'awpt/propose-plugin-deactivate',
         'awpt/apply-action',
         'awpt/sideload-media',
+        'awpt/read-error-log',
+        'awpt/read-plugins',
+        'awpt/read-site-health',
+        'awpt/probe-url',
+        'awpt/diagnose-error',
     ];
 
     /**
      * Whether the Abilities API functions AWPT needs are present.
      */
-    public static function api_functions_available(): bool
-    {
+    public static function api_functions_available(): bool {
         return (
             function_exists('wp_register_ability')
             && function_exists('wp_register_ability_category')
@@ -59,8 +63,7 @@ final class AbilitiesHealth
     /**
      * Whether AWPT abilities registered successfully.
      */
-    public static function is_awpt_registry_healthy(): bool
-    {
+    public static function is_awpt_registry_healthy(): bool {
         if (!self::api_functions_available() || !function_exists('wp_has_ability')) {
             return false;
         }
@@ -73,8 +76,7 @@ final class AbilitiesHealth
      *
      * @return array<string, mixed>
      */
-    public static function registration_status(): array
-    {
+    public static function registration_status(): array {
         $registered = self::registered_awpt_abilities();
 
         return [
@@ -91,8 +93,7 @@ final class AbilitiesHealth
      *
      * @return list<string>
      */
-    public static function registered_awpt_abilities(): array
-    {
+    public static function registered_awpt_abilities(): array {
         if (!function_exists('wp_get_abilities')) {
             return [];
         }

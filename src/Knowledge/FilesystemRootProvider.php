@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves configured Knowledge document roots.
  */
-final class FilesystemRootProvider
-{
+final class FilesystemRootProvider {
     private FilesystemAccessPolicy $policy;
 
-    public function __construct(?FilesystemAccessPolicy $policy = null)
-    {
+    public function __construct(?FilesystemAccessPolicy $policy = null) {
         $this->policy = $policy ?? new FilesystemAccessPolicy();
     }
 
     /**
      * @return list<string>
      */
-    public function allowed_roots(): array
-    {
+    public function allowed_roots(): array {
         $normalized = [];
 
         foreach ($this->configured_roots() as $root) {
@@ -48,8 +45,7 @@ final class FilesystemRootProvider
      * @param list<string> $roots Raw roots.
      * @return list<string>
      */
-    public function sanitize_configured_roots(array $roots): array
-    {
+    public function sanitize_configured_roots(array $roots): array {
         $valid = [];
 
         foreach ($roots as $root) {
@@ -66,8 +62,7 @@ final class FilesystemRootProvider
     /**
      * @return list<string>
      */
-    private function configured_roots(): array
-    {
+    private function configured_roots(): array {
         $upload_dir = wp_get_upload_dir();
         $roots = [];
 

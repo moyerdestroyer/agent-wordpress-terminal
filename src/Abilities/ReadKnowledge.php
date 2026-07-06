@@ -19,10 +19,8 @@ if (!defined('ABSPATH')) {
 /**
  * Reads one Core Knowledge or legacy guideline post.
  */
-final class ReadKnowledge
-{
-    public function register(): void
-    {
+final class ReadKnowledge {
+    public function register(): void {
         wp_register_ability('awpt/read-knowledge', [
             'label' => __('Read Knowledge', 'agent-wordpress-terminal'),
             'description' => __(
@@ -57,8 +55,7 @@ final class ReadKnowledge
     /**
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
         return $post_id > 0 && current_user_can('read_post', $post_id);
@@ -68,8 +65,7 @@ final class ReadKnowledge
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $source = new KnowledgeRepository()->read_knowledge_post((int) ($input['id'] ?? 0));
 
         if (is_wp_error($source)) {

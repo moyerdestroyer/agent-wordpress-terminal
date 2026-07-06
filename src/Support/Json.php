@@ -17,15 +17,13 @@ if (!defined('ABSPATH')) {
 /**
  * Safe JSON decoding at mixed boundaries.
  */
-final class Json
-{
+final class Json {
     /**
      * Decode JSON into an associative array.
      *
      * @return array<array-key, mixed>
      */
-    public static function decode_array(string $json): array
-    {
+    public static function decode_array(string $json): array {
         if ('' === $json) {
             return [];
         }

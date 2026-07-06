@@ -24,8 +24,7 @@ if (!defined('ABSPATH')) {
 /**
  * Stages a surgical Gutenberg block attribute update.
  */
-final class ProposeBlockAttrsUpdate
-{
+final class ProposeBlockAttrsUpdate {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;
@@ -40,8 +39,7 @@ final class ProposeBlockAttrsUpdate
         $this->preview = $preview ?? new StagedPostPreview();
     }
 
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/propose-block-attrs-update',
             'label' => __('Propose Block Attribute Update', 'agent-wordpress-terminal'),
@@ -110,8 +108,7 @@ final class ProposeBlockAttrsUpdate
     /**
      * @param array<string, mixed> $input
      */
-    public function can_propose(array $input): bool
-    {
+    public function can_propose(array $input): bool {
         $post_id = (int) ($input['post_id'] ?? 0);
 
         return $post_id > 0 && current_user_can('edit_post', $post_id) && current_user_can('manage_options');
@@ -121,8 +118,7 @@ final class ProposeBlockAttrsUpdate
      * @param array<string, mixed> $input
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
         $post_id = (int) ($input['post_id'] ?? 0);
         $post = get_post($post_id);

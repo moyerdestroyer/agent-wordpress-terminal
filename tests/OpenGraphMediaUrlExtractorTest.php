@@ -10,13 +10,21 @@ declare(strict_types=1);
 
 use AWPT\Abilities\OpenGraphMediaUrlExtractor;
 
-function test_open_graph_media_url_extractor(): void
-{
+function test_open_graph_media_url_extractor(): void {
     $extractor = new OpenGraphMediaUrlExtractor();
 
-    Assert::true($extractor->looks_like_html("<!DOCTYPE html>\n<html><head></head></html>"), 'doctype should be detected as html');
-    Assert::true($extractor->looks_like_html('<html lang="en"><head></head></html>'), 'bare html tag should be detected as html');
-    Assert::false($extractor->looks_like_html("GIF89a\x01\x00\x01\x00"), 'binary GIF header should not be detected as html');
+    Assert::true(
+        $extractor->looks_like_html("<!DOCTYPE html>\n<html><head></head></html>"),
+        'doctype should be detected as html',
+    );
+    Assert::true(
+        $extractor->looks_like_html('<html lang="en"><head></head></html>'),
+        'bare html tag should be detected as html',
+    );
+    Assert::false(
+        $extractor->looks_like_html("GIF89a\x01\x00\x01\x00"),
+        'binary GIF header should not be detected as html',
+    );
 
     // Real-world shape: a Tenor share page's Open Graph tags (property before content).
     $tenor_html = <<<'HTML'

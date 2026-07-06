@@ -21,13 +21,11 @@ if (!defined('ABSPATH')) {
 /**
  * Exposes registered abilities and MCP status.
  */
-final class ToolsController
-{
+final class ToolsController {
     /**
      * Register routes.
      */
-    public function register_routes(): void
-    {
+    public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/tools', [
             [
                 'methods' => \WP_REST_Server::READABLE,
@@ -78,8 +76,7 @@ final class ToolsController
     /**
      * Permission check.
      */
-    public function can_manage(): bool
-    {
+    public function can_manage(): bool {
         return current_user_can('manage_options');
     }
 
@@ -88,21 +85,18 @@ final class ToolsController
      *
      * @return \WP_REST_Response
      */
-    public function list_tools(): \WP_REST_Response
-    {
+    public function list_tools(): \WP_REST_Response {
         return new \WP_REST_Response($this->tools_payload(include_all_abilities: true), 200);
     }
 
-    public function list_awpt_tools(): \WP_REST_Response
-    {
+    public function list_awpt_tools(): \WP_REST_Response {
         return new \WP_REST_Response($this->tools_payload(include_all_abilities: false), 200);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function tools_payload(bool $include_all_abilities): array
-    {
+    private function tools_payload(bool $include_all_abilities): array {
         $tools = [
             'core' => [],
             'plugin' => [],
@@ -136,8 +130,7 @@ final class ToolsController
     /**
      * @return array<string, mixed>
      */
-    private function ability_item(object $ability, bool $include_schemas): array
-    {
+    private function ability_item(object $ability, bool $include_schemas): array {
         $item = [
             'name' => $ability->get_name(),
             'label' => $ability->get_label(),
@@ -177,8 +170,7 @@ final class ToolsController
      *
      * @return \WP_REST_Response
      */
-    public function mcp_status(): \WP_REST_Response
-    {
+    public function mcp_status(): \WP_REST_Response {
         return new \WP_REST_Response(new StatusService()->get_status(), 200);
     }
 
@@ -187,8 +179,7 @@ final class ToolsController
      *
      * @return \WP_REST_Response
      */
-    public function mcp_tools(): \WP_REST_Response
-    {
+    public function mcp_tools(): \WP_REST_Response {
         return new \WP_REST_Response(new Adapter()->list_tools(), 200);
     }
 
@@ -198,8 +189,7 @@ final class ToolsController
      * @param \WP_REST_Request $request Request object.
      * @return \WP_REST_Response|\WP_Error
      */
-    public function execute_mcp_tool(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function execute_mcp_tool(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $input = $request->get_param('input');
         $result = new Adapter()->execute_tool(
             rawurldecode((string) $request->get_param('name')),

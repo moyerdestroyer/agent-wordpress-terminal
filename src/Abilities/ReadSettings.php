@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Returns non-secret site settings for agent analysis.
  */
-final class ReadSettings
-{
+final class ReadSettings {
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         wp_register_ability('awpt/read-settings', [
             'label' => __('Read Settings', 'agent-wordpress-terminal'),
             'description' => __(
@@ -58,8 +56,7 @@ final class ReadSettings
      *
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         return current_user_can('manage_options');
     }
 
@@ -69,8 +66,7 @@ final class ReadSettings
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         $front_page_id = (int) get_option('page_on_front', 0);
         $posts_page_id = (int) get_option('page_for_posts', 0);
         $theme = wp_get_theme();

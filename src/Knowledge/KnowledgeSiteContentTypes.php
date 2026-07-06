@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Resolves installed site content post types for indexing.
  */
-final class KnowledgeSiteContentTypes
-{
+final class KnowledgeSiteContentTypes {
     /**
      * @var list<string>
      */
@@ -27,8 +26,7 @@ final class KnowledgeSiteContentTypes
     /**
      * @return list<string>
      */
-    public function installed(): array
-    {
+    public function installed(): array {
         return array_values(array_filter(self::CANDIDATES, static fn(string $post_type): bool => post_type_exists(
             $post_type,
         )));
@@ -37,8 +35,7 @@ final class KnowledgeSiteContentTypes
     /**
      * @return array{cap: int, eligible: int}
      */
-    public function index_stats(int $cap): array
-    {
+    public function index_stats(int $cap): array {
         $post_types = $this->installed();
         $eligible = 0;
 

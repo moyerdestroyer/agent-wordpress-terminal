@@ -19,20 +19,17 @@ if (!defined('ABSPATH')) {
 /**
  * CRUD endpoints for agent sessions.
  */
-final class SessionsController extends RestController
-{
+final class SessionsController extends RestController {
     private SessionRepository $sessions;
 
-    public function __construct(?SessionRepository $sessions = null)
-    {
+    public function __construct(?SessionRepository $sessions = null) {
         $this->sessions = $sessions ?? new SessionRepository();
     }
 
     /**
      * Register routes.
      */
-    public function register_routes(): void
-    {
+    public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/sessions', [
             [
                 'methods' => \WP_REST_Server::READABLE,
@@ -85,16 +82,14 @@ final class SessionsController extends RestController
     /**
      * List sessions visible to admins.
      */
-    public function list_sessions(): \WP_REST_Response
-    {
+    public function list_sessions(): \WP_REST_Response {
         return new \WP_REST_Response($this->sessions->list_summaries(), status: 200);
     }
 
     /**
      * Create a new session.
      */
-    public function create_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function create_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $title = sanitize_text_field(RequestParams::string($request, 'title'));
 
         if ('' === $title) {
@@ -117,8 +112,7 @@ final class SessionsController extends RestController
     /**
      * Get a session with messages and context.
      */
-    public function get_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function get_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $session_id = RequestParams::int($request, 'id');
         $messages_limit = RequestParams::int($request, 'messages_limit');
         $messages_limit = $messages_limit > 0 ? $messages_limit : 50;
@@ -140,8 +134,7 @@ final class SessionsController extends RestController
     /**
      * Update a session.
      */
-    public function update_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function update_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $session_id = RequestParams::int($request, 'id');
         $title = sanitize_text_field(RequestParams::string($request, 'title'));
 
@@ -169,8 +162,7 @@ final class SessionsController extends RestController
     /**
      * Delete a session and its associated records.
      */
-    public function delete_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
-    {
+    public function delete_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $session_id = RequestParams::int($request, 'id');
 
         if (!$this->sessions->exists($session_id)) {

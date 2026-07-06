@@ -10,10 +10,12 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Database\IncidentRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Database\WpDb;
 use AWPT\Knowledge\KnowledgeRepository;
 use AWPT\Knowledge\KnowledgeSearchCache;
+use AWPT\Support\Diagnostics\DiagnosisInstructions;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -22,16 +24,14 @@ if (!defined('ABSPATH')) {
 /**
  * Assembles system instructions and session history for provider calls.
  */
-final class ProviderMessageBuilder
-{
+final class ProviderMessageBuilder {
     /**
      * Build provider messages with terminal instructions and visible sources.
      *
      * @param int $session_id Session ID.
      * @return array<int, array<string, mixed>>
      */
-    public function build(int $session_id): array
-    {
+    public function build(int $session_id): array {
         $instructions = implode("\n", [
             'You are AWPT, a WordPress-native terminal for agent-assisted site work.',
             sprintf('Current AWPT session ID: %d. Use this value when staging proposed actions.', $session_id),
@@ -51,6 +51,8 @@ final class ProviderMessageBuilder
             'Copy media URLs to awpt/sideload-media exactly as given, character-for-character, including punctuation like parentheses. If it fails, check the error message (it echoes back the exact URL that was attempted) against the URL the user actually gave you before guessing at a fix like changing the extension.',
             'Answer concisely and include evidence from tool calls when relevant.',
             'When you need site data, call the relevant awpt/ ability immediately. Do not say you will check something without invoking the tool in the same turn.',
+            DiagnosisInstructions::system_prompt_line(),
+            $this->get_open_incidents_context($session_id),
             new ToolCatalogFormatter()->get_system_prompt_catalog(),
             new KnowledgeRepository()->format_guidelines_for_prompt(),
             $this->get_knowledge_summary($session_id),
@@ -70,8 +72,7 @@ final class ProviderMessageBuilder
      * @param int $session_id Session ID.
      * @return array<int, array<string, string>>
      */
-    private function get_session_messages(int $session_id): array
-    {
+    private function get_session_messages(int $session_id): array {
         $wpdb = WpDb::get();
 
         $rows = $wpdb->get_results(
@@ -99,8 +100,7 @@ final class ProviderMessageBuilder
      *
      * @param int $session_id Session ID.
      */
-    private function get_knowledge_summary(int $session_id): string
-    {
+    private function get_knowledge_summary(int $session_id): string {
         $wpdb = WpDb::get();
 
         $message = $wpdb->get_var($wpdb->prepare(
@@ -111,8 +111,7 @@ final class ProviderMessageBuilder
         return new KnowledgeSearchCache()->format_context_for_prompt((string) $message);
     }
 
-    private function get_focus_context(int $session_id): string
-    {
+    private function get_focus_context(int $session_id): string {
         $session = new SessionRepository()->get_summary($session_id);
         $post_id = (int) ($session['focus_post_id'] ?? 0);
 
@@ -134,5 +133,27 @@ final class ProviderMessageBuilder
             $post->post_status,
             (string) get_permalink($post),
         );
+    }
+
+    private function get_open_incidents_context(int $session_id): string {
+        $incidents = new IncidentRepository()->list_open($session_id, 3);
+
+        if ([] === $incidents) {
+            return 'Open incidents: none.';
+        }
+
+        $lines = ['Open incidents requiring attention:'];
+
+        foreach ($incidents as $incident) {
+            $lines[] = sprintf(
+                '- #%d %s via %s: %s',
+                (int) ($incident['id'] ?? 0),
+                (string) ($incident['kind'] ?? ''),
+                (string) ($incident['source'] ?? ''),
+                mb_substr((string) ($incident['error_text'] ?? ''), 0, 200),
+            );
+        }
+
+        return implode("\n", $lines);
     }
 }

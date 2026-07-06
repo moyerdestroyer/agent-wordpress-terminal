@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Normalizes WordPress AI Client result objects for ProviderRuntime.
  */
-final class WordPressAIClientResultParser
-{
+final class WordPressAIClientResultParser {
     /**
      * Function call extractor.
      */
@@ -27,8 +26,7 @@ final class WordPressAIClientResultParser
     /**
      * @param WordPressAIClientFunctionCallExtractor|null $function_calls Optional extractor for testing.
      */
-    public function __construct(?WordPressAIClientFunctionCallExtractor $function_calls = null)
-    {
+    public function __construct(?WordPressAIClientFunctionCallExtractor $function_calls = null) {
         $this->function_calls = $function_calls ?? new WordPressAIClientFunctionCallExtractor();
     }
 
@@ -37,8 +35,7 @@ final class WordPressAIClientResultParser
      *
      * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string}
      */
-    public function parse(mixed $result): array
-    {
+    public function parse(mixed $result): array {
         if (is_wp_error($result)) {
             return [
                 'content' => $this->provider_error_content($result),
@@ -66,8 +63,7 @@ final class WordPressAIClientResultParser
     /**
      * Extract assistant text from a provider result.
      */
-    private function extract_content(mixed $result): string
-    {
+    private function extract_content(mixed $result): string {
         if (is_string($result)) {
             return $result;
         }
@@ -94,8 +90,7 @@ final class WordPressAIClientResultParser
     /**
      * Extract model metadata from a provider result.
      */
-    private function extract_model(mixed $result): string
-    {
+    private function extract_model(mixed $result): string {
         if (!is_object($result) || !method_exists($result, 'getModelMetadata')) {
             return '';
         }
@@ -112,8 +107,7 @@ final class WordPressAIClientResultParser
     /**
      * Normalize provider WP_Error messages for downstream recovery.
      */
-    private function provider_error_content(\WP_Error $error): string
-    {
+    private function provider_error_content(\WP_Error $error): string {
         $message = $error->get_error_message();
 
         if ($this->is_text_generation_model_error($message)) {
@@ -133,13 +127,11 @@ final class WordPressAIClientResultParser
     /**
      * Whether a provider error can be recovered via local tool execution.
      */
-    private function is_recoverable_provider_error(string $message): bool
-    {
+    private function is_recoverable_provider_error(string $message): bool {
         return (bool) preg_match('/no text content found|invalid schema|bad request/i', $message);
     }
 
-    private function is_text_generation_model_error(string $message): bool
-    {
+    private function is_text_generation_model_error(string $message): bool {
         return (bool) preg_match('/no models found.*text_generation|support text_generation/i', $message);
     }
 }

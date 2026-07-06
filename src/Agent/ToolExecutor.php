@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Executes WordPress abilities as agent tools.
  */
-final class ToolExecutor
-{
+final class ToolExecutor {
     /**
      * Execute a registered ability.
      *
@@ -26,8 +25,7 @@ final class ToolExecutor
      * @param array<string, mixed> $input Ability input.
      * @return array<array-key, mixed>|\WP_Error
      */
-    public function execute(string $tool_name, array $input): array|\WP_Error
-    {
+    public function execute(string $tool_name, array $input): array|\WP_Error {
         if (!function_exists('wp_get_ability')) {
             return new \WP_Error('awpt_abilities_unavailable', __(
                 'WordPress Abilities API is not available.',

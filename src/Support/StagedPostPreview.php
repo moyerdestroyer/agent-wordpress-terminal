@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
  *
  * For brand-new posts, delegates to a hidden staging draft that can be previewed before apply.
  */
-final class StagedPostPreview
-{
+final class StagedPostPreview {
     private NewPostStagingDraft $staging_drafts;
     private ContentUpdatePreviewAutosave $content_autosaves;
 
@@ -36,8 +35,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload Staged action payload.
      * @return array<string, mixed>|\WP_Error
      */
-    public function preview_from_payload(array $payload): array|\WP_Error
-    {
+    public function preview_from_payload(array $payload): array|\WP_Error {
         if (ActionOperations::NEW_POST === (string) ($payload['operation'] ?? ActionOperations::CONTENT_UPDATE)) {
             return $this->preview_new_post($payload);
         }
@@ -49,8 +47,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    public function prepare_new_post_payload(array $payload): array|\WP_Error
-    {
+    public function prepare_new_post_payload(array $payload): array|\WP_Error {
         $post_id = (int) ($payload['post_id'] ?? 0);
 
         if ($post_id <= 0) {
@@ -87,8 +84,7 @@ final class StagedPostPreview
      *
      * @param array<array-key, mixed> $payload
      */
-    public function discard_preview_resources(array $payload): void
-    {
+    public function discard_preview_resources(array $payload): void {
         $operation = (string) ($payload['operation'] ?? '');
 
         if (ActionOperations::NEW_POST === $operation) {
@@ -105,8 +101,7 @@ final class StagedPostPreview
     /**
      * @param array<string, mixed> $payload
      */
-    public function discard_staging_draft(array $payload): void
-    {
+    public function discard_staging_draft(array $payload): void {
         $this->discard_preview_resources($payload);
     }
 
@@ -114,8 +109,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    private function preview_new_post(array $payload): array|\WP_Error
-    {
+    private function preview_new_post(array $payload): array|\WP_Error {
         $prepared = $this->prepare_new_post_payload($payload);
 
         if (is_wp_error($prepared)) {
@@ -129,8 +123,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    private function preview_content_update(array $payload): array|\WP_Error
-    {
+    private function preview_content_update(array $payload): array|\WP_Error {
         $post_id = (int) ($payload['post_id'] ?? 0);
 
         if ($post_id <= 0) {
@@ -182,8 +175,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
      */
-    private function build_preview_response(int $post_id, array $payload): array|\WP_Error
-    {
+    private function build_preview_response(int $post_id, array $payload): array|\WP_Error {
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -232,8 +224,7 @@ final class StagedPostPreview
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function build_autosave_data(\WP_Post $post, array $payload): array
-    {
+    private function build_autosave_data(\WP_Post $post, array $payload): array {
         return [
             'ID' => 0,
             'post_ID' => $post->ID,

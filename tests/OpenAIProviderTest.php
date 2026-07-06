@@ -13,16 +13,14 @@ use AWPT\Agent\OpenAIProvider;
 /**
  * Invoke a protected/private method for testing without triggering a network request.
  */
-function awpt_test_invoke_protected(object $object, string $method): mixed
-{
+function awpt_test_invoke_protected(object $object, string $method): mixed {
     $reflection = new ReflectionMethod($object, $method);
     $reflection->setAccessible(true);
 
     return $reflection->invoke($object);
 }
 
-function test_openai_provider(): void
-{
+function test_openai_provider(): void {
     // Model selection is automatic: no awpt_model option is involved at all.
     awpt_test_reset_state();
     update_option('awpt_model', 'this-should-never-be-used');

@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Executes provider-requested tools and asks the provider for follow-up text.
  */
-final class ProviderToolLoop
-{
+final class ProviderToolLoop {
     private const MAX_TOOL_ROUNDS = 4;
 
     /**
@@ -81,6 +80,17 @@ final class ProviderToolLoop
             $content = new ToolResultFormatter()->format_for_transcript($tool_calls, $content);
         }
 
+        $diagnosis = new FailureDiagnosisOrchestrator()->diagnose_first_failure($session_id, $tool_calls);
+
+        if (null !== $diagnosis) {
+            $content = trim($content . "\n\n" . (string) ($diagnosis['content'] ?? ''));
+            $tool_calls = array_merge(
+                $tool_calls,
+                is_array($diagnosis['tool_calls'] ?? null) ? $diagnosis['tool_calls'] : [],
+            );
+            $actions = array_merge($actions, is_array($diagnosis['actions'] ?? null) ? $diagnosis['actions'] : []);
+        }
+
         return [
             'content' => $content,
             'tool_calls' => $tool_calls,
@@ -95,8 +105,7 @@ final class ProviderToolLoop
      * @param array<int, array<string, mixed>> $tool_calls Tool call records.
      * @return list<array<string, mixed>>
      */
-    private function actions_from_tool_calls(array $tool_calls): array
-    {
+    private function actions_from_tool_calls(array $tool_calls): array {
         $actions = [];
 
         foreach ($tool_calls as $tool_call) {
@@ -119,8 +128,7 @@ final class ProviderToolLoop
     /**
      * @param array<string, mixed> $tool_call
      */
-    private function is_proposal_tool(array $tool_call): bool
-    {
+    private function is_proposal_tool(array $tool_call): bool {
         return ToolRegistry::is_proposal_ability((string) ($tool_call['tool'] ?? ''));
     }
 
@@ -129,16 +137,14 @@ final class ProviderToolLoop
      *
      * @param array<string, mixed> $result Provider result.
      */
-    private function has_tool_calls(array $result): bool
-    {
+    private function has_tool_calls(array $result): bool {
         return is_array($result['raw_tool_calls'] ?? null) && [] !== $result['raw_tool_calls'];
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    private function string_keyed_array_or_null(mixed $value): ?array
-    {
+    private function string_keyed_array_or_null(mixed $value): ?array {
         if (!is_array($value)) {
             return null;
         }

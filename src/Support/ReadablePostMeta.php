@@ -17,22 +17,19 @@ if (!defined('ABSPATH')) {
 /**
  * Filters and sanitizes post meta for agent-readable output.
  */
-final class ReadablePostMeta
-{
+final class ReadablePostMeta {
     private const VALUE_MAX_CHARS = 4_096;
 
     private PostMetaKeyPolicy $policy;
 
-    public function __construct(?PostMetaKeyPolicy $policy = null)
-    {
+    public function __construct(?PostMetaKeyPolicy $policy = null) {
         $this->policy = $policy ?? new PostMetaKeyPolicy();
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function for_post(int $post_id): array
-    {
+    public function for_post(int $post_id): array {
         $meta = [];
         $raw = get_post_meta($post_id);
 
@@ -59,8 +56,7 @@ final class ReadablePostMeta
         return $meta;
     }
 
-    private function sanitize_value(mixed $value): mixed
-    {
+    private function sanitize_value(mixed $value): mixed {
         if (is_string($value) && mb_strlen($value, 'UTF-8') > self::VALUE_MAX_CHARS) {
             return mb_substr($value, 0, self::VALUE_MAX_CHARS - 3, 'UTF-8') . '…';
         }

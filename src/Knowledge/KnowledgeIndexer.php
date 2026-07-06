@@ -20,31 +20,27 @@ if (!defined('ABSPATH')) {
 /**
  * Builds AWPT's local retrieval cache from Knowledge and safe read-only sources.
  */
-final class KnowledgeIndexer
-{
+final class KnowledgeIndexer {
     private const CHUNK_SIZE = 3000;
     private const CHUNK_OVERLAP = 250;
 
     private KnowledgeIndexRepository $index;
 
-    public function __construct(?KnowledgeIndexRepository $index = null)
-    {
+    public function __construct(?KnowledgeIndexRepository $index = null) {
         $this->index = $index ?? new KnowledgeIndexRepository();
     }
 
     /**
      * Mark the local retrieval cache stale when indexable content changes.
      */
-    public static function mark_stale(mixed ...$unused): void
-    {
+    public static function mark_stale(mixed ...$unused): void {
         update_option('awpt_knowledge_stale', '1', false);
     }
 
     /**
      * Register content hooks that should invalidate the local retrieval cache.
      */
-    public static function register_content_hooks(): void
-    {
+    public static function register_content_hooks(): void {
         foreach ([
             'save_post',
             'deleted_post',
@@ -61,8 +57,7 @@ final class KnowledgeIndexer
     /**
      * @return array<string, mixed>
      */
-    public function rebuild(): array
-    {
+    public function rebuild(): array {
         Installer::create_tables();
 
         $now = current_time('mysql');
@@ -112,8 +107,7 @@ final class KnowledgeIndexer
     /**
      * @return array<string, mixed>
      */
-    public function status(): array
-    {
+    public function status(): array {
         Installer::create_tables();
 
         $source_count = $this->index->count_sources();
@@ -152,8 +146,7 @@ final class KnowledgeIndexer
     /**
      * @return list<string>
      */
-    private function chunk_text(string $content): array
-    {
+    private function chunk_text(string $content): array {
         $normalized = preg_replace('/\s+/', ' ', $content);
         $content = trim(is_string($normalized) ? $normalized : $content);
         $length = mb_strlen($content, 'UTF-8');

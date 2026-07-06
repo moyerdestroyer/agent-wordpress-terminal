@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for staged action outputs.
  */
-final class ToolResultProposalFormatter
-{
+final class ToolResultProposalFormatter {
     /**
      * @param array<array-key, mixed> $output
      */
-    public function format(string $tool, array $output): string
-    {
+    public function format(string $tool, array $output): string {
         $title = (string) ($output['title'] ?? '');
         $status = (string) ($output['status'] ?? 'proposed');
         $id = (int) ($output['id'] ?? 0);

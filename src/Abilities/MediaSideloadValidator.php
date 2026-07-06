@@ -18,8 +18,7 @@ if (!defined('ABSPATH')) {
  * Pure validation logic for `awpt/sideload-media`, kept free of WordPress file/HTTP
  * APIs so it can be unit tested without a full WordPress environment.
  */
-final class MediaSideloadValidator
-{
+final class MediaSideloadValidator {
     /**
      * File extensions AWPT will import. Deliberately conservative — WordPress's own
      * `wp_handle_sideload()` re-validates the actual downloaded file's real type on
@@ -38,16 +37,14 @@ final class MediaSideloadValidator
      * Validate a media URL before download. Allows extensionless share/preview pages
      * so Open Graph resolution can run after the initial fetch.
      */
-    public function validate_url(string $url): ?string
-    {
+    public function validate_url(string $url): ?string {
         return $this->validate_url_scheme($url);
     }
 
     /**
      * Validate a resolved direct media URL (after OG extraction). Requires a supported extension.
      */
-    public function validate_direct_media_url(string $url): ?string
-    {
+    public function validate_direct_media_url(string $url): ?string {
         $scheme_error = $this->validate_url_scheme($url);
 
         if (null !== $scheme_error) {
@@ -60,8 +57,7 @@ final class MediaSideloadValidator
     /**
      * Validate URL scheme only.
      */
-    public function validate_url_scheme(string $url): ?string
-    {
+    public function validate_url_scheme(string $url): ?string {
         $url = trim($url);
 
         if ('' === $url) {
@@ -77,8 +73,7 @@ final class MediaSideloadValidator
         return null;
     }
 
-    private function validate_extension(string $url): ?string
-    {
+    private function validate_extension(string $url): ?string {
         $extension = $this->extension_from_url($url);
 
         if (!in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
@@ -99,8 +94,7 @@ final class MediaSideloadValidator
     /**
      * Extract a lowercase file extension from a URL's path component.
      */
-    public function extension_from_url(string $url): string
-    {
+    public function extension_from_url(string $url): string {
         $path = (string) parse_url($url, PHP_URL_PATH);
 
         return strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -109,8 +103,7 @@ final class MediaSideloadValidator
     /**
      * Whether a downloaded file's size is within the accepted limit.
      */
-    public function is_size_allowed(int $bytes): bool
-    {
+    public function is_size_allowed(int $bytes): bool {
         return $bytes > 0 && $bytes <= self::MAX_BYTES;
     }
 }

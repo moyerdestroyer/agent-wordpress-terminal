@@ -19,8 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Sanitizes post-related action payload fields.
  */
-final class ContentPayloadSanitizer
-{
+final class ContentPayloadSanitizer {
     private PostMetaPayloadSanitizer $post_meta;
     private BlockAttrsPayloadSanitizer $block_attrs;
 
@@ -37,8 +36,7 @@ final class ContentPayloadSanitizer
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function sanitize(array $clean, array $payload): array
-    {
+    public function sanitize(array $clean, array $payload): array {
         $clean = $this->sanitize_text_fields($clean, $payload);
         $clean = $this->sanitize_html_fields($clean, $payload);
         $clean = $this->sanitize_preview_fields($clean, $payload);
@@ -79,8 +77,7 @@ final class ContentPayloadSanitizer
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function sanitize_preview_fields(array $clean, array $payload): array
-    {
+    private function sanitize_preview_fields(array $clean, array $payload): array {
         if (array_key_exists('preview_url', $payload)) {
             $clean['preview_url'] = esc_url_raw((string) $payload['preview_url']);
         }
@@ -99,8 +96,7 @@ final class ContentPayloadSanitizer
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function sanitize_text_fields(array $clean, array $payload): array
-    {
+    private function sanitize_text_fields(array $clean, array $payload): array {
         foreach (['post_title', 'post_type', 'post_status', 'original_post_title', 'original_post_status'] as $key) {
             if (!array_key_exists($key, $payload)) {
                 continue;
@@ -117,8 +113,7 @@ final class ContentPayloadSanitizer
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function sanitize_html_fields(array $clean, array $payload): array
-    {
+    private function sanitize_html_fields(array $clean, array $payload): array {
         foreach (['post_content', 'original_post_content'] as $key) {
             if (!array_key_exists($key, $payload)) {
                 continue;

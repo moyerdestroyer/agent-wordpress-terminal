@@ -17,27 +17,31 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable assistant text when provider follow-up is empty.
  */
-final class ToolResultFormatter
-{
+final class ToolResultFormatter {
     /**
      * Format successful tool calls into assistant-visible text.
      *
      * @param array<int, array<string, mixed>> $tool_calls Executed tool calls.
      * @param string                           $prefix Optional assistant prefix text.
      */
-    public function format_for_transcript(array $tool_calls, string $prefix = ''): string
-    {
+    public function format_for_transcript(array $tool_calls, string $prefix = ''): string {
         $sections = [];
 
         foreach ($tool_calls as $tool_call) {
-            if ('success' !== (string) ($tool_call['status'] ?? '')) {
+            $status = (string) ($tool_call['status'] ?? '');
+
+            if ('success' === $status) {
+                $section = $this->format_tool_call($tool_call);
+
+                if ('' !== $section) {
+                    $sections[] = $section;
+                }
+
                 continue;
             }
 
-            $section = $this->format_tool_call($tool_call);
-
-            if ('' !== $section) {
-                $sections[] = $section;
+            if (in_array($status, ['failed', 'rejected'], true)) {
+                $sections[] = new ToolResultFailureFormatter()->format_tool_call($tool_call);
             }
         }
 
@@ -59,8 +63,7 @@ final class ToolResultFormatter
      *
      * @param array<string, mixed> $tool_call Tool call record.
      */
-    private function format_tool_call(array $tool_call): string
-    {
+    private function format_tool_call(array $tool_call): string {
         $tool = (string) ($tool_call['tool'] ?? '');
         $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
 
@@ -84,6 +87,14 @@ final class ToolResultFormatter
             return new ToolResultSettingsFormatter()->format($output);
         }
 
+        if ('awpt/read-site-health' === $tool) {
+            return new ToolResultSiteHealthFormatter()->format($output);
+        }
+
+        if ('awpt/diagnose-error' === $tool) {
+            return new ToolResultFailureFormatter()->format_diagnosis($output);
+        }
+
         if (ToolRegistry::is_proposal_ability($tool)) {
             return new ToolResultProposalFormatter()->format($tool, $output);
         }
@@ -96,8 +107,7 @@ final class ToolResultFormatter
      *
      * @param array<string, mixed> $output Tool output.
      */
-    private function format_generic_tool(string $tool, array $output): string
-    {
+    private function format_generic_tool(string $tool, array $output): string {
         return sprintf(
             /* translators: 1: tool name, 2: JSON output */
             __('Tool %1$s returned: %2$s', 'agent-wordpress-terminal'),

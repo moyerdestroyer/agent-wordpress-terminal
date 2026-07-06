@@ -19,13 +19,11 @@ if (!defined('ABSPATH')) {
 /**
  * Returns parsed Gutenberg block structure for a post.
  */
-final class ReadBlockTree
-{
+final class ReadBlockTree {
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         wp_register_ability('awpt/read-block-tree', [
             'label' => __('Read Block Tree', 'agent-wordpress-terminal'),
             'description' => __('Returns parsed Gutenberg block structure for a post.', 'agent-wordpress-terminal'),
@@ -64,8 +62,7 @@ final class ReadBlockTree
      *
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
         return $post_id > 0 && current_user_can('read_post', $post_id);
@@ -77,8 +74,7 @@ final class ReadBlockTree
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>|\WP_Error
      */
-    public function execute(array $input): array|\WP_Error
-    {
+    public function execute(array $input): array|\WP_Error {
         $post_id = (int) ($input['id'] ?? 0);
         $post = get_post($post_id);
 

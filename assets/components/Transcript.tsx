@@ -370,6 +370,18 @@ export function Transcript({
 
 					const message = item.message;
 
+					if (message.role === 'incident') {
+						return (
+							<div
+								key={message.id ?? `incident-${message.created_at ?? message.content}`}
+								className="awpt-message awpt-message--incident"
+								role="note"
+							>
+								{message.content}
+							</div>
+						);
+					}
+
 					return (
 						<div
 							key={message.id ?? `${message.role}-${message.created_at ?? message.content}`}

@@ -8,8 +8,7 @@
 
 declare(strict_types=1);
 
-final class Assert
-{
+final class Assert {
     private static int $passed = 0;
 
     /**
@@ -17,33 +16,25 @@ final class Assert
      */
     private static array $failures = [];
 
-    public static function true(bool $condition, string $message): void
-    {
+    public static function true(bool $condition, string $message): void {
         self::report($condition, $message);
     }
 
-    public static function false(bool $condition, string $message): void
-    {
+    public static function false(bool $condition, string $message): void {
         self::report(!$condition, $message);
     }
 
-    public static function same(mixed $expected, mixed $actual, string $message): void
-    {
+    public static function same(mixed $expected, mixed $actual, string $message): void {
         $condition = $expected === $actual;
 
         if (!$condition) {
-            $message .= sprintf(
-                ' (expected %s, got %s)',
-                var_export($expected, true),
-                var_export($actual, true),
-            );
+            $message .= sprintf(' (expected %s, got %s)', var_export($expected, true), var_export($actual, true));
         }
 
         self::report($condition, $message);
     }
 
-    public static function instanceOf(string $class, mixed $actual, string $message): void
-    {
+    public static function instanceOf(string $class, mixed $actual, string $message): void {
         $condition = $actual instanceof $class;
 
         if (!$condition) {
@@ -53,8 +44,7 @@ final class Assert
         self::report($condition, $message);
     }
 
-    private static function report(bool $condition, string $message): void
-    {
+    private static function report(bool $condition, string $message): void {
         if ($condition) {
             ++self::$passed;
 
@@ -64,16 +54,14 @@ final class Assert
         self::$failures[] = $message;
     }
 
-    public static function passed(): int
-    {
+    public static function passed(): int {
         return self::$passed;
     }
 
     /**
      * @return list<string>
      */
-    public static function failures(): array
-    {
+    public static function failures(): array {
         return self::$failures;
     }
 }

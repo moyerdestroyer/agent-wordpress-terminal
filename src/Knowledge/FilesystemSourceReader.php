@@ -17,14 +17,12 @@ if (!defined('ABSPATH')) {
 /**
  * Discovers readable document files from approved roots.
  */
-final class FilesystemSourceReader
-{
+final class FilesystemSourceReader {
     private FilesystemRootProvider $roots;
 
     private FilesystemSourceFactory $factory;
 
-    public function __construct(?FilesystemRootProvider $roots = null, ?FilesystemSourceFactory $factory = null)
-    {
+    public function __construct(?FilesystemRootProvider $roots = null, ?FilesystemSourceFactory $factory = null) {
         $this->roots = $roots ?? new FilesystemRootProvider();
         $this->factory = $factory ?? new FilesystemSourceFactory();
     }
@@ -32,8 +30,7 @@ final class FilesystemSourceReader
     /**
      * @return list<string>
      */
-    public function allowed_roots(): array
-    {
+    public function allowed_roots(): array {
         return $this->roots->allowed_roots();
     }
 
@@ -41,8 +38,7 @@ final class FilesystemSourceReader
      * @param list<string> $roots Raw roots.
      * @return list<string>
      */
-    public function sanitize_configured_roots(array $roots): array
-    {
+    public function sanitize_configured_roots(array $roots): array {
         return $this->roots->sanitize_configured_roots($roots);
     }
 
@@ -51,8 +47,7 @@ final class FilesystemSourceReader
      *
      * @return list<array<string, mixed>>
      */
-    public function list_sources(): array
-    {
+    public function list_sources(): array {
         $sources = [];
 
         foreach ($this->roots->allowed_roots() as $root) {
@@ -71,8 +66,7 @@ final class FilesystemSourceReader
     /**
      * @return list<string>
      */
-    private function files_in_root(string $root): array
-    {
+    private function files_in_root(string $root): array {
         $files = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),

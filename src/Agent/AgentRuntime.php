@@ -21,13 +21,11 @@ if (!defined('ABSPATH')) {
 /**
  * Receives user messages and returns agent responses.
  */
-final class AgentRuntime
-{
+final class AgentRuntime {
     private SessionRepository $sessions;
     private MessageRepository $messages;
 
-    public function __construct(?SessionRepository $sessions = null, ?MessageRepository $messages = null)
-    {
+    public function __construct(?SessionRepository $sessions = null, ?MessageRepository $messages = null) {
         $this->sessions = $sessions ?? new SessionRepository();
         $this->messages = $messages ?? new MessageRepository();
     }
@@ -37,8 +35,7 @@ final class AgentRuntime
      *
      * @return array<string, mixed>|\WP_Error
      */
-    public function handle_message(int $session_id, string $message): array|\WP_Error
-    {
+    public function handle_message(int $session_id, string $message): array|\WP_Error {
         if (!$this->sessions->exists($session_id) || !current_user_can(capability: 'manage_options')) {
             return new \WP_Error(
                 code: 'awpt_session_not_found',
@@ -105,8 +102,7 @@ final class AgentRuntime
      *
      * @return array<string, mixed>|\WP_Error
      */
-    private function dispatch_message(int $session_id, string $message): array|\WP_Error
-    {
+    private function dispatch_message(int $session_id, string $message): array|\WP_Error {
         $trimmed = trim($message);
 
         if (str_starts_with($trimmed, '/')) {
@@ -119,8 +115,7 @@ final class AgentRuntime
     /**
      * @return array<string, mixed>
      */
-    private function provider_response(int $session_id): array
-    {
+    private function provider_response(int $session_id): array {
         return new ProviderRuntime()->respond($session_id);
     }
 }

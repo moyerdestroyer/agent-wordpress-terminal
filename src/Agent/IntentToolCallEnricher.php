@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Detects settings-related requests that the model answered with deferred intent text.
  */
-final class IntentToolCallEnricher
-{
+final class IntentToolCallEnricher {
     /**
      * Add tool calls when the model defers work in text instead of invoking abilities.
      *
@@ -27,8 +26,7 @@ final class IntentToolCallEnricher
      * @param ToolRegistry                     $tool_registry Tool registry.
      * @return array<string, mixed>
      */
-    public function enrich(array $messages, array $result, ToolRegistry $tool_registry): array
-    {
+    public function enrich(array $messages, array $result, ToolRegistry $tool_registry): array {
         $raw_tool_calls = is_array($result['raw_tool_calls'] ?? null) ? $result['raw_tool_calls'] : [];
 
         if ([] !== $raw_tool_calls) {
@@ -125,8 +123,7 @@ final class IntentToolCallEnricher
      *
      * @param array<int, array<string, mixed>> $messages Provider messages.
      */
-    private function get_last_user_message(array $messages): string
-    {
+    private function get_last_user_message(array $messages): string {
         for ($index = count($messages) - 1; $index >= 0; --$index) {
             if ('user' === (string) ($messages[$index]['role'] ?? '')) {
                 return (string) ($messages[$index]['content'] ?? '');
@@ -139,8 +136,7 @@ final class IntentToolCallEnricher
     /**
      * Whether AWPT should invoke read-settings without provider tool calls.
      */
-    private function should_auto_invoke_tool(string $content): bool
-    {
+    private function should_auto_invoke_tool(string $content): bool {
         $trimmed = trim($content);
 
         if ('' === $trimmed) {
@@ -153,16 +149,14 @@ final class IntentToolCallEnricher
     /**
      * Whether assistant text only promises future work.
      */
-    private function is_deferred_intent_content(string $content): bool
-    {
+    private function is_deferred_intent_content(string $content): bool {
         return (bool) preg_match('/\b(i(?:[\'\x{2019}]ll| will))\s+(check|look|read|fetch|review)\b/iu', $content);
     }
 
     /**
      * Whether provider output indicates a recoverable tool-call failure.
      */
-    private function is_provider_failure_content(string $content): bool
-    {
+    private function is_provider_failure_content(string $content): bool {
         return (bool) preg_match(
             '/no text content found|invalid schema|bad request|abilities api is not available/i',
             $content,
@@ -172,8 +166,7 @@ final class IntentToolCallEnricher
     /**
      * Whether the user is asking for site settings.
      */
-    private function should_auto_read_settings(string $message): bool
-    {
+    private function should_auto_read_settings(string $message): bool {
         $normalized = strtolower($message);
 
         return (
@@ -188,8 +181,7 @@ final class IntentToolCallEnricher
     /**
      * Whether the user is asking for existing content.
      */
-    private function should_auto_search_content(string $message): bool
-    {
+    private function should_auto_search_content(string $message): bool {
         $normalized = strtolower($message);
 
         if ($this->looks_like_new_content_request($normalized)) {
@@ -219,8 +211,7 @@ final class IntentToolCallEnricher
         return (bool) preg_match('/https?:\/\/\S+/i', $message);
     }
 
-    private function looks_like_new_content_request(string $normalized): bool
-    {
+    private function looks_like_new_content_request(string $normalized): bool {
         return (bool) preg_match('/\b(create|draft|write|make|add)\s+(a\s+)?new\s+(post|page|article)\b/', $normalized);
     }
 }

@@ -17,13 +17,11 @@ if (!defined('ABSPATH')) {
 /**
  * Returns installed theme summaries for agent analysis.
  */
-final class ReadThemes
-{
+final class ReadThemes {
     /**
      * Register the ability.
      */
-    public function register(): void
-    {
+    public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/read-themes',
             'label' => __('Read Themes', 'agent-wordpress-terminal'),
@@ -45,8 +43,7 @@ final class ReadThemes
     /**
      * @param array<string, mixed> $input Ability input.
      */
-    public function can_read(array $input): bool
-    {
+    public function can_read(array $input): bool {
         return current_user_can('manage_options');
     }
 
@@ -54,8 +51,7 @@ final class ReadThemes
      * @param array<string, mixed> $input Ability input.
      * @return array<string, mixed>
      */
-    public function execute(array $input): array
-    {
+    public function execute(array $input): array {
         $active = get_stylesheet();
         $themes = [];
 

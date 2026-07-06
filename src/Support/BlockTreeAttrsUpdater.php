@@ -17,12 +17,10 @@ if (!defined('ABSPATH')) {
 /**
  * Updates one block's attributes by dotted path.
  */
-final class BlockTreeAttrsUpdater
-{
+final class BlockTreeAttrsUpdater {
     private BlockTreeArrays $arrays;
 
-    public function __construct(?BlockTreeArrays $arrays = null)
-    {
+    public function __construct(?BlockTreeArrays $arrays = null) {
         $this->arrays = $arrays ?? new BlockTreeArrays();
     }
 
@@ -62,8 +60,7 @@ final class BlockTreeAttrsUpdater
     /**
      * @return list<int>
      */
-    private function path_segments(string $path): array
-    {
+    private function path_segments(string $path): array {
         $path = trim($path);
 
         if ('' === $path || !preg_match('/^\d+(?:\.\d+)*$/', $path)) {
@@ -164,16 +161,14 @@ final class BlockTreeAttrsUpdater
     /**
      * @param array<int|string, array<string, mixed>> $blocks
      */
-    private function serialize(array $blocks): string
-    {
+    private function serialize(array $blocks): string {
         /** @var array<int|string, array{attrs: array<array-key, mixed>, blockName: null|string, innerBlocks: array<array-key, array<array-key, mixed>>, innerContent: array<array-key, mixed>, innerHTML: string}> $serializable_blocks */
         $serializable_blocks = $blocks;
 
         return serialize_blocks($serializable_blocks);
     }
 
-    private function error(string $code, string $message, int $status): \WP_Error
-    {
+    private function error(string $code, string $message, int $status): \WP_Error {
         return new \WP_Error(code: $code, message: $message, data: ['status' => $status]);
     }
 }

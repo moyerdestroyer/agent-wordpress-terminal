@@ -17,8 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Combines exact ID/URL/slug resolution with bounded WP_Query search.
  */
-final class ContentSearchService
-{
+final class ContentSearchService {
     private ContentSearchTypes $types;
     private ContentSearchExactResolver $exact;
     private ContentSearchResultSet $results;
@@ -37,8 +36,7 @@ final class ContentSearchService
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function search(array $input): array
-    {
+    public function search(array $input): array {
         $query = trim((string) ($input['query'] ?? ''));
         $limit = max(1, min(25, (int) ($input['limit'] ?? 10)));
         $post_types = $this->types->from_requested((string) ($input['post_type'] ?? ''));
@@ -61,8 +59,7 @@ final class ContentSearchService
      * @param array<int, array<string, mixed>> $results
      * @param list<string>                     $post_types
      */
-    private function add_text_search_results(array &$results, string $query, array $post_types, int $limit): void
-    {
+    private function add_text_search_results(array &$results, string $query, array $post_types, int $limit): void {
         if (count($results) >= $limit || '' === $query || !class_exists('WP_Query')) {
             return;
         }
@@ -94,8 +91,7 @@ final class ContentSearchService
         }
     }
 
-    private function supports_title_only_search(): bool
-    {
+    private function supports_title_only_search(): bool {
         return class_exists('WP_Query') && version_compare(get_bloginfo('version'), '6.2', '>=');
     }
 }

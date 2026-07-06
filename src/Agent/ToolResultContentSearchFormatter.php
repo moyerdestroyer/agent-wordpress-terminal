@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) {
 /**
  * Builds readable summaries for content search results.
  */
-final class ToolResultContentSearchFormatter
-{
+final class ToolResultContentSearchFormatter {
     private ToolResultArrayFormatter $arrays;
 
-    public function __construct(?ToolResultArrayFormatter $arrays = null)
-    {
+    public function __construct(?ToolResultArrayFormatter $arrays = null) {
         $this->arrays = $arrays ?? new ToolResultArrayFormatter();
     }
 
     /**
      * @param array<array-key, mixed> $output
      */
-    public function format(array $output): string
-    {
+    public function format(array $output): string {
         $results = $this->arrays->list_items($output['results'] ?? []);
         $query = (string) ($output['query'] ?? '');
 
@@ -58,8 +55,7 @@ final class ToolResultContentSearchFormatter
     /**
      * @param array<array-key, mixed> $result
      */
-    private function format_result_line(array $result): string
-    {
+    private function format_result_line(array $result): string {
         return sprintf(
             /* translators: 1: post ID, 2: title, 3: post type, 4: status, 5: match reason */
             __('- #%1$d %2$s (%3$s, %4$s; %5$s)', 'agent-wordpress-terminal'),
