@@ -97,7 +97,7 @@ final class StagedPostPreview
             return;
         }
 
-        if (ActionOperations::CONTENT_UPDATE === $operation) {
+        if (ActionOperations::CONTENT_UPDATE === $operation || ActionOperations::BLOCK_ATTRS_UPDATE === $operation) {
             $this->content_autosaves->discard($payload);
         }
     }
@@ -241,7 +241,7 @@ final class StagedPostPreview
                 ? sanitize_text_field((string) $payload['post_title'])
                 : $post->post_title,
             'post_content' => array_key_exists('post_content', $payload)
-                ? wp_kses_post((string) $payload['post_content'])
+                ? PostContentSanitizer::for_staged_update((string) $payload['post_content'])
                 : $post->post_content,
             'post_excerpt' => $post->post_excerpt,
             'post_status' => array_key_exists('post_status', $payload)

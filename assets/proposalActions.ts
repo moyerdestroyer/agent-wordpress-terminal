@@ -2,6 +2,7 @@ import type { ProposedAction, ToolCall } from './types';
 
 const DEFAULT_PROPOSAL_TOOLS = [
 	'awpt/propose-content-update',
+	'awpt/propose-block-attrs-update',
 	'awpt/propose-new-post',
 	'awpt/propose-site-settings-update',
 	'awpt/propose-theme-switch',

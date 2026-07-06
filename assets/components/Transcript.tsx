@@ -185,17 +185,39 @@ function statusLabel(status: string): string {
 	}
 }
 
+function toolNoteLabel(call: ToolCall): string {
+	if (call.tool === 'awpt/knowledge-auto-retrieval') {
+		const count = typeof call.output?.count === 'number' ? call.output.count : null;
+
+		return count
+			? sprintf(
+					/* translators: %d: retrieved Knowledge result count */
+					__('Added %d Knowledge context results', 'agent-wordpress-terminal'),
+					count,
+				)
+			: __('Checked Knowledge context', 'agent-wordpress-terminal');
+	}
+
+	const summary = call.output_summary?.trim();
+
+	if (!call.output && summary) {
+		return summary;
+	}
+
+	return sprintf(
+		/* translators: %s: tool name */
+		__('Called %s', 'agent-wordpress-terminal'),
+		call.tool,
+	);
+}
+
 function InlineToolNote({ call }: { call: ToolCall }): JSX.Element {
 	const status = call.status ?? 'success';
 	const failure = toolFailureMessage(call);
 
 	return (
 		<div className={`awpt-tool-inline awpt-tool-inline--${status}`} role="note">
-			{sprintf(
-				/* translators: %s: tool name */
-				__('Called %s', 'agent-wordpress-terminal'),
-				call.tool,
-			)}
+			{toolNoteLabel(call)}
 			{failure ? (
 				<span className="awpt-tool-inline__failure">
 					{' — '}
@@ -326,7 +348,7 @@ export function Transcript({
 			{messages.length === 0 && !isThinking ? (
 				<p className="awpt-empty">
 					{__(
-						'Ask the agent or try /help, /focus 291, /preview 291, or /knowledge search brand voice',
+						'Ask the agent what you want changed, or try “Focus the About page”, “Preview the homepage”, or “Find brand voice guidance”.',
 						'agent-wordpress-terminal',
 					)}
 				</p>

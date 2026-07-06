@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Support\BlockTree;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -43,6 +45,7 @@ final class ReadBlockTree
                 'properties' => [
                     'blocks' => ['type' => 'array'],
                     'count' => ['type' => 'integer'],
+                    'path_format' => ['type' => 'string'],
                 ],
             ],
             'permission_callback' => [$this, 'can_read'],
@@ -83,57 +86,12 @@ final class ReadBlockTree
             return new \WP_Error('awpt_post_not_found', __('Post not found.', 'agent-wordpress-terminal'));
         }
 
-        $blocks = parse_blocks((string) $post->post_content);
+        $tree = BlockTree::from_content((string) $post->post_content);
 
         return [
-            'blocks' => $this->normalize_blocks($blocks),
-            'count' => $this->count_blocks($blocks),
+            'blocks' => $tree->normalized(),
+            'count' => $tree->count(),
+            'path_format' => __('Dotted zero-based visible block path, e.g. 0 or 2.1.', 'agent-wordpress-terminal'),
         ];
-    }
-
-    /**
-     * Normalize blocks for agent consumption.
-     *
-     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
-     * @return array<int, array<string, mixed>>
-     */
-    private function normalize_blocks(array $blocks): array
-    {
-        $normalized = [];
-
-        foreach ($blocks as $block) {
-            if (!\AWPT\Support\BlockTree::has_block_name($block)) {
-                continue;
-            }
-
-            $normalized[] = [
-                'name' => $block['blockName'],
-                'attributes' => $block['attrs'] ?? [],
-                'inner' => $this->normalize_blocks($block['innerBlocks'] ?? []),
-            ];
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * Count blocks recursively.
-     *
-     * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
-     */
-    private function count_blocks(array $blocks): int
-    {
-        $count = 0;
-
-        foreach ($blocks as $block) {
-            if (!\AWPT\Support\BlockTree::has_block_name($block)) {
-                continue;
-            }
-
-            ++$count;
-            $count += $this->count_blocks($block['innerBlocks'] ?? []);
-        }
-
-        return $count;
     }
 }

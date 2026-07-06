@@ -68,6 +68,29 @@ function test_content_update_action_applier(): void
         $GLOBALS['awpt_test_post_meta_updates'][42] ?? null,
         'meta-only apply() should write the staged meta values',
     );
+
+    // Block attribute updates are recomputed against the current post content and
+    // preserve the surrounding serialized block markup.
+    awpt_test_reset_state();
+    $GLOBALS['awpt_test_current_user_can'] = $can_edit_post_42;
+    $post = new WP_Post();
+    $post->ID = 42;
+    $post->post_content = '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+        . '<!-- wp:image {"width":"120","id":9} --><figure>Image</figure><!-- /wp:image -->';
+    $GLOBALS['awpt_test_posts'][42] = $post;
+    $fingerprint = AWPT\Support\BlockTree::from_content($post->post_content)->normalized()[1]['fingerprint'] ?? '';
+    $result = $applier->apply([
+        'operation' => 'block_attrs_update',
+        'post_id' => 42,
+        'block_path' => '1',
+        'expected_fingerprint' => $fingerprint,
+        'attrs' => ['width' => '180'],
+    ]);
+    Assert::false(is_wp_error($result), 'apply() should succeed for a staged block attr update');
+    Assert::true(
+        str_contains($GLOBALS['awpt_test_posts'][42]->post_content, '<!-- wp:image {"width":"180","id":9} -->'),
+        'block attr apply() should write the updated serialized block content',
+    );
 }
 
 test_content_update_action_applier();

@@ -19,10 +19,23 @@ if (!defined('ABSPATH')) {
  */
 final class KnowledgeRepository
 {
+    public const SITE_CONTENT_INDEX_CAP = 500;
+
     private const CORE_POST_TYPE = 'wp_knowledge';
     private const CORE_TAXONOMY = 'wp_knowledge_type';
     private const LEGACY_POST_TYPE = 'wp_guideline';
     private const LEGACY_TAXONOMY = 'wp_guideline_type';
+
+    private KnowledgePostSourceMapper $mapper;
+    private KnowledgeSiteContentTypes $site_content_types;
+
+    public function __construct(
+        ?KnowledgePostSourceMapper $mapper = null,
+        ?KnowledgeSiteContentTypes $site_content_types = null,
+    ) {
+        $this->mapper = $mapper ?? new KnowledgePostSourceMapper();
+        $this->site_content_types = $site_content_types ?? new KnowledgeSiteContentTypes();
+    }
 
     /**
      * Return active Knowledge backend metadata.
@@ -78,16 +91,21 @@ final class KnowledgeRepository
      */
     public function list_site_content_sources(): array
     {
-        $post_types = array_values(array_filter(
-            ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'],
-            static fn(string $post_type): bool => post_type_exists($post_type),
-        ));
+        $post_types = $this->site_content_types->installed();
 
         if ([] === $post_types) {
             return [];
         }
 
         return $this->list_post_sources($post_types, '', 'wp_content');
+    }
+
+    /**
+     * @return array{cap: int, eligible: int}
+     */
+    public function site_content_index_stats(): array
+    {
+        return $this->site_content_types->index_stats(self::SITE_CONTENT_INDEX_CAP);
     }
 
     /**
@@ -115,7 +133,7 @@ final class KnowledgeRepository
 
         $kind = self::CORE_POST_TYPE === $post->post_type ? 'core_knowledge' : 'legacy_guideline';
 
-        return $this->post_to_source($post, $kind, $this->taxonomy_for_post_type($post->post_type));
+        return $this->mapper->from_post($post, $kind, $this->mapper->taxonomy_for_post_type($post->post_type));
     }
 
     /**
@@ -165,7 +183,7 @@ final class KnowledgeRepository
         $query = new \WP_Query([
             'post_type' => $post_type,
             'post_status' => ['publish', 'draft', 'pending', 'private'],
-            'posts_per_page' => 200,
+            'posts_per_page' => self::SITE_CONTENT_INDEX_CAP,
             'orderby' => 'modified',
             'order' => 'DESC',
             'no_found_rows' => true,
@@ -180,69 +198,9 @@ final class KnowledgeRepository
                 continue;
             }
 
-            $sources[] = $this->post_to_source($post, $kind, $taxonomy);
+            $sources[] = $this->mapper->from_post($post, $kind, $taxonomy);
         }
 
         return $sources;
-    }
-
-    /**
-     * Build a source array from a WordPress post.
-     *
-     * @return array<string, mixed>
-     */
-    private function post_to_source(\WP_Post $post, string $kind, string $taxonomy): array
-    {
-        $types = '' !== $taxonomy ? wp_get_object_terms($post->ID, $taxonomy, ['fields' => 'slugs']) : [];
-        $types = is_wp_error($types) || !is_array($types) ? [] : array_values(array_map('strval', $types));
-        $content = $post->post_content;
-        $excerpt = wp_strip_all_tags($post->post_excerpt);
-
-        if ('' !== $excerpt) {
-            $content = trim($content . "\n\n" . $excerpt);
-        }
-
-        return [
-            'kind' => $kind,
-            'source_id' => $kind . ':' . $post->ID,
-            'post_id' => $post->ID,
-            'label' => $this->source_label($post),
-            'uri' => $this->source_uri($post),
-            'content' => $content,
-            'modified_at' => $post->post_modified_gmt,
-            'types' => $types,
-            'metadata' => [
-                'post_type' => $post->post_type,
-                'status' => $post->post_status,
-                'knowledge_types' => $types,
-            ],
-        ];
-    }
-
-    private function source_label(\WP_Post $post): string
-    {
-        $title = get_the_title($post);
-
-        if ('' !== $title) {
-            return $title;
-        }
-
-        return sprintf('%s #%d', $post->post_type, $post->ID);
-    }
-
-    private function source_uri(\WP_Post $post): string
-    {
-        $permalink = get_permalink($post);
-
-        return get_permalink($post);
-    }
-
-    private function taxonomy_for_post_type(string $post_type): string
-    {
-        return match ($post_type) {
-            self::CORE_POST_TYPE => self::CORE_TAXONOMY,
-            self::LEGACY_POST_TYPE => self::LEGACY_TAXONOMY,
-            default => '',
-        };
     }
 }

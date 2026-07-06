@@ -63,21 +63,38 @@ export async function deleteSession(id: number): Promise<{ deleted: boolean; id:
 	});
 }
 
-export async function getSession(id: number): Promise<{
+export async function getSession(
+	id: number,
+	options: { messagesLimit?: number; includeToolOutputs?: boolean } = {},
+): Promise<{
 	id: number;
 	user_id?: number;
 	title: string;
 	model?: string;
 	provider?: string;
 	focus_post_id?: number | null;
+	focus?: import('./types').FocusSummary | null;
 	created_at: string;
 	updated_at: string;
 	messages: Array<{ id: number; role: string; content: string; created_at: string }>;
 	tool_calls: ToolCall[];
 	actions: ProposedAction[];
 }> {
+	const query = new URLSearchParams();
+	const messagesLimit = options.messagesLimit ?? 50;
+
+	if (messagesLimit > 0) {
+		query.set('messages_limit', String(messagesLimit));
+	}
+
+	if (options.includeToolOutputs) {
+		query.set('include_tool_outputs', '1');
+	}
+
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+
 	return apiFetch({
-		path: path(`/sessions/${id}`),
+		path: path(`/sessions/${id}${suffix}`),
 	});
 }
 
@@ -130,6 +147,10 @@ export async function updateKnowledgeSettings(
 		method: 'PUT',
 		data: settings,
 	});
+}
+
+export async function listAwptTools(): Promise<ToolsResponse> {
+	return apiFetch<ToolsResponse>({ path: path('/tools/awpt') });
 }
 
 export async function listTools(): Promise<ToolsResponse> {

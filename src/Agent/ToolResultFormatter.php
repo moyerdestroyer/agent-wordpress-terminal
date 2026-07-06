@@ -64,73 +64,31 @@ final class ToolResultFormatter
         $tool = (string) ($tool_call['tool'] ?? '');
         $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
 
-        return match ($tool) {
-            'awpt/read-settings' => $this->format_read_settings($output),
-            default => $this->format_generic_tool($tool, $output),
-        };
-    }
-
-    /**
-     * Format read-settings output.
-     *
-     * @param array<string, mixed> $output Tool output.
-     */
-    private function format_read_settings(array $output): string
-    {
-        $site = is_array($output['site'] ?? null) ? $output['site'] : [];
-        $theme = is_array($output['theme'] ?? null) ? $output['theme'] : [];
-        $discussion = is_array($output['discussion'] ?? null) ? $output['discussion'] : [];
-        $comments_open = 'open' === (string) ($discussion['default_comment_status'] ?? '');
-
-        $lines = [
-            __('Here are the non-secret site settings I found:', 'agent-wordpress-terminal'),
-            sprintf(
-                /* translators: %s: site URL */
-                __('- Site URL: %s', 'agent-wordpress-terminal'),
-                (string) ($site['url'] ?? ''),
-            ),
-            sprintf(
-                /* translators: %s: site name */
-                __('- Site name: %s', 'agent-wordpress-terminal'),
-                (string) ($site['name'] ?? ''),
-            ),
-        ];
-
-        if ([] !== $theme) {
-            $lines[] = sprintf(
-                /* translators: %s: theme name */
-                __('- Active theme: %s', 'agent-wordpress-terminal'),
-                (string) ($theme['name'] ?? ''),
-            );
-
-            if ('' !== (string) ($theme['version'] ?? '')) {
-                $lines[] = sprintf(
-                    /* translators: %s: theme version */
-                    __('- Theme version: %s', 'agent-wordpress-terminal'),
-                    (string) $theme['version'],
-                );
-            }
-
-            if ('' !== (string) ($theme['stylesheet'] ?? '')) {
-                $lines[] = sprintf(
-                    /* translators: %s: theme stylesheet slug */
-                    __('- Theme stylesheet: %s', 'agent-wordpress-terminal'),
-                    (string) $theme['stylesheet'],
-                );
-            }
+        if ('awpt/knowledge-auto-retrieval' === $tool) {
+            return new ToolResultKnowledgeFormatter()->format($output);
         }
 
-        if ([] !== $discussion) {
-            $lines[] = sprintf(
-                /* translators: %s: open or closed */
-                __('- New posts allow comments: %s', 'agent-wordpress-terminal'),
-                $comments_open
-                    ? __('yes (open)', 'agent-wordpress-terminal')
-                    : __('no (closed)', 'agent-wordpress-terminal'),
-            );
+        if ('awpt/search-content' === $tool) {
+            return new ToolResultContentSearchFormatter()->format($output);
         }
 
-        return implode("\n", $lines);
+        if ('awpt/list-content' === $tool) {
+            return new ToolResultContentListFormatter()->format($output);
+        }
+
+        if (in_array($tool, ['awpt/read-content', 'awpt/read-block-tree'], true)) {
+            return new ToolResultContentReadFormatter()->format($tool, $output);
+        }
+
+        if ('awpt/read-settings' === $tool) {
+            return new ToolResultSettingsFormatter()->format($output);
+        }
+
+        if (ToolRegistry::is_proposal_ability($tool)) {
+            return new ToolResultProposalFormatter()->format($tool, $output);
+        }
+
+        return $this->format_generic_tool($tool, $output);
     }
 
     /**

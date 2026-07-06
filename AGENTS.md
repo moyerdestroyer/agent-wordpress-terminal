@@ -93,13 +93,13 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 |------|------|
 | `agent-wordpress-terminal.php` | Plugin bootstrap |
 | `src/Plugin.php` | Singleton, wires hooks |
-| `src/Agent/AgentRuntime.php` | Message dispatch, slash commands |
+| `src/Agent/AgentRuntime.php` | Message dispatch, secondary slash shortcuts |
 | `assets/components/Terminal.tsx` | Main UI shell |
 | `mago.toml` / `biome.json` | Lint/format config |
 
 ## MVP scope (0.1)
 
-In scope: admin UI, sessions (per-admin), tool registry display, read/analyze/preview abilities, staged action cards (content updates, new posts, settings, theme switch), slash commands, knowledge auto-retrieval.
+In scope: admin UI, sessions (per-admin), tool registry display, read/analyze/preview abilities, staged action cards (content updates, new posts, settings, theme switch), secondary slash shortcuts, knowledge auto-retrieval.
 
 Out of scope for now: full autonomous editing, multi-agent orchestration, remote browser workers, context picker UI.
 

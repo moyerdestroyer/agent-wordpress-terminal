@@ -20,6 +20,7 @@ if (!defined('ABSPATH')) {
 final class ActionOperations
 {
     public const CONTENT_UPDATE = 'content_update';
+    public const BLOCK_ATTRS_UPDATE = 'block_attrs_update';
     public const NEW_POST = 'new_post';
     public const SITE_SETTINGS_UPDATE = 'site_settings_update';
     public const THEME_SWITCH = 'theme_switch';
@@ -29,6 +30,7 @@ final class ActionOperations
      */
     public const ALL = [
         self::CONTENT_UPDATE,
+        self::BLOCK_ATTRS_UPDATE,
         self::NEW_POST,
         self::SITE_SETTINGS_UPDATE,
         self::THEME_SWITCH,
@@ -41,6 +43,7 @@ final class ActionOperations
      */
     public const PREVIEWABLE = [
         self::CONTENT_UPDATE,
+        self::BLOCK_ATTRS_UPDATE,
         self::NEW_POST,
     ];
 

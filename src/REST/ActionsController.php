@@ -27,10 +27,8 @@ final class ActionsController extends RestController
     private ActionRepository $actions;
     private StagedPostPreview $preview;
 
-    public function __construct(
-        ?ActionRepository $actions = null,
-        ?StagedPostPreview $preview = null,
-    ) {
+    public function __construct(?ActionRepository $actions = null, ?StagedPostPreview $preview = null)
+    {
         $this->actions = $actions ?? new ActionRepository();
         $this->preview = $preview ?? new StagedPostPreview();
     }

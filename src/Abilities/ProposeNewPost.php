@@ -12,6 +12,8 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\ActionOperations;
+use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -169,12 +171,12 @@ final class ProposeNewPost
         }
 
         $payload = [
-            'operation' => 'new_post',
+            'operation' => ActionOperations::NEW_POST,
             'post_id' => 0,
             'post_type' => $post_type,
             'post_status' => 'draft',
             'post_title' => $post_title,
-            'post_content' => wp_kses_post($post_content),
+            'post_content' => PostContentSanitizer::for_staged_update($post_content),
         ];
 
         if ($featured_image_id > 0) {

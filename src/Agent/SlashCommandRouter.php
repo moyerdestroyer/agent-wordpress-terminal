@@ -65,15 +65,17 @@ final class SlashCommandRouter
     {
         return [
             'content' => implode("\n", [
-                __('Slash commands:', 'agent-wordpress-terminal'),
-                __('/focus 123 - set the session focus to a post or page', 'agent-wordpress-terminal'),
-                __('/preview 123 - load a post preview in the preview workspace', 'agent-wordpress-terminal'),
+                __('You can usually ask in plain language:', 'agent-wordpress-terminal'),
+                __('Focus the About page', 'agent-wordpress-terminal'),
+                __('Preview the homepage', 'agent-wordpress-terminal'),
+                __('Find brand voice guidance', 'agent-wordpress-terminal'),
+                '',
+                __('Useful shortcuts:', 'agent-wordpress-terminal'),
+                __('/focus about - set focus by title, slug, URL, or ID', 'agent-wordpress-terminal'),
+                __('/preview about - open a preview by title, slug, URL, or ID', 'agent-wordpress-terminal'),
                 __('/knowledge search brand voice - search indexed Knowledge', 'agent-wordpress-terminal'),
-                __('/knowledge read 123 - load a Knowledge item by post ID', 'agent-wordpress-terminal'),
                 __('/tools - list registered abilities and MCP tools', 'agent-wordpress-terminal'),
                 __('/mcp status - show MCP connection status', 'agent-wordpress-terminal'),
-                __('/mcp tools - list MCP tools', 'agent-wordpress-terminal'),
-                __('/mcp call tool/name {"key":"value"} - run a specific MCP tool', 'agent-wordpress-terminal'),
                 __('/clear - clear this session transcript', 'agent-wordpress-terminal'),
             ]),
             'tool_calls' => [],

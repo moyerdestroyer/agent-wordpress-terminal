@@ -36,6 +36,14 @@ final class ToolsController
             ],
         ]);
 
+        register_rest_route(AWPT_REST_NAMESPACE, '/tools/awpt', [
+            [
+                'methods' => \WP_REST_Server::READABLE,
+                'callback' => [$this, 'list_awpt_tools'],
+                'permission_callback' => [$this, 'can_manage'],
+            ],
+        ]);
+
         register_rest_route(AWPT_REST_NAMESPACE, '/mcp/status', [
             [
                 'methods' => \WP_REST_Server::READABLE,
@@ -82,55 +90,86 @@ final class ToolsController
      */
     public function list_tools(): \WP_REST_Response
     {
+        return new \WP_REST_Response($this->tools_payload(include_all_abilities: true), 200);
+    }
+
+    public function list_awpt_tools(): \WP_REST_Response
+    {
+        return new \WP_REST_Response($this->tools_payload(include_all_abilities: false), 200);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tools_payload(bool $include_all_abilities): array
+    {
         $tools = [
             'core' => [],
             'plugin' => [],
-            'mcp' => new Adapter()->list_tools(),
+            'mcp' => $include_all_abilities ? new Adapter()->list_tools() : [],
             'environment' => Environment::status(),
         ];
 
         if (!function_exists('wp_get_abilities')) {
-            return new \WP_REST_Response($tools, 200);
+            return $tools;
         }
 
         foreach (wp_get_abilities() as $ability) {
             $name = $ability->get_name();
-            $item = [
-                'name' => $name,
-                'label' => $ability->get_label(),
-                'description' => $ability->get_description(),
-                'category' => $ability->get_category(),
-                'input_schema' => method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : null,
-                'output_schema' => method_exists($ability, 'get_output_schema') ? $ability->get_output_schema() : null,
-                'permission' => null,
-                'readonly' => null,
-                'destructive' => null,
-                'requires_approval' => null,
-            ];
-
-            if (method_exists($ability, 'get_meta')) {
-                $meta = $ability->get_meta();
-                $annotations = $meta['annotations'] ?? [];
-
-                if (is_array($annotations)) {
-                    $item['readonly'] = $annotations['readonly'] ?? null;
-                    $item['destructive'] = $annotations['destructive'] ?? null;
-                    $item['requires_approval'] = $annotations['requires_approval'] ?? null;
-                }
-            }
+            $item = $this->ability_item($ability, $include_all_abilities);
 
             if (str_starts_with($name, 'core/')) {
-                $tools['core'][] = $item;
+                if ($include_all_abilities) {
+                    $tools['core'][] = $item;
+                }
                 continue;
             }
 
             if (str_starts_with($name, 'awpt/')) {
                 $tools['plugin'][] = $item;
-                continue;
             }
         }
 
-        return new \WP_REST_Response($tools, 200);
+        return $tools;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function ability_item(object $ability, bool $include_schemas): array
+    {
+        $item = [
+            'name' => $ability->get_name(),
+            'label' => $ability->get_label(),
+            'description' => $ability->get_description(),
+            'category' => $ability->get_category(),
+            'input_schema' => null,
+            'output_schema' => null,
+            'permission' => null,
+            'readonly' => null,
+            'destructive' => null,
+            'requires_approval' => null,
+        ];
+
+        if ($include_schemas) {
+            $item['input_schema'] = method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : null;
+            $item['output_schema'] = method_exists($ability, 'get_output_schema')
+                ? $ability->get_output_schema()
+                : null;
+        }
+
+        if (method_exists($ability, 'get_meta')) {
+            $meta = $ability->get_meta();
+            $annotations = $meta['annotations'] ?? [];
+
+            if (is_array($annotations)) {
+                $item['readonly'] = $annotations['readonly'] ?? null;
+                $item['destructive'] = $annotations['destructive'] ?? null;
+                $item['requires_approval'] = $annotations['requires_approval'] ?? null;
+            }
+        }
+
+        return $item;
     }
 
     /**

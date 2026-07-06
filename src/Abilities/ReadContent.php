@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Support\ReadablePostMeta;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -19,6 +21,13 @@ if (!defined('ABSPATH')) {
  */
 final class ReadContent
 {
+    private ReadablePostMeta $meta;
+
+    public function __construct(?ReadablePostMeta $meta = null)
+    {
+        $this->meta = $meta ?? new ReadablePostMeta();
+    }
+
     /**
      * Register the ability.
      */
@@ -99,66 +108,7 @@ final class ReadContent
             'excerpt' => wp_strip_all_tags((string) $post->post_excerpt),
             'modified' => $post->post_modified_gmt,
             'author_id' => (int) $post->post_author,
-            'meta' => $this->readable_meta($post_id),
+            'meta' => $this->meta->for_post($post_id),
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function readable_meta(int $post_id): array
-    {
-        $meta = [];
-        $raw = get_post_meta($post_id);
-
-        if (!is_array($raw)) {
-            return $meta;
-        }
-
-        foreach ($raw as $key => $values) {
-            if (!is_string($key) || !$this->is_exposed_meta_key($key)) {
-                continue;
-            }
-
-            if (!is_array($values) || [] === $values) {
-                continue;
-            }
-
-            $meta[$key] = 1 === count($values)
-                ? maybe_unserialize((string) $values[0])
-                : array_map(static fn(mixed $value): mixed => maybe_unserialize((string) $value), $values);
-        }
-
-        return $meta;
-    }
-
-    private function is_exposed_meta_key(string $key): bool
-    {
-        if (in_array($key, ['_edit_lock', '_edit_last'], true)) {
-            return false;
-        }
-
-        if (str_starts_with($key, '_')) {
-            return '_thumbnail_id' === $key;
-        }
-
-        $lower = strtolower($key);
-
-        foreach ([
-            'password',
-            'secret',
-            'token',
-            'api_key',
-            'license',
-            'auth',
-            'credential',
-            'private_key',
-        ] as $needle) {
-            if (str_contains($lower, $needle)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Database\ActionPayloadSanitizers;
 
+use AWPT\Support\PostContentSanitizer;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -20,10 +22,14 @@ if (!defined('ABSPATH')) {
 final class ContentPayloadSanitizer
 {
     private PostMetaPayloadSanitizer $post_meta;
+    private BlockAttrsPayloadSanitizer $block_attrs;
 
-    public function __construct(?PostMetaPayloadSanitizer $post_meta = null)
-    {
+    public function __construct(
+        ?PostMetaPayloadSanitizer $post_meta = null,
+        ?BlockAttrsPayloadSanitizer $block_attrs = null,
+    ) {
         $this->post_meta = $post_meta ?? new PostMetaPayloadSanitizer();
+        $this->block_attrs = $block_attrs ?? new BlockAttrsPayloadSanitizer();
     }
 
     /**
@@ -49,6 +55,22 @@ final class ContentPayloadSanitizer
             $clean['original_post_meta'] = $this->post_meta->sanitize_map($payload['original_post_meta']);
         }
 
+        if (array_key_exists('block_path', $payload)) {
+            $clean['block_path'] = sanitize_text_field((string) $payload['block_path']);
+        }
+
+        if (array_key_exists('block_name', $payload)) {
+            $clean['block_name'] = sanitize_text_field((string) $payload['block_name']);
+        }
+
+        if (array_key_exists('expected_fingerprint', $payload)) {
+            $clean['expected_fingerprint'] = sanitize_text_field((string) $payload['expected_fingerprint']);
+        }
+
+        if (array_key_exists('attrs', $payload) && is_array($payload['attrs'])) {
+            $clean['attrs'] = $this->block_attrs->sanitize_map($payload['attrs']);
+        }
+
         return $clean;
     }
 
@@ -64,7 +86,9 @@ final class ContentPayloadSanitizer
         }
 
         if (array_key_exists('preview_autosave_id', $payload)) {
-            $clean['preview_autosave_id'] = absint(is_scalar($payload['preview_autosave_id']) ? $payload['preview_autosave_id'] : 0);
+            $clean['preview_autosave_id'] = absint(
+                is_scalar($payload['preview_autosave_id']) ? $payload['preview_autosave_id'] : 0,
+            );
         }
 
         return $clean;
@@ -100,7 +124,7 @@ final class ContentPayloadSanitizer
                 continue;
             }
 
-            $clean[$key] = wp_kses_post((string) $payload[$key]);
+            $clean[$key] = PostContentSanitizer::for_staged_update((string) $payload[$key]);
         }
 
         return $clean;

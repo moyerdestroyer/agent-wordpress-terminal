@@ -138,12 +138,70 @@ final class KnowledgeIndexRepository
      */
     public function search_chunks(array $tokens): array
     {
-        $wpdb = WpDb::get();
+        $tokens = array_slice($tokens, 0, 8);
 
+        if ([] === $tokens) {
+            return [];
+        }
+
+        $fulltext_rows = $this->search_chunks_fulltext($tokens);
+
+        if ([] !== $fulltext_rows) {
+            return $fulltext_rows;
+        }
+
+        return $this->search_chunks_like($tokens);
+    }
+
+    /**
+     * @param list<string> $tokens
+     * @return list<array<string, mixed>>
+     */
+    private function search_chunks_fulltext(array $tokens): array
+    {
+        $wpdb = WpDb::get();
+        $terms = [];
+
+        foreach ($tokens as $token) {
+            $token = preg_replace('/[^\p{L}\p{N}]+/u', '', $token);
+
+            if (!is_string($token) || strlen($token) < 2) {
+                continue;
+            }
+
+            $terms[] = '+' . $token . '*';
+        }
+
+        if ([] === $terms) {
+            return [];
+        }
+
+        $boolean_query = implode(' ', $terms);
+        $sql = "SELECT c.id, c.chunk_text, c.chunk_index, i.source_kind, i.source_id, i.source_post_id,
+				i.label, i.uri, i.metadata_json,
+				MATCH(c.chunk_text) AGAINST (%s IN BOOLEAN MODE) AS relevance
+			FROM {$wpdb->prefix}awpt_knowledge_chunks c
+			INNER JOIN {$wpdb->prefix}awpt_knowledge_index i ON i.id = c.index_id
+			WHERE MATCH(c.chunk_text) AGAINST (%s IN BOOLEAN MODE)
+			ORDER BY relevance DESC, i.indexed_at DESC
+			LIMIT 200";
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $boolean_query, $boolean_query), output: \ARRAY_A);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @param list<string> $tokens
+     * @return list<array<string, mixed>>
+     */
+    private function search_chunks_like(array $tokens): array
+    {
+        $wpdb = WpDb::get();
         $like_clauses = [];
         $params = [];
 
-        foreach (array_slice($tokens, 0, 8) as $token) {
+        foreach ($tokens as $token) {
             $like = '%' . $wpdb->esc_like($token) . '%';
             $like_clauses[] = '(c.chunk_text LIKE %s OR i.label LIKE %s OR i.metadata_json LIKE %s)';
             $params[] = $like;

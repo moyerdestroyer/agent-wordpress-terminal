@@ -55,7 +55,7 @@ final class NewPostStagingDraft
 
         $post_id = wp_insert_post([
             'post_title' => $post_title,
-            'post_content' => wp_kses_post($post_content),
+            'post_content' => PostContentSanitizer::for_staged_update($post_content),
             'post_type' => $post_type,
             'post_status' => 'draft',
             'post_author' => get_current_user_id(),
@@ -100,7 +100,7 @@ final class NewPostStagingDraft
         }
 
         if (array_key_exists('post_content', $payload)) {
-            $update['post_content'] = wp_kses_post((string) $payload['post_content']);
+            $update['post_content'] = PostContentSanitizer::for_staged_update((string) $payload['post_content']);
         }
 
         if (array_key_exists('post_type', $payload)) {

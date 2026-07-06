@@ -59,9 +59,12 @@ final class RegisterAbilities
         new ReadBlockTree()->register();
         new AnalyzePage()->register();
         new PreviewPost()->register();
+        new SearchContent()->register();
+        new ListContent()->register();
         new SearchKnowledge()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
+        new ProposeBlockAttrsUpdate()->register();
         new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();

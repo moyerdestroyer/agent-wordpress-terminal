@@ -143,6 +143,9 @@ final class KnowledgeIndexer
                 'max_file_size' => (int) get_option('awpt_knowledge_max_file_size', 2_097_152),
             ],
             'repository' => new KnowledgeRepository()->status(),
+            'site_content_index' => array_merge(new KnowledgeRepository()->site_content_index_stats(), [
+                'indexed' => (int) ($source_kinds['wp_content'] ?? 0),
+            ]),
         ];
     }
 

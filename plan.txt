@@ -51,29 +51,59 @@ Required layout:
 │ Tools        │ Actions / Responses   │ Inspector   │
 │ Status       │                       │             │
 ├──────────────┴───────────────────────┴─────────────┤
-│ / ask the agent...                                 │
+│ Ask about a page, post, or site task...            │
 └────────────────────────────────────────────────────┘
 ```
 
 ### 2. Chat / Command Bar
 
-The bottom input should support both natural language and slash commands.
+The bottom input should support natural language first, with a small set of optional
+slash shortcuts for explicit control.
 
 Examples:
 
 ```txt
-Summarize the selected page.
+Focus the About page.
+Preview the homepage.
+Make the SEM icon on the About page a little bigger.
 Analyze this draft for layout issues.
-/focus 291
+Find brand voice guidance.
+```
+
+Useful shortcuts:
+
+```txt
+/focus about
+/preview https://example.com/about/
+/knowledge search brand voice
 /tools
 /mcp status
-/preview 291
 /clear
 ```
 
+Natural language is the primary path. Slash shortcuts are precise escape hatches for
+admins who already know what they want to do. Human-facing copy should not imply that
+users must know numeric post IDs.
+
+Focus and preview commands should resolve title, slug, URL, or ID and report ambiguity
+instead of silently choosing the wrong item.
+
 ### 3. Context Sidebar
 
-Users should be able to pin WordPress objects into the agent context.
+Users should be able to see what the agent currently knows and, over time, pin
+WordPress objects into the agent context.
+
+The MVP context model is:
+
+```txt
+Current focused content object
+Retrieved Knowledge evidence
+Recent tool results
+Pending/staged action evidence
+Preview target
+```
+
+The next context model is a first-class pinned context stack.
 
 Supported context items:
 
@@ -95,6 +125,8 @@ Preview URL
 ```
 
 Context items should be explicit. The agent should know what has been added and what has not.
+The transcript should show hidden retrieval/capture context as evidence, not bury it only
+inside the provider prompt.
 
 ### 4. Tool Sidebar
 
@@ -109,9 +141,15 @@ Core Abilities
 - core/read-users
 
 Plugin Abilities
+- awpt/search-content
+- awpt/read-content
 - awpt/read-block-tree
 - awpt/analyze-page
 - awpt/preview-post
+- awpt/propose-block-attrs-update
+- awpt/propose-content-update
+- awpt/propose-new-post
+- awpt/sideload-media
 - awpt/inspect-selection
 
 MCP
@@ -141,9 +179,10 @@ Example:
 ```txt
 User: Analyze the Membership Application page.
 
-Agent: I’ll inspect the page content and block structure.
+> awpt/search-content { query: "Membership Application" }
+✓ Found page: Membership Application #291
 
-> core/read-content { id: 291 }
+> awpt/read-content { id: 291 }
 ✓ Loaded page: Membership Application
 
 > awpt/read-block-tree { id: 291 }
@@ -151,6 +190,10 @@ Agent: I’ll inspect the page content and block structure.
 
 Agent: This page is low risk. It contains a file download and basic instructions. I recommend preserving the copy and improving the layout around the download link.
 ```
+
+If Knowledge excerpts are automatically injected into model context, the transcript should
+show that evidence as a context event. If the provider follow-up fails or returns no text,
+AWPT should still show readable summaries of important tool results instead of raw JSON.
 
 ### 6. Action Cards
 
@@ -186,6 +229,9 @@ Selected block details
 
 This is where AWPT can outperform a plain MCP client. It can combine WordPress state, browser state, rendered layout, and agent feedback in one place.
 
+The preview is human-visible in the MVP. Agent-visible screenshots, DOM snapshots,
+computed styles, and before/after visual captures are a follow-on capability.
+
 ### 8. Sessions
 
 AWPT should persist agent sessions.
@@ -197,11 +243,13 @@ User prompt history
 Tool calls
 Tool results
 Pinned context
+Retrieved Knowledge evidence
 Proposed actions
 Approved/rejected actions
 Model/provider used
 Timestamps
 Current post/page focus
+Generated session title
 ```
 
 ## Technical Requirements
@@ -257,14 +305,15 @@ MCP status adapter
 
 Custom database tables are probably justified.
 
-Suggested tables:
+Current and likely tables:
 
 ```txt
 wp_awpt_sessions
 wp_awpt_messages
 wp_awpt_tool_calls
-wp_awpt_context_items
 wp_awpt_actions
+wp_awpt_context_items      (planned: first-class pinned context stack)
+wp_awpt_captures           (planned: visual/DOM capture records)
 ```
 
 Avoid storing huge raw model responses in post meta/options.
@@ -283,19 +332,28 @@ agent-wordpress-terminal/
 │  ├─ REST/
 │  │  ├─ SessionsController.php
 │  │  ├─ ChatController.php
-│  │  ├─ ContextController.php
+│  │  ├─ ActionsController.php
+│  │  ├─ ContextController.php        (planned)
+│  │  ├─ CaptureController.php        (planned)
 │  │  └─ ToolsController.php
 │  ├─ Abilities/
 │  │  ├─ RegisterAbilities.php
+│  │  ├─ SearchContent.php
+│  │  ├─ ReadContent.php
 │  │  ├─ ReadBlockTree.php
 │  │  ├─ AnalyzePage.php
-│  │  └─ PreviewPost.php
+│  │  ├─ PreviewPost.php
+│  │  ├─ ProposeContentUpdate.php
+│  │  ├─ ProposeBlockAttrsUpdate.php
+│  │  ├─ ProposeNewPost.php
+│  │  └─ SideloadMedia.php
 │  ├─ Agent/
 │  │  ├─ AgentRuntime.php
 │  │  ├─ ProviderInterface.php
 │  │  ├─ OpenAIProvider.php
 │  │  ├─ OpenRouterProvider.php
-│  │  └─ ToolExecutor.php
+│  │  ├─ ToolExecutor.php
+│  │  └─ ToolRegistry.php
 │  ├─ MCP/
 │  │  └─ StatusService.php
 │  └─ Database/
@@ -316,13 +374,17 @@ Admin terminal UI
 Chat transcript
 Session persistence
 Provider settings
-Context picker for posts/pages
+Natural-language content resolution
+Current focus summary
+Visible retrieval/tool evidence
 Tool registry display
 Read post/page content
 Read block tree
 Preview pane
 Manual tool-call log
 Basic proposed action cards
+Targeted block attribute proposal
+Gutenberg-safe content staging
 ```
 
 Do not start with:
@@ -332,17 +394,42 @@ Full autonomous editing
 Visual regression testing
 Bulk workflows
 Complex memory
+Full pinned context stack UI
 Multi-agent orchestration
 Remote browser workers
 ```
+
+## Near-Term Roadmap
+
+The product path should stay ambitious, but the next work should harden the workflow
+before adding heavier infrastructure.
+
+1. Finish the context model: keep the current focused content object, then add a pinned
+   context stack with explicit add/remove/read behavior.
+2. Make content-intent fallback target-aware: when a deferred provider response has one
+   clear content match, proceed to read content and block tree instead of stopping at
+   search.
+3. Add smoke tests for natural workflows: "focus About", "preview homepage", and "make
+   SEM icon bigger".
+4. Improve Knowledge retrieval: FULLTEXT fallback, structure-aware chunking, attachment
+   metadata, then embeddings.
+5. Add agent-visible visual evidence through client-side preview capture before considering
+   remote browser workers.
 
 ## MVP Skills
 
 AWPT should expose a few higher-level tools beyond Core Abilities.
 
+### `awpt/search-content`
+
+Finds posts, pages, templates, template parts, and reusable blocks by title, slug, ID,
+or URL. This is the normal bridge between human language ("the About page") and
+WordPress identifiers.
+
 ### `awpt/read-block-tree`
 
-Returns parsed Gutenberg structure for a post.
+Returns parsed Gutenberg structure for a post, including stable visible paths,
+attribute summaries, text excerpts, and fingerprints.
 
 ### `awpt/analyze-page`
 
@@ -364,7 +451,9 @@ recommended next actions
 
 ### `awpt/get-context`
 
-Returns all pinned context for the current session.
+Returns all pinned context for the current session. This is a next-step capability;
+the current MVP stores a single focus object plus transcript-visible retrieval/tool
+evidence.
 
 ### `awpt/preview-post`
 
@@ -373,7 +462,14 @@ Returns preview URL and iframe metadata.
 ### `awpt/propose-content-update`
 
 Creates a staged proposed update, not an immediate save. Only works on a post that
-already exists.
+already exists. This is for full-document or classic-content edits; Gutenberg block
+delimiter markup must be preserved.
+
+### `awpt/propose-block-attrs-update`
+
+Stages a targeted Gutenberg block attribute merge by post ID and block path. The action
+stores the block path, block name, changed attrs, and optional expected fingerprint so
+the admin can review a surgical proposal instead of a whole-document rewrite.
 
 ### `awpt/propose-new-post`
 
@@ -425,6 +521,8 @@ Render terminal interface
 Manage chat input
 Show tool calls
 Show context items
+Show focus object
+Show retrieval evidence
 Show preview pane
 Show action cards
 Handle approvals
@@ -442,6 +540,7 @@ Responsibilities:
 
 ```txt
 Read content
+Search content
 Parse blocks
 Inspect settings
 Inspect users

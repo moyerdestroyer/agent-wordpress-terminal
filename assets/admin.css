@@ -807,6 +807,13 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	font-size: 11px;
 }
 
+.awpt-list-meta__detail {
+	display: block;
+	margin-top: 2px;
+	color: rgba(174, 184, 201, 0.82);
+	overflow-wrap: anywhere;
+}
+
 .awpt-session-actions {
 	display: flex;
 	gap: 8px;

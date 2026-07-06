@@ -7,6 +7,7 @@ import {
 	fetchActionPreview,
 	getMcpStatus,
 	getSession,
+	listAwptTools,
 	listSessions,
 	listTools,
 	sendMessage,
@@ -29,6 +30,32 @@ import { PreviewPane } from './PreviewPane';
 import { ToolsSidebar } from './ToolsSidebar';
 import { Transcript } from './Transcript';
 
+function titleCase(value: string): string {
+	return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function focusLabel(session: SessionSummary | null): string {
+	if (!session?.focus_post_id) {
+		return __('None', 'agent-wordpress-terminal');
+	}
+
+	if (!session.focus) {
+		return `#${session.focus_post_id}`;
+	}
+
+	return `${session.focus.title} #${session.focus.id}`;
+}
+
+function focusMeta(session: SessionSummary): string {
+	if (!session.focus) {
+		return session.focus_post_id ? `#${session.focus_post_id}` : '';
+	}
+
+	return [titleCase(session.focus.type), titleCase(session.focus.status), session.focus.slug]
+		.filter(Boolean)
+		.join(' · ');
+}
+
 export function Terminal(): JSX.Element {
 	const [sessions, setSessions] = useState<SessionSummary[]>([]);
 	const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -47,6 +74,7 @@ export function Terminal(): JSX.Element {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSending, setIsSending] = useState(false);
 	const [sidebarTab, setSidebarTab] = useState<'knowledge' | 'tools'>('knowledge');
+	const [toolsLoadedFully, setToolsLoadedFully] = useState(false);
 	const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 	const [editingSessionTitle, setEditingSessionTitle] = useState('');
 	const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<number | null>(null);
@@ -59,7 +87,7 @@ export function Terminal(): JSX.Element {
 			try {
 				const [sessionList, toolList, mcp] = await Promise.all([
 					listSessions(),
-					listTools(),
+					listAwptTools(),
 					getMcpStatus(),
 				]);
 
@@ -82,6 +110,20 @@ export function Terminal(): JSX.Element {
 		void boot();
 	}, []);
 
+	useEffect(() => {
+		if (sidebarTab !== 'tools' || toolsLoadedFully) {
+			return;
+		}
+
+		const loadFullTools = async (): Promise<void> => {
+			const fullTools = await listTools();
+			setTools(fullTools);
+			setToolsLoadedFully(true);
+		};
+
+		void loadFullTools();
+	}, [sidebarTab, toolsLoadedFully]);
+
 	const loadSession = async (sessionId: number): Promise<void> => {
 		const session = await getSession(sessionId);
 		setActiveSessionId(sessionId);
@@ -95,6 +137,7 @@ export function Terminal(): JSX.Element {
 							model: session.model,
 							provider: session.provider,
 							focus_post_id: session.focus_post_id,
+							focus: session.focus,
 							updated_at: session.updated_at,
 						}
 					: item,
@@ -208,15 +251,23 @@ export function Terminal(): JSX.Element {
 				setIsPreviewOpen(true);
 			}
 
-			if (response.provider || response.model || response.focus_post_id) {
+			if (
+				response.provider ||
+				response.model ||
+				response.focus_post_id ||
+				response.focus ||
+				response.session_title
+			) {
 				setSessions((current) =>
 					current.map((session) =>
 						session.id === activeSessionId
 							? {
 									...session,
+									title: response.session_title ?? session.title,
 									provider: response.provider ?? session.provider,
 									model: response.model ?? session.model,
 									focus_post_id: response.focus_post_id ?? session.focus_post_id,
+									focus: response.focus ?? session.focus,
 								}
 							: session,
 					),
@@ -417,8 +468,7 @@ export function Terminal(): JSX.Element {
 						{activeSession?.user_id ?? __('Unknown', 'agent-wordpress-terminal')}
 					</span>
 					<span>
-						{__('Focus', 'agent-wordpress-terminal')}:{' '}
-						{activeSession?.focus_post_id ?? __('None', 'agent-wordpress-terminal')}
+						{__('Focus', 'agent-wordpress-terminal')}: {focusLabel(activeSession)}
 					</span>
 					<span
 						className={`awpt-header__status ${
@@ -532,7 +582,10 @@ export function Terminal(): JSX.Element {
 									)}
 									{session.focus_post_id ? (
 										<div className="awpt-list-meta">
-											{__('Focus', 'agent-wordpress-terminal')}: {session.focus_post_id}
+											{__('Focus', 'agent-wordpress-terminal')}: {focusLabel(session)}
+											{focusMeta(session) ? (
+												<span className="awpt-list-meta__detail">{focusMeta(session)}</span>
+											) : null}
 										</div>
 									) : null}
 									{session.user_id ? (
@@ -576,7 +629,10 @@ export function Terminal(): JSX.Element {
 									setHistoryIndex(null);
 								}
 							}}
-							placeholder="/ ask the agent…"
+							placeholder={__(
+								'Ask about a page, post, or site task...',
+								'agent-wordpress-terminal',
+							)}
 							onKeyDown={(event) => {
 								if (event.key === 'Enter') {
 									void handleSend();

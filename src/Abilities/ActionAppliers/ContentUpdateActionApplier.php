@@ -10,6 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities\ActionAppliers;
 
+use AWPT\Support\ActionOperations;
+use AWPT\Support\PostContentSanitizer;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -19,6 +22,13 @@ if (!defined('ABSPATH')) {
  */
 final class ContentUpdateActionApplier
 {
+    private BlockAttrsUpdateActionApplier $block_attrs;
+
+    public function __construct(?BlockAttrsUpdateActionApplier $block_attrs = null)
+    {
+        $this->block_attrs = $block_attrs ?? new BlockAttrsUpdateActionApplier();
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|\WP_Error
@@ -41,8 +51,18 @@ final class ContentUpdateActionApplier
             $update['post_title'] = sanitize_text_field((string) $payload['post_title']);
         }
 
-        if (array_key_exists('post_content', $payload)) {
-            $update['post_content'] = wp_kses_post((string) $payload['post_content']);
+        $operation = (string) ($payload['operation'] ?? ActionOperations::CONTENT_UPDATE);
+
+        if (ActionOperations::BLOCK_ATTRS_UPDATE === $operation) {
+            $rebuilt = $this->block_attrs->content_from_payload($post_id, $payload);
+
+            if (is_wp_error($rebuilt)) {
+                return $rebuilt;
+            }
+
+            $update['post_content'] = $rebuilt;
+        } elseif (array_key_exists('post_content', $payload)) {
+            $update['post_content'] = PostContentSanitizer::for_staged_update((string) $payload['post_content']);
         }
 
         if (array_key_exists('post_status', $payload)) {

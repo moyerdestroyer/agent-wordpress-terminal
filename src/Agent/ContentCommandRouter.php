@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ContentTargetResolver;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -27,12 +29,21 @@ final class ContentCommandRouter
      */
     public function focus(array $parts): array
     {
-        $post_id = (int) ($parts[1] ?? 0);
+        $query = trim(implode(' ', array_slice($parts, 1)));
+        $resolved = new ContentTargetResolver()->resolve($query);
 
-        if ($post_id <= 0) {
-            return $this->usage('focus', __('Usage: /focus 291', 'agent-wordpress-terminal'));
+        if ('missing' === $resolved['status']) {
+            return $this->usage('focus', __(
+                'Usage: /focus about, /focus https://example.com/about, or /focus {id}',
+                'agent-wordpress-terminal',
+            ));
         }
 
+        if ('ambiguous' === $resolved['status']) {
+            return $this->ambiguous_response('focus', $resolved['results'] ?? []);
+        }
+
+        $post_id = (int) ($resolved['post_id'] ?? 0);
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -56,6 +67,7 @@ final class ContentCommandRouter
             'actions' => [],
             'command' => 'focus',
             'focus_post_id' => $post_id,
+            'focus' => $resolved['result'] ?? null,
         ];
     }
 
@@ -67,12 +79,21 @@ final class ContentCommandRouter
      */
     public function preview(array $parts): array
     {
-        $post_id = (int) ($parts[1] ?? 0);
+        $query = trim(implode(' ', array_slice($parts, 1)));
+        $resolved = new ContentTargetResolver()->resolve($query);
 
-        if ($post_id <= 0) {
-            return $this->usage('preview', __('Usage: /preview 291', 'agent-wordpress-terminal'));
+        if ('missing' === $resolved['status']) {
+            return $this->usage('preview', __(
+                'Usage: /preview about, /preview https://example.com/about, or /preview {id}',
+                'agent-wordpress-terminal',
+            ));
         }
 
+        if ('ambiguous' === $resolved['status']) {
+            return $this->ambiguous_response('preview', $resolved['results'] ?? []);
+        }
+
+        $post_id = (int) ($resolved['post_id'] ?? 0);
         $preview = $this->execute_tool('awpt/preview-post', ['id' => $post_id]);
 
         if (is_wp_error($preview)) {
@@ -97,6 +118,37 @@ final class ContentCommandRouter
             'preview' => $preview,
             'command' => 'preview',
             'focus_post_id' => $post_id,
+            'focus' => $resolved['result'] ?? null,
+        ];
+    }
+
+    /**
+     * @param list<array<array-key, mixed>> $results
+     * @return array<string, mixed>
+     */
+    private function ambiguous_response(string $command, array $results): array
+    {
+        $lines = [__(
+            'I found multiple matching content items. Use a specific ID, URL, or slug:',
+            'agent-wordpress-terminal',
+        )];
+
+        foreach (array_slice($results, 0, 5) as $result) {
+            $lines[] = sprintf(
+                /* translators: 1: post ID, 2: title, 3: post type, 4: status */
+                __('- #%1$d %2$s (%3$s, %4$s)', 'agent-wordpress-terminal'),
+                (int) ($result['id'] ?? 0),
+                (string) ($result['title'] ?? ''),
+                (string) ($result['type'] ?? ''),
+                (string) ($result['status'] ?? ''),
+            );
+        }
+
+        return [
+            'content' => implode("\n", $lines),
+            'tool_calls' => [],
+            'actions' => [],
+            'command' => $command,
         ];
     }
 

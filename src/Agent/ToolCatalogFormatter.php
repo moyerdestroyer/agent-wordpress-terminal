@@ -34,9 +34,12 @@ final class ToolCatalogFormatter
         'awpt/read-block-tree' => 'Returns parsed Gutenberg block structure for a post.',
         'awpt/analyze-page' => 'Returns an agent-friendly page brief with structure and risk signals.',
         'awpt/preview-post' => 'Returns preview URL and iframe metadata for a post.',
+        'awpt/search-content' => 'Finds posts, pages, templates, template parts, and reusable blocks by title, slug, ID, or URL.',
+        'awpt/list-content' => 'Lists and browses WordPress content with filters for post type, status, author, and search text, plus totals and item metadata.',
         'awpt/search-knowledge' => 'Searches Core Knowledge, legacy guidelines, site content, and allowed read-only document sources.',
         'awpt/read-knowledge' => 'Reads a specific Core Knowledge or legacy guideline record by WordPress post ID.',
         'awpt/propose-content-update' => 'Stages a proposed post update (title, content, status, or meta) for explicit admin approval.',
+        'awpt/propose-block-attrs-update' => 'Stages a targeted Gutenberg block attribute update by block path for explicit admin approval.',
         'awpt/propose-new-post' => 'Stages creation of a brand new post or page for explicit admin approval. Use for new posts, not existing ones. Optional featured_image_id sets the WordPress featured image on apply.',
         'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
         'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
@@ -51,6 +54,7 @@ final class ToolCatalogFormatter
      */
     private const APPROVAL_REQUIRED_ABILITIES = [
         'awpt/propose-content-update',
+        'awpt/propose-block-attrs-update',
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
@@ -58,14 +62,14 @@ final class ToolCatalogFormatter
     ];
 
     /**
-     * Build a system-prompt catalog of callable tools and slash commands.
+     * Build a system-prompt catalog of callable tools and secondary user shortcuts.
      */
     public function get_system_prompt_catalog(): string
     {
         $registry = new ToolRegistry();
         $lines = [
-            'Ability names use the awpt/ prefix and are callable via function calling. Slash commands start with / and are typed by the user in the terminal.',
-            'When asked what tools you have, list the ability names below first, then mention slash commands separately.',
+            'Ability names use the awpt/ prefix and are callable via function calling.',
+            'Natural language is the primary user workflow. Slash shortcuts are typed by users and should only be mentioned when users ask for shortcuts or commands.',
             'Use awpt/search-knowledge for durable site knowledge, guidelines, memories, notes, indexed content, and allowed document sources.',
             'Write abilities stage proposed actions for admin approval; never claim a destructive change was applied without approval.',
             'Auto-callable ability names:',
@@ -95,15 +99,12 @@ final class ToolCatalogFormatter
             }
         }
 
-        $lines[] = 'Slash commands (typed by the user, not ability names):';
-        $lines[] = '- /help — list user-facing slash commands';
-        $lines[] = '- /focus {id} — set the session focus to a post or page';
-        $lines[] = '- /preview {id} — load a post preview in the preview workspace';
+        $lines[] = 'Secondary user shortcuts (do not lead with these unless asked):';
+        $lines[] = '- /focus {title|slug|url|id} — set session focus';
+        $lines[] = '- /preview {title|slug|url|id} — open a preview';
+        $lines[] = '- /knowledge search {query} — search indexed Knowledge';
         $lines[] = '- /tools — list registered abilities and MCP tools';
         $lines[] = '- /mcp status — show MCP connection status';
-        $lines[] = '- /mcp tools — list MCP tools';
-        $lines[] = '- /knowledge search {query} — search indexed Knowledge and read-only site sources';
-        $lines[] = '- /knowledge read {id} — read a Core Knowledge or legacy guideline item';
         $lines[] = '- /clear — clear the transcript';
 
         if (!function_exists('wp_get_abilities')) {

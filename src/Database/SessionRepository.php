@@ -45,14 +45,15 @@ final class SessionRepository
             output: \ARRAY_A,
         );
 
-        return is_array($rows) ? $rows : [];
+        return $this->with_focus_summaries(is_array($rows) ? $rows : []);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function find_detail(int $session_id): ?array
+    public function find_detail(int $session_id, int $messages_limit = 50, bool $include_tool_outputs = false): ?array
     {
+        $messages_limit = max(1, min(200, $messages_limit));
         $wpdb = WpDb::get();
 
         $sessions = $wpdb->prefix . 'awpt_sessions';
@@ -75,21 +76,24 @@ final class SessionRepository
 
         $message_rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT id, role, content, created_at FROM {$messages} WHERE session_id = %d ORDER BY id ASC",
+                "SELECT id, role, content, created_at FROM {$messages} WHERE session_id = %d ORDER BY id DESC LIMIT %d",
                 $session_id,
+                $messages_limit,
             ),
             output: \ARRAY_A,
         );
-        $session['messages'] = is_array($message_rows) ? $message_rows : [];
+        $message_rows = is_array($message_rows) ? array_reverse($message_rows) : [];
+        $session['messages'] = $message_rows;
+        $session['messages_truncated'] = count($message_rows) >= $messages_limit;
 
+        $tool_call_sql = "SELECT id, tool_name, input_json, output_json, status, created_at FROM {$tool_calls} WHERE session_id = %d ORDER BY id DESC LIMIT %d";
         $tool_call_rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT id, tool_name, input_json, output_json, status, created_at FROM {$tool_calls} WHERE session_id = %d ORDER BY id ASC",
-                $session_id,
-            ),
+            $wpdb->prepare($tool_call_sql, $session_id, $messages_limit * 4),
             output: \ARRAY_A,
         );
-        $session['tool_calls'] = $this->hydrator->tool_calls(is_array($tool_call_rows) ? $tool_call_rows : []);
+        $tool_call_rows = is_array($tool_call_rows) ? array_reverse($tool_call_rows) : [];
+        $session['tool_calls'] = $this->hydrator->tool_calls($tool_call_rows, $include_tool_outputs);
+        $session['tool_calls_truncated'] = count($tool_call_rows) >= ($messages_limit * 4);
 
         $action_rows = $wpdb->get_results(
             $wpdb->prepare(
@@ -100,7 +104,7 @@ final class SessionRepository
         );
         $session['actions'] = $this->hydrator->actions(is_array($action_rows) ? $action_rows : []);
 
-        return $session;
+        return $this->with_focus_summary($session);
     }
 
     /**
@@ -132,6 +136,7 @@ final class SessionRepository
             'id' => (int) $wpdb->insert_id,
             'user_id' => $this->current_user_id(),
             'title' => $title,
+            'focus' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ];
@@ -257,12 +262,53 @@ final class SessionRepository
             output: \ARRAY_A,
         );
 
-        return is_array($row) ? $row : [];
+        return is_array($row) ? $this->with_focus_summary($row) : [];
     }
 
     private function current_user_id(): int
     {
         return get_current_user_id();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $sessions
+     * @return list<array<string, mixed>>
+     */
+    private function with_focus_summaries(array $sessions): array
+    {
+        return array_map($this->with_focus_summary(...), $sessions);
+    }
+
+    /**
+     * @param array<string, mixed> $session
+     * @return array<string, mixed>
+     */
+    private function with_focus_summary(array $session): array
+    {
+        $post_id = (int) ($session['focus_post_id'] ?? 0);
+        $session['focus'] = null;
+
+        if ($post_id <= 0) {
+            return $session;
+        }
+
+        $post = get_post($post_id);
+
+        if (!$post instanceof \WP_Post || !current_user_can('read_post', $post_id)) {
+            return $session;
+        }
+
+        $session['focus'] = [
+            'id' => $post_id,
+            'title' => get_the_title($post),
+            'type' => $post->post_type,
+            'status' => $post->post_status,
+            'slug' => $post->post_name,
+            'url' => get_permalink($post),
+            'edit_url' => (string) get_edit_post_link($post_id, 'raw'),
+        ];
+
+        return $session;
     }
 
     private function discard_preview_resources_for_session(int $session_id): void

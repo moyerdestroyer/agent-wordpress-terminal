@@ -10,6 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Database\WpDb;
+use AWPT\Knowledge\KnowledgeSearchCache;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -59,6 +62,13 @@ final class ProviderRuntime
 
         $result = new IntentToolCallEnricher()->enrich($messages, $result, $tool_registry);
         $response = $this->finalize_response($session_id, $provider, $messages, $result, $tool_registry);
+        $knowledge_trace = $this->knowledge_trace($session_id);
+
+        if (null !== $knowledge_trace) {
+            $tool_calls = is_array($response['tool_calls'] ?? null) ? $response['tool_calls'] : [];
+            array_unshift($tool_calls, $knowledge_trace);
+            $response['tool_calls'] = $tool_calls;
+        }
 
         if ('' !== $notice) {
             $response['content'] = trim($notice . "\n\n" . (string) $response['content']);
@@ -128,6 +138,40 @@ final class ProviderRuntime
             'actions' => $loop_result['actions'],
             'provider' => $provider->get_name(),
             'model' => $loop_result['model'],
+        ];
+    }
+
+    /**
+     * Build a transcript-visible record for automatic Knowledge context.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function knowledge_trace(int $session_id): ?array
+    {
+        $wpdb = WpDb::get();
+        $message = trim((string) $wpdb->get_var($wpdb->prepare(
+            "SELECT content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT 1",
+            $session_id,
+        )));
+
+        if ('' === $message) {
+            return null;
+        }
+
+        $results = new KnowledgeSearchCache()->search($message, 5);
+
+        if ([] === $results) {
+            return null;
+        }
+
+        return [
+            'tool' => 'awpt/knowledge-auto-retrieval',
+            'input' => ['query' => $message, 'limit' => 5],
+            'output' => [
+                'count' => count($results),
+                'results' => $results,
+            ],
+            'status' => 'success',
         ];
     }
 }

@@ -51,6 +51,16 @@ final class SessionsController extends RestController
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'get_session'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'messages_limit' => [
+                        'type' => 'integer',
+                        'default' => 50,
+                    ],
+                    'include_tool_outputs' => [
+                        'type' => 'integer',
+                        'default' => 0,
+                    ],
+                ],
             ],
             [
                 'methods' => \WP_REST_Server::EDITABLE,
@@ -110,7 +120,11 @@ final class SessionsController extends RestController
     public function get_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
     {
         $session_id = RequestParams::int($request, 'id');
-        $session = $this->sessions->find_detail($session_id);
+        $messages_limit = RequestParams::int($request, 'messages_limit');
+        $messages_limit = $messages_limit > 0 ? $messages_limit : 50;
+        $messages_limit = max(1, min(200, $messages_limit));
+        $include_tool_outputs = 1 === RequestParams::int($request, 'include_tool_outputs');
+        $session = $this->sessions->find_detail($session_id, $messages_limit, $include_tool_outputs);
 
         if (null === $session) {
             return new \WP_Error(

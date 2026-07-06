@@ -39,14 +39,63 @@ final class IntentToolCallEnricher
         $content = (string) ($result['content'] ?? '');
 
         if (
-            '' === $last_user_message
-            || !$this->should_auto_read_settings($last_user_message)
-            || !$this->should_auto_invoke_read_settings($content)
+            '' !== $last_user_message
+            && $this->should_auto_read_settings($last_user_message)
+            && $this->should_auto_invoke_tool($content)
         ) {
-            return $result;
+            return $this->with_tool_call($result, $tool_registry, 'awpt/read-settings', '{}');
         }
 
-        $function_name = $tool_registry->function_name_for_ability('awpt/read-settings');
+        $list_detector = new ContentListIntentDetector();
+
+        if (
+            '' !== $last_user_message
+            && !$this->looks_like_new_content_request(strtolower($last_user_message))
+            && $list_detector->should_auto_list($last_user_message)
+            && $this->should_auto_invoke_tool($content)
+        ) {
+            $arguments = wp_json_encode($list_detector->arguments_for_message($last_user_message));
+
+            return $this->with_tool_call(
+                $result,
+                $tool_registry,
+                'awpt/list-content',
+                false === $arguments ? '{}' : $arguments,
+            );
+        }
+
+        if (
+            '' !== $last_user_message
+            && $this->should_auto_search_content($last_user_message)
+            && $this->should_auto_invoke_tool($content)
+        ) {
+            $arguments = wp_json_encode([
+                'query' => $last_user_message,
+                'limit' => 5,
+            ]);
+
+            return $this->with_tool_call(
+                $result,
+                $tool_registry,
+                'awpt/search-content',
+                false === $arguments ? '{}' : $arguments,
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function with_tool_call(
+        array $result,
+        ToolRegistry $tool_registry,
+        string $ability,
+        string $arguments,
+    ): array {
+        $function_name = $tool_registry->function_name_for_ability($ability);
 
         if (null === $function_name) {
             return $result;
@@ -57,7 +106,7 @@ final class IntentToolCallEnricher
                 'id' => 'awpt_intent_' . wp_generate_password(8, false),
                 'function' => [
                     'name' => $function_name,
-                    'arguments' => '{}',
+                    'arguments' => $arguments,
                 ],
             ],
         ];
@@ -90,7 +139,7 @@ final class IntentToolCallEnricher
     /**
      * Whether AWPT should invoke read-settings without provider tool calls.
      */
-    private function should_auto_invoke_read_settings(string $content): bool
+    private function should_auto_invoke_tool(string $content): bool
     {
         $trimmed = trim($content);
 
@@ -134,5 +183,44 @@ final class IntentToolCallEnricher
             || str_contains($normalized, 'comment')
             || str_contains($normalized, 'theme')
         );
+    }
+
+    /**
+     * Whether the user is asking for existing content.
+     */
+    private function should_auto_search_content(string $message): bool
+    {
+        $normalized = strtolower($message);
+
+        if ($this->looks_like_new_content_request($normalized)) {
+            return false;
+        }
+
+        foreach ([
+            'page',
+            'post',
+            'content',
+            'block',
+            'icon',
+            'hero',
+            'section',
+            'template',
+            'about',
+            'homepage',
+            'home page',
+            'landing page',
+            'preview',
+        ] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return (bool) preg_match('/https?:\/\/\S+/i', $message);
+    }
+
+    private function looks_like_new_content_request(string $normalized): bool
+    {
+        return (bool) preg_match('/\b(create|draft|write|make|add)\s+(a\s+)?new\s+(post|page|article)\b/', $normalized);
     }
 }

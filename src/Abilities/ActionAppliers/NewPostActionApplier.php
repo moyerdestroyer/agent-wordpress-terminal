@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities\ActionAppliers;
 
 use AWPT\Support\NewPostStagingDraft;
+use AWPT\Support\PostContentSanitizer;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -68,7 +69,7 @@ final class NewPostActionApplier
             $post_id = wp_update_post([
                 'ID' => $staging_post_id,
                 'post_title' => sanitize_text_field($post_title),
-                'post_content' => wp_kses_post($post_content),
+                'post_content' => PostContentSanitizer::for_staged_update($post_content),
                 'post_type' => $post_type,
                 'post_status' => 'draft',
             ], true);
@@ -82,7 +83,7 @@ final class NewPostActionApplier
         } else {
             $post_id = wp_insert_post([
                 'post_title' => sanitize_text_field($post_title),
-                'post_content' => wp_kses_post($post_content),
+                'post_content' => PostContentSanitizer::for_staged_update($post_content),
                 'post_type' => $post_type,
                 'post_status' => 'draft',
                 'post_author' => get_current_user_id(),

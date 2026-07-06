@@ -6,6 +6,16 @@ export interface AwptSettings {
 	environment?: EnvironmentStatus;
 }
 
+export interface FocusSummary {
+	id: number;
+	title: string;
+	type: string;
+	status: string;
+	slug?: string;
+	url?: string;
+	edit_url?: string;
+}
+
 export interface SessionSummary {
 	id: number;
 	user_id?: number;
@@ -13,6 +23,7 @@ export interface SessionSummary {
 	model?: string;
 	provider?: string;
 	focus_post_id?: number | null;
+	focus?: FocusSummary | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -26,6 +37,7 @@ export interface Message {
 
 export type ActionOperation =
 	| 'content_update'
+	| 'block_attrs_update'
 	| 'new_post'
 	| 'site_settings_update'
 	| 'theme_switch';
@@ -45,6 +57,10 @@ export interface ActionPayload {
 	preview_url?: string;
 	preview_autosave_id?: number;
 	affected?: string;
+	block_path?: string;
+	block_name?: string;
+	expected_fingerprint?: string;
+	attrs?: Record<string, unknown>;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
 	stylesheet?: string;
@@ -70,6 +86,7 @@ export interface ToolCall {
 	tool: string;
 	input: Record<string, unknown>;
 	output?: Record<string, unknown> | null;
+	output_summary?: string;
 	status?: string;
 	created_at?: string;
 }
@@ -172,5 +189,7 @@ export interface ChatResponse {
 	command?: string;
 	provider?: string;
 	model?: string;
+	session_title?: string;
 	focus_post_id?: number | null;
+	focus?: FocusSummary | null;
 }

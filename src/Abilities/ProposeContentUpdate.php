@@ -12,6 +12,8 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\ActionOperations;
+use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -151,7 +153,7 @@ final class ProposeContentUpdate
         }
 
         $payload = [
-            'operation' => 'content_update',
+            'operation' => ActionOperations::CONTENT_UPDATE,
             'post_id' => $post_id,
             'post_type' => $post->post_type,
             'post_status' => $post->post_status,
@@ -165,7 +167,7 @@ final class ProposeContentUpdate
         }
 
         if (array_key_exists('post_content', $input)) {
-            $payload['post_content'] = wp_kses_post((string) $input['post_content']);
+            $payload['post_content'] = PostContentSanitizer::for_staged_update((string) $input['post_content']);
         }
 
         if (array_key_exists('post_status', $input)) {

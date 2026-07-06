@@ -94,10 +94,14 @@ final class ProviderToolCallExecutor
         }
 
         [$status, $output] = $this->run_safe_tool($tool_name, $function_name, $input, $tool_registry);
+        $tool = $tool_name ?? $function_name;
+        $truncator = new ToolResultTruncator();
+        $provider_output = is_array($output) ? $truncator->for_provider($tool, $output) : $output;
+        $storage_output = is_array($output) ? $truncator->for_storage($tool, $output) : $output;
         $tool_call = [
-            'tool' => $tool_name ?? $function_name,
+            'tool' => $tool,
             'input' => $input,
-            'output' => $output,
+            'output' => $storage_output,
             'status' => $status,
             'provider_call_id' => $provider_call_id,
         ];
@@ -112,7 +116,7 @@ final class ProviderToolCallExecutor
             'message' => [
                 'role' => 'tool',
                 'tool_call_id' => $provider_call_id,
-                'content' => wp_json_encode($output),
+                'content' => wp_json_encode($provider_output),
             ],
         ];
     }

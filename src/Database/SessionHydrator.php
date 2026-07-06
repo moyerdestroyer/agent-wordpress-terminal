@@ -25,24 +25,60 @@ final class SessionHydrator
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
-    public function tool_calls(array $rows): array
+    public function tool_calls(array $rows, bool $include_outputs = true): array
     {
         $hydrated = [];
 
         foreach ($rows as $tool_call) {
             $input = Json::decode_array((string) ($tool_call['input_json'] ?? ''));
             $output = Json::decode_array((string) ($tool_call['output_json'] ?? ''));
-            $hydrated[] = [
+            $item = [
                 'id' => $tool_call['id'] ?? 0,
                 'tool' => (string) ($tool_call['tool_name'] ?? ''),
                 'input' => $input,
-                'output' => [] !== $output ? $output : null,
                 'status' => (string) ($tool_call['status'] ?? ''),
                 'created_at' => (string) ($tool_call['created_at'] ?? ''),
             ];
+
+            if ($include_outputs) {
+                $item['output'] = [] !== $output ? $output : null;
+            } else {
+                $item['output'] = null;
+                $item['output_summary'] = $this->tool_output_summary((string) ($tool_call['tool_name'] ?? ''), $output);
+            }
+
+            $hydrated[] = $item;
         }
 
         return $hydrated;
+    }
+
+    /**
+     * @param array<array-key, mixed> $output
+     */
+    private function tool_output_summary(string $tool, array $output): string
+    {
+        if ([] === $output) {
+            return '';
+        }
+
+        if (array_key_exists('error', $output)) {
+            return (string) $output['error'];
+        }
+
+        if (array_key_exists('count', $output)) {
+            return sprintf('%s: %d result(s)', $tool, (int) $output['count']);
+        }
+
+        if (array_key_exists('total', $output)) {
+            return sprintf('%s: %d total', $tool, (int) $output['total']);
+        }
+
+        if (array_key_exists('title', $output)) {
+            return sprintf('%s: %s', $tool, (string) $output['title']);
+        }
+
+        return $tool;
     }
 
     /**

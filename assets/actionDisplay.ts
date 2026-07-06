@@ -18,7 +18,11 @@ export function titleCase(value: string): string {
 }
 
 export function canPreviewAction(payload?: ActionPayload): boolean {
-	return payload?.operation === 'content_update' || payload?.operation === 'new_post';
+	return (
+		payload?.operation === 'content_update' ||
+		payload?.operation === 'block_attrs_update' ||
+		payload?.operation === 'new_post'
+	);
 }
 
 export function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: string }> {
@@ -77,7 +81,7 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 				? titleCase(nextStatus)
 				: '';
 
-	return [
+	const metadata = [
 		{
 			label: __('Target', 'agent-wordpress-terminal'),
 			value: postReference,
@@ -94,7 +98,28 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 			label: __('Blocks / area', 'agent-wordpress-terminal'),
 			value: payload.affected ?? '',
 		},
-	].filter((item) => item.value !== '');
+	];
+
+	if (payload.operation === 'block_attrs_update') {
+		metadata.push(
+			{
+				label: __('Block', 'agent-wordpress-terminal'),
+				value: [payload.block_path, payload.block_name].filter(Boolean).join(' · '),
+			},
+			{
+				label: __('Attributes', 'agent-wordpress-terminal'),
+				value: payload.attrs ? Object.keys(payload.attrs).join(', ') : '',
+			},
+			{
+				label: __('Fingerprint', 'agent-wordpress-terminal'),
+				value: payload.expected_fingerprint
+					? `${payload.expected_fingerprint.slice(0, 12)}...`
+					: '',
+			},
+		);
+	}
+
+	return metadata.filter((item) => item.value !== '');
 }
 
 export function actionDiff(payload?: ActionPayload): { before: string; after: string } {

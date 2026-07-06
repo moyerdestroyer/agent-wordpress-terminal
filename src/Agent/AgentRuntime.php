@@ -12,6 +12,7 @@ namespace AWPT\Agent;
 
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\SessionTitleSuggester;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -74,6 +75,13 @@ final class AgentRuntime
 
         $session_update = ['updated_at' => $now];
         $session_formats = ['%s'];
+        $suggested_title = new SessionTitleSuggester()->suggest($message, $this->sessions->get_summary($session_id));
+
+        if (null !== $suggested_title) {
+            $session_update['title'] = $suggested_title;
+            $session_formats[] = '%s';
+            $response['session_title'] = $suggested_title;
+        }
 
         if (array_key_exists('provider', $response)) {
             $session_update['provider'] = (string) $response['provider'];
