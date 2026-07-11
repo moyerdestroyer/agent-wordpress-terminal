@@ -41,7 +41,11 @@ final class IntentToolCallEnricher {
             && $this->should_auto_read_settings($last_user_message)
             && $this->should_auto_invoke_tool($content)
         ) {
-            return $this->with_tool_call($result, $tool_registry, 'awpt/read-settings', '{}');
+            $site_info_ability = $tool_registry->preferred_site_info_ability();
+
+            if (null !== $site_info_ability) {
+                return $this->with_tool_call($result, $tool_registry, $site_info_ability, '{}');
+            }
         }
 
         $list_detector = new ContentListIntentDetector();
@@ -134,7 +138,7 @@ final class IntentToolCallEnricher {
     }
 
     /**
-     * Whether AWPT should invoke read-settings without provider tool calls.
+     * Whether AWPT should auto-invoke a tool without provider tool calls.
      */
     private function should_auto_invoke_tool(string $content): bool {
         $trimmed = trim($content);

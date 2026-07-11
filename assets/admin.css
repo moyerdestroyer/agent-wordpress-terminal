@@ -1378,6 +1378,13 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	font-size: 11px;
 }
 
+.awpt-tool-summary__hint {
+	margin: 0 0 14px;
+	color: var(--awpt-muted);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
 .awpt-tool-group__header {
 	display: flex;
 	align-items: center;
@@ -1436,6 +1443,7 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	gap: 6px;
 	flex-wrap: wrap;
 	margin-top: 6px;
+	align-items: center;
 }
 
 .awpt-tool-item__meta span {
@@ -1447,6 +1455,34 @@ body.settings_page_awpt-terminal .notice-dismiss::before {
 	border-radius: 999px;
 	color: var(--awpt-text);
 	font-size: 10px;
+}
+
+.awpt-tool-item__description {
+	margin: 4px 0 0;
+	color: var(--awpt-muted);
+	font-size: 10px;
+	line-height: 1.4;
+}
+
+.awpt-tool-item--disabled {
+	opacity: 0.62;
+}
+
+.awpt-tool-item__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 18px;
+	padding: 1px 6px;
+	border: 1px solid rgba(91, 159, 212, 0.35);
+	border-radius: 999px;
+	color: var(--awpt-text);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.awpt-tool-item__toggle input {
+	margin: 0;
 }
 
 .awpt-tool-item__facts {

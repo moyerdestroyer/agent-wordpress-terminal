@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\MCP\Adapter;
+use AWPT\Support\ToolPreferences;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -40,35 +41,68 @@ final class ToolCommandRouter {
      * @return array<string, array<int, string>>
      */
     private function groups(): array {
+        $prefs = new ToolPreferences();
         $core_label = __('Core Abilities', 'agent-wordpress-terminal');
-        $plugin_label = __('Plugin Abilities', 'agent-wordpress-terminal');
+        $awpt_label = __('AWPT Abilities', 'agent-wordpress-terminal');
+        $other_label = __('Other plugin/theme abilities', 'agent-wordpress-terminal');
         $mcp_label = __('MCP Tools', 'agent-wordpress-terminal');
         $groups = [
             $core_label => [],
-            $plugin_label => [],
+            $awpt_label => [],
+            $other_label => [],
             $mcp_label => [],
         ];
 
         if (function_exists('wp_get_abilities')) {
             foreach (wp_get_abilities() as $ability) {
                 $name = $ability->get_name();
+                $suffix = $this->status_suffix($name, $prefs);
 
                 if (str_starts_with($name, 'core/')) {
-                    $groups[$core_label][] = $name;
+                    $groups[$core_label][] = $name . $suffix;
                     continue;
                 }
 
                 if (str_starts_with($name, 'awpt/')) {
-                    $groups[$plugin_label][] = $name;
+                    $groups[$awpt_label][] = $name . $suffix;
+                    continue;
                 }
+
+                $groups[$other_label][] = $name . $suffix;
+            }
+        }
+
+        $seen = [];
+
+        if (function_exists('wp_get_abilities')) {
+            foreach (wp_get_abilities() as $ability) {
+                $seen[$ability->get_name()] = true;
             }
         }
 
         foreach (new Adapter()->list_tools() as $tool) {
-            $groups[$mcp_label][] = (string) $tool['name'];
+            $name = (string) ($tool['name'] ?? '');
+
+            if ('' === $name || array_key_exists($name, $seen)) {
+                continue;
+            }
+
+            $groups[$mcp_label][] = $name . $this->status_suffix($name, $prefs);
         }
 
         return $groups;
+    }
+
+    private function status_suffix(string $name, ToolPreferences $prefs): string {
+        if ($prefs->is_never_auto($name)) {
+            return ' ' . __('(human-only)', 'agent-wordpress-terminal');
+        }
+
+        if (!$prefs->is_enabled($name)) {
+            return ' ' . __('(disabled)', 'agent-wordpress-terminal');
+        }
+
+        return '';
     }
 
     /**

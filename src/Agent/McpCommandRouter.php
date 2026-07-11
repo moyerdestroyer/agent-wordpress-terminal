@@ -19,6 +19,9 @@ if (!defined('ABSPATH')) {
 
 /**
  * Handles MCP status, discovery, and explicit tool calls.
+ *
+ * Explicit `/mcp call` uses the same direct-execution path as WordPress MCP clients
+ * (capability checks on the ability, no extra AWPT staged-approval gate).
  */
 final class McpCommandRouter {
     /**

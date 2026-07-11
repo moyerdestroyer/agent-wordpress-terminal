@@ -15,13 +15,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Converts an allowed file into an indexable source.
+ * Converts a readable file into an indexable source.
  */
 final class FilesystemSourceFactory {
     private FilesystemAccessPolicy $policy;
+    private PdfTextExtractor $pdf;
 
-    public function __construct(?FilesystemAccessPolicy $policy = null) {
+    public function __construct(?FilesystemAccessPolicy $policy = null, ?PdfTextExtractor $pdf = null) {
         $this->policy = $policy ?? new FilesystemAccessPolicy();
+        $this->pdf = $pdf ?? new PdfTextExtractor();
     }
 
     /**
@@ -33,7 +35,8 @@ final class FilesystemSourceFactory {
         }
 
         $real = (string) realpath($path);
-        $content = $this->read_text_file($real);
+        $extension = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+        $content = 'pdf' === $extension ? $this->pdf->extract($real) : $this->read_text_file($real);
 
         if ('' === trim($content)) {
             return null;
@@ -51,7 +54,7 @@ final class FilesystemSourceFactory {
             'content' => $content,
             'modified_at' => gmdate('Y-m-d H:i:s', (int) filemtime($real)),
             'metadata' => [
-                'extension' => strtolower(pathinfo($real, PATHINFO_EXTENSION)),
+                'extension' => $extension,
                 'size' => is_int($size) ? $size : 0,
                 'root' => $root,
             ],

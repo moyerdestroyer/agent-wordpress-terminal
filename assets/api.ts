@@ -157,6 +157,17 @@ export async function listTools(): Promise<ToolsResponse> {
 	return apiFetch<ToolsResponse>({ path: path('/tools') });
 }
 
+export async function updateToolEnabled(
+	name: string,
+	enabled: boolean,
+): Promise<import('./types').ToolPreferencesResponse> {
+	return apiFetch<import('./types').ToolPreferencesResponse>({
+		path: path('/tools/preferences'),
+		method: 'POST',
+		data: { name, enabled },
+	});
+}
+
 export async function getMcpStatus(): Promise<McpStatus> {
 	return apiFetch<McpStatus>({ path: path('/mcp/status') });
 }

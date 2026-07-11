@@ -23,18 +23,24 @@ final class AbilitiesHealth {
      */
     private const EXPECTED_ABILITIES = [
         'awpt/read-content',
-        'awpt/read-settings',
         'awpt/read-themes',
-        'awpt/read-users',
+        'awpt/read-theme-json',
         'awpt/read-block-tree',
+        'awpt/get-block',
+        'awpt/list-blocks',
+        'awpt/render-block',
         'awpt/analyze-page',
         'awpt/preview-post',
         'awpt/search-content',
         'awpt/list-content',
+        'awpt/list-templates',
+        'awpt/read-template',
         'awpt/search-knowledge',
         'awpt/read-knowledge',
         'awpt/propose-content-update',
         'awpt/propose-block-attrs-update',
+        'awpt/propose-block-insert',
+        'awpt/propose-block-remove',
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
@@ -68,7 +74,7 @@ final class AbilitiesHealth {
             return false;
         }
 
-        return wp_has_ability('awpt/read-settings');
+        return wp_has_ability('awpt/search-content');
     }
 
     /**

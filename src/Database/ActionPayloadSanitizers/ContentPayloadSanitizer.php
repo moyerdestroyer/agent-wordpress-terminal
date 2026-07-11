@@ -69,7 +69,37 @@ final class ContentPayloadSanitizer {
             $clean['attrs'] = $this->block_attrs->sanitize_map($payload['attrs']);
         }
 
+        if (array_key_exists('position', $payload)) {
+            $clean['position'] = sanitize_key((string) $payload['position']);
+        }
+
+        if (array_key_exists('inserted_path', $payload)) {
+            $clean['inserted_path'] = sanitize_text_field((string) $payload['inserted_path']);
+        }
+
+        if (array_key_exists('block', $payload) && is_array($payload['block'])) {
+            $clean['block'] = $this->sanitize_block_definition($payload['block']);
+        }
+
         return $clean;
+    }
+
+    /**
+     * @param array<array-key, mixed> $block
+     * @return array<string, mixed>
+     */
+    private function sanitize_block_definition(array $block): array {
+        $name = sanitize_text_field((string) ($block['blockName'] ?? ''));
+        $attrs = is_array($block['attrs'] ?? null) ? $this->block_attrs->sanitize_map($block['attrs']) : [];
+        $inner_html = is_string($block['innerHTML'] ?? null) ? wp_kses_post($block['innerHTML']) : '';
+
+        return [
+            'blockName' => $name,
+            'attrs' => $attrs,
+            'innerHTML' => $inner_html,
+            'innerBlocks' => [],
+            'innerContent' => [$inner_html],
+        ];
     }
 
     /**

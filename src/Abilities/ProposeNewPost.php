@@ -115,7 +115,7 @@ final class ProposeNewPost {
     public function can_propose(array $input): bool {
         unset($input);
 
-        return current_user_can('edit_posts') && current_user_can('manage_options');
+        return current_user_can('edit_posts');
     }
 
     /**
@@ -125,7 +125,7 @@ final class ProposeNewPost {
     public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
 
-        if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
+        if (!$this->sessions->exists($session_id)) {
             return new \WP_Error(
                 code: 'awpt_session_not_found',
                 message: __('Session not found.', 'agent-wordpress-terminal'),

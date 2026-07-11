@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\REST;
 
+use AWPT\Knowledge\EmbeddingService;
+use AWPT\Knowledge\FilesystemAccessPolicy;
 use AWPT\Knowledge\FilesystemSourceReader;
 use AWPT\Knowledge\KnowledgeIndexer;
 
@@ -91,7 +93,22 @@ final class KnowledgeController {
         KnowledgeIndexer::mark_stale();
 
         if ($max_file_size > 0) {
-            update_option('awpt_knowledge_max_file_size', max(1024, min($max_file_size, 10_485_760)), false);
+            update_option('awpt_knowledge_max_file_size', max(1024, min($max_file_size, 20_971_520)), false);
+        }
+
+        if (null !== $request->get_param('embeddings_enabled')) {
+            $enabled = $request->get_param('embeddings_enabled');
+            $is_on = true === $enabled || 1 === $enabled || '1' === $enabled || 'true' === $enabled;
+            update_option(EmbeddingService::OPTION_ENABLED, $is_on ? '1' : '0', false);
+        }
+
+        if (null !== $request->get_param('embedding_model')) {
+            $model = sanitize_text_field((string) $request->get_param('embedding_model'));
+            update_option(
+                EmbeddingService::OPTION_MODEL,
+                '' !== $model ? $model : EmbeddingService::DEFAULT_MODEL,
+                false,
+            );
         }
 
         return new \WP_REST_Response($this->settings_payload(), 200);
@@ -102,19 +119,20 @@ final class KnowledgeController {
      */
     private function settings_payload(): array {
         $reader = new FilesystemSourceReader();
+        $embeddings = new EmbeddingService();
+        $split = preg_split('/\R+/', (string) get_option('awpt_knowledge_roots', ''));
 
         return [
-            'roots' => array_values(
-                array_filter(
-                    (static function (): array {
-                        $split = preg_split('/\R+/', (string) get_option('awpt_knowledge_roots', ''));
-
-                        return is_array($split) ? $split : [];
-                    })(),
-                ),
-            ),
+            'roots' => array_values(array_filter(is_array($split) ? $split : [])),
             'allowed_roots' => $reader->allowed_roots(),
-            'max_file_size' => (int) get_option('awpt_knowledge_max_file_size', 2_097_152),
+            'max_file_size' => (int) get_option(
+                'awpt_knowledge_max_file_size',
+                FilesystemAccessPolicy::DEFAULT_MAX_FILE_SIZE,
+            ),
+            'embeddings_enabled' => '1' === (string) get_option(EmbeddingService::OPTION_ENABLED, '1'),
+            'embeddings_available' => $embeddings->is_available(),
+            'embedding_model' => $embeddings->model(),
+            'embedding_provider' => $embeddings->provider_label(),
         ];
     }
 }

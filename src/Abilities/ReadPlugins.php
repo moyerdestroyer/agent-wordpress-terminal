@@ -54,7 +54,7 @@ final class ReadPlugins {
      * @param array<string, mixed> $input
      */
     public function can_read(array $input): bool {
-        return current_user_can('manage_options');
+        return current_user_can('activate_plugins');
     }
 
     /**

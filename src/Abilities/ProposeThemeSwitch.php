@@ -71,7 +71,7 @@ final class ProposeThemeSwitch {
      * @param array<string, mixed> $input
      */
     public function can_propose(array $input): bool {
-        return current_user_can('switch_themes') && current_user_can('manage_options');
+        return current_user_can('switch_themes');
     }
 
     /**
@@ -82,7 +82,7 @@ final class ProposeThemeSwitch {
         $session_id = (int) ($input['session_id'] ?? 0);
         $stylesheet = sanitize_key((string) ($input['stylesheet'] ?? ''));
 
-        if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
+        if (!$this->sessions->exists($session_id)) {
             return new \WP_Error('awpt_session_not_found', __('Session not found.', 'agent-wordpress-terminal'));
         }
 

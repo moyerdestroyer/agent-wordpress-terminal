@@ -68,7 +68,7 @@ final class SearchContent {
     public function can_search(array $input): bool {
         unset($input);
 
-        return current_user_can('manage_options');
+        return current_user_can('edit_posts');
     }
 
     /**

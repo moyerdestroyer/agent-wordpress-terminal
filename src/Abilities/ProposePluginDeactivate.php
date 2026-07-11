@@ -73,7 +73,7 @@ final class ProposePluginDeactivate {
      * @param array<string, mixed> $input
      */
     public function can_propose(array $input): bool {
-        return current_user_can('activate_plugins') && current_user_can('manage_options');
+        return current_user_can('activate_plugins');
     }
 
     /**
@@ -84,7 +84,7 @@ final class ProposePluginDeactivate {
         $session_id = (int) ($input['session_id'] ?? 0);
         $plugin_file = sanitize_text_field((string) ($input['plugin_file'] ?? ''));
 
-        if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
+        if (!$this->sessions->exists($session_id)) {
             return new \WP_Error('awpt_session_not_found', __('Session not found.', 'agent-wordpress-terminal'));
         }
 

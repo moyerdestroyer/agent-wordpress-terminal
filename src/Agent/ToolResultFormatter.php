@@ -83,10 +83,6 @@ final class ToolResultFormatter {
             return new ToolResultContentReadFormatter()->format($tool, $output);
         }
 
-        if ('awpt/read-settings' === $tool) {
-            return new ToolResultSettingsFormatter()->format($output);
-        }
-
         if ('awpt/read-site-health' === $tool) {
             return new ToolResultSiteHealthFormatter()->format($output);
         }

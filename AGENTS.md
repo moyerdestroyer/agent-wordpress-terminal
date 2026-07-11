@@ -18,7 +18,7 @@ AWPT is a WordPress admin app: a terminal-style cockpit for chatting with an age
 - `src/REST/` — `awpt/v1` API (sessions, chat, context, tools)
 - `src/Abilities/` — WordPress Abilities (`awpt/*`)
 - `src/Agent/` — runtime, providers, tool execution
-- `src/MCP/` — MCP status adapter
+- `src/MCP/` — MCP status adapter + in-process WordPress MCP Adapter bridge (auto-detect, not a network client)
 - `src/Database/` — custom tables on activation
 - `assets/` — React TSX admin UI, built to `build/`
 
@@ -85,7 +85,7 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 - Abilities: register on `wp_abilities_api_init`, category `awpt`, prefix `awpt/`.
 - TSX: match existing terminal UI patterns in `assets/components/`. Use `@wordpress/i18n` for user-facing strings.
 - Do not store large model payloads in post meta/options — use custom tables (`wp_awpt_*`).
-- Treat the agent as untrusted: capability checks on tools, explicit approval for destructive actions.
+- Treat the agent as untrusted: ability `permission_callback`s use minimum WordPress caps (no redundant `manage_options` double-gates on content/media/theme/plugin ops). Diagnostics and site-settings stay admin-only. `awpt/apply-action` stays human-only. Discovered abilities/MCP tools are auto-offered unless disabled in the Tools UI (`awpt_disabled_tools`).
 
 ## Key files
 

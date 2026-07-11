@@ -2,4 +2,4 @@
 
 ## Knowledge
 
-- [ ] Add embedding retrieval through OpenRouter's `/embeddings` API, with configurable model, dimensions, batch size, and keyword retrieval fallback.
+- [x] Add embedding retrieval through OpenRouter's `/embeddings` API, with configurable model, batch size, and keyword retrieval fallback (hybrid RRF).

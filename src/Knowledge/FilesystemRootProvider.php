@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Resolves configured Knowledge document roots.
+ * Resolves Knowledge document roots — open under wp-content by default.
  */
 final class FilesystemRootProvider {
     private FilesystemAccessPolicy $policy;
@@ -63,11 +63,22 @@ final class FilesystemRootProvider {
      * @return list<string>
      */
     private function configured_roots(): array {
-        $upload_dir = wp_get_upload_dir();
         $roots = [];
+        $upload_dir = wp_get_upload_dir();
 
         if (is_string($upload_dir['basedir'] ?? null)) {
             $roots[] = $upload_dir['basedir'];
+        }
+
+        $stylesheet = get_stylesheet_directory();
+        $template = get_template_directory();
+
+        if ('' !== $stylesheet) {
+            $roots[] = $stylesheet;
+        }
+
+        if ('' !== $template && $template !== $stylesheet) {
+            $roots[] = $template;
         }
 
         $configured = (string) get_option('awpt_knowledge_roots', '');

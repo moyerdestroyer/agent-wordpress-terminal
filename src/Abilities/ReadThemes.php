@@ -44,7 +44,7 @@ final class ReadThemes {
      * @param array<string, mixed> $input Ability input.
      */
     public function can_read(array $input): bool {
-        return current_user_can('manage_options');
+        return current_user_can('switch_themes') || current_user_can('edit_theme_options');
     }
 
     /**

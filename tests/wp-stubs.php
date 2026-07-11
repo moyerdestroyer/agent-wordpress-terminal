@@ -41,6 +41,7 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_attachment_is_image'] = [];
     $GLOBALS['awpt_test_trashed_posts'] = [];
     $GLOBALS['awpt_test_users'] = [];
+    $GLOBALS['awpt_test_filters'] = [];
 }
 
 awpt_test_reset_state();
@@ -83,6 +84,12 @@ if (!function_exists('sanitize_key')) {
 
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $value): string {
+        return trim($value);
+    }
+}
+
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field(string $value): string {
         return trim($value);
     }
 }
@@ -417,9 +424,33 @@ if (!function_exists('update_post_meta')) {
     }
 }
 
+if (!function_exists('add_filter')) {
+    /**
+     * @param callable $callback Filter callback.
+     */
+    function add_filter(string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1): bool {
+        unset($accepted_args);
+        $GLOBALS['awpt_test_filters'][$hook_name][$priority][] = $callback;
+
+        return true;
+    }
+}
+
 if (!function_exists('apply_filters')) {
     function apply_filters(string $hook_name, mixed $value, mixed ...$args): mixed {
-        unset($hook_name, $args);
+        $by_priority = $GLOBALS['awpt_test_filters'][$hook_name] ?? [];
+
+        if ([] === $by_priority) {
+            return $value;
+        }
+
+        ksort($by_priority);
+
+        foreach ($by_priority as $callbacks) {
+            foreach ($callbacks as $callback) {
+                $value = $callback($value, ...$args);
+            }
+        }
 
         return $value;
     }

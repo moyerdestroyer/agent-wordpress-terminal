@@ -14,6 +14,7 @@ use AWPT\Abilities\RegisterAbilities;
 use AWPT\Admin\Page;
 use AWPT\Database\Installer;
 use AWPT\Knowledge\KnowledgeIndexer;
+use AWPT\MCP\WordPressMcpBridge;
 use AWPT\REST\ActionsController;
 use AWPT\REST\ChatController;
 use AWPT\REST\IncidentsController;
@@ -65,6 +66,7 @@ final class Plugin {
         KnowledgeIndexer::register_content_hooks();
         new Page()->init();
         new RegisterAbilities()->init();
+        new WordPressMcpBridge()->init();
     }
 
     /**

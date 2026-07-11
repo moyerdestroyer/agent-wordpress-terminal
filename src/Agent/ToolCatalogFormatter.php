@@ -10,8 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-use AWPT\MCP\Adapter;
-
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -27,10 +25,18 @@ final class ToolCatalogFormatter {
      */
     private const ABILITY_DESCRIPTIONS = [
         'awpt/read-content' => 'Returns readable post or page content and metadata.',
-        'awpt/read-settings' => 'Returns non-secret WordPress site settings and environment details.',
         'awpt/read-themes' => 'Returns installed WordPress themes and the active stylesheet.',
-        'awpt/read-users' => 'Returns WordPress user summaries without exposing emails or password data.',
+        'awpt/read-theme-json' => 'Returns active theme theme.json settings/styles summary for design constraints.',
         'awpt/read-block-tree' => 'Returns parsed Gutenberg block structure for a post.',
+        'awpt/get-block' => 'Returns one Gutenberg block by dotted path (name, attrs, fingerprint).',
+        'awpt/list-blocks' => 'Lists Gutenberg blocks as a flat path/name/attrs index; optional name filter.',
+        'awpt/render-block' => 'Renders one block or the full post to HTML via render_block().',
+        'awpt/list-templates' => 'Lists block theme templates and template parts.',
+        'awpt/read-template' => 'Reads a template/template part with content and block summary.',
+        'core/get-site-info' => 'Returns WordPress site information (Core ability; shared with MCP).',
+        'core/get-user-info' => 'Returns the current authenticated user profile (Core ability; shared with MCP).',
+        'core/get-environment-info' => 'Returns WordPress runtime environment details (Core ability; shared with MCP).',
+        'core/read-settings' => 'Returns WordPress settings exposed to abilities (Core/AI ability; shared with MCP).',
         'awpt/analyze-page' => 'Returns an agent-friendly page brief with structure and risk signals.',
         'awpt/preview-post' => 'Returns preview URL and iframe metadata for a post.',
         'awpt/search-content' => 'Finds posts, pages, templates, template parts, and reusable blocks by title, slug, ID, or URL.',
@@ -39,6 +45,8 @@ final class ToolCatalogFormatter {
         'awpt/read-knowledge' => 'Reads a specific Core Knowledge or legacy guideline record by WordPress post ID.',
         'awpt/propose-content-update' => 'Stages a proposed post update (title, content, status, or meta) for explicit admin approval.',
         'awpt/propose-block-attrs-update' => 'Stages a targeted Gutenberg block attribute update by block path for explicit admin approval.',
+        'awpt/propose-block-insert' => 'Stages insertion of a Gutenberg block (before/after/append a path) for admin approval.',
+        'awpt/propose-block-remove' => 'Stages removal of a Gutenberg block by path and fingerprint for admin approval.',
         'awpt/propose-new-post' => 'Stages creation of a brand new post or page for explicit admin approval. Use for new posts, not existing ones. Optional featured_image_id sets the WordPress featured image on apply.',
         'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
         'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
@@ -60,6 +68,8 @@ final class ToolCatalogFormatter {
     private const APPROVAL_REQUIRED_ABILITIES = [
         'awpt/propose-content-update',
         'awpt/propose-block-attrs-update',
+        'awpt/propose-block-insert',
+        'awpt/propose-block-remove',
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
@@ -73,35 +83,22 @@ final class ToolCatalogFormatter {
     public function get_system_prompt_catalog(): string {
         $registry = new ToolRegistry();
         $lines = [
-            'Ability names use the awpt/ prefix and are callable via function calling.',
+            'You may call any enabled site tool discovered from WordPress Abilities (any plugin/theme) and connected MCP tools. Names use namespace/tool form (e.g. core/get-site-info, ai/get-post-details, awpt/search-content).',
             'Natural language is the primary user workflow. Slash shortcuts are typed by users and should only be mentioned when users ask for shortcuts or commands.',
-            'Use awpt/search-knowledge for durable site knowledge, guidelines, memories, notes, indexed content, and allowed document sources.',
-            'Write abilities stage proposed actions for admin approval; never claim a destructive change was applied without approval.',
-            'Auto-callable ability names:',
+            'Use awpt/search-knowledge for durable site knowledge, guidelines, memories, notes, indexed content, and allowed document sources when available.',
+            'AWPT write abilities (awpt/propose-*) stage proposed actions for admin approval; never claim a destructive change was applied without approval.',
+            'Block edits: use awpt/list-blocks or awpt/read-block-tree for dotted paths (0, 2.1). Prefer fingerprint when proposing attrs/remove. Stage inserts with awpt/propose-block-insert (before|after|append) and removals with awpt/propose-block-remove.',
+            'Auto-callable tools currently enabled for this site:',
         ];
 
         foreach ($registry->get_auto_executable_ability_names() as $ability_name) {
             $lines[] = sprintf('- %s: %s', $ability_name, $this->describe_ability($ability_name));
         }
 
-        $lines[] = 'Approval-required ability names:';
+        $lines[] = 'AWPT proposal abilities (stage only; require admin apply):';
 
         foreach (self::APPROVAL_REQUIRED_ABILITIES as $ability_name) {
             $lines[] = sprintf('- %s: %s', $ability_name, $this->describe_ability($ability_name));
-        }
-
-        $mcp_tools = new Adapter()->list_tools();
-
-        if ([] !== $mcp_tools) {
-            $lines[] = 'Connected MCP tools:';
-
-            foreach ($mcp_tools as $tool) {
-                $lines[] = sprintf(
-                    '- %s: %s',
-                    (string) ($tool['name'] ?? 'unknown'),
-                    (string) ($tool['description'] ?? ''),
-                );
-            }
         }
 
         $lines[] = 'Secondary user shortcuts (do not lead with these unless asked):';

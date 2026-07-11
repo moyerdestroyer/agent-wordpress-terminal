@@ -172,9 +172,18 @@ final class KnowledgeRepository {
      * @return list<array<string, mixed>>
      */
     private function list_post_sources(string|array $post_type, string $taxonomy, string $kind): array {
+        $statuses = ['publish', 'draft', 'pending', 'private'];
+
+        // Media Library attachments use inherit; include them so PDFs are indexable.
+        if (is_array($post_type) && in_array('attachment', $post_type, true)) {
+            $statuses[] = 'inherit';
+        } elseif ('attachment' === $post_type) {
+            $statuses[] = 'inherit';
+        }
+
         $query = new \WP_Query([
             'post_type' => $post_type,
-            'post_status' => ['publish', 'draft', 'pending', 'private'],
+            'post_status' => $statuses,
             'posts_per_page' => self::SITE_CONTENT_INDEX_CAP,
             'orderby' => 'modified',
             'order' => 'DESC',

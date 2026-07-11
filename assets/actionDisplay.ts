@@ -21,6 +21,8 @@ export function canPreviewAction(payload?: ActionPayload): boolean {
 	return (
 		payload?.operation === 'content_update' ||
 		payload?.operation === 'block_attrs_update' ||
+		payload?.operation === 'block_insert' ||
+		payload?.operation === 'block_remove' ||
 		payload?.operation === 'new_post'
 	);
 }
@@ -117,11 +119,17 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 		},
 	];
 
-	if (payload.operation === 'block_attrs_update') {
+	if (
+		payload.operation === 'block_attrs_update' ||
+		payload.operation === 'block_insert' ||
+		payload.operation === 'block_remove'
+	) {
 		metadata.push(
 			{
 				label: __('Block', 'agent-wordpress-terminal'),
-				value: [payload.block_path, payload.block_name].filter(Boolean).join(' · '),
+				value: [payload.inserted_path || payload.block_path, payload.block_name, payload.position]
+					.filter(Boolean)
+					.join(' · '),
 			},
 			{
 				label: __('Attributes', 'agent-wordpress-terminal'),

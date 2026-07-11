@@ -45,8 +45,11 @@ final class KnowledgeSiteContentTypes {
 
         foreach ($post_types as $post_type) {
             $counts = wp_count_posts($post_type);
+            $statuses = 'attachment' === $post_type
+                ? ['inherit', 'private']
+                : ['publish', 'draft', 'pending', 'private'];
 
-            foreach (['publish', 'draft', 'pending', 'private'] as $status) {
+            foreach ($statuses as $status) {
                 $eligible += (int) ($counts->{$status} ?? 0);
             }
         }

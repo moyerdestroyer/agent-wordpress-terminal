@@ -51,6 +51,16 @@ final class BlockTreeFormatter {
     }
 
     /**
+     * Flatten named blocks into a path list for agent tooling.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @return array<int, array<string, mixed>>
+     */
+    public function flat_list(array $blocks, ?string $name_filter = null, int $max = 100): array {
+        return new BlockTreeFlatList($this->arrays)->collect($blocks, $name_filter, $max);
+    }
+
+    /**
      * @param array<string, mixed> $block
      */
     public static function fingerprint(array $block): string {

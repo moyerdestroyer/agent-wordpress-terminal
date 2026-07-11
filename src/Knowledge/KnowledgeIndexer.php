@@ -21,13 +21,18 @@ if (!defined('ABSPATH')) {
  * Builds AWPT's local retrieval cache from Knowledge and safe read-only sources.
  */
 final class KnowledgeIndexer {
-    private const CHUNK_SIZE = 3000;
-    private const CHUNK_OVERLAP = 250;
-
     private KnowledgeIndexRepository $index;
+    private KnowledgeSourceIndexer $source_indexer;
+    private EmbeddingService $embeddings;
 
-    public function __construct(?KnowledgeIndexRepository $index = null) {
+    public function __construct(
+        ?KnowledgeIndexRepository $index = null,
+        ?KnowledgeSourceIndexer $source_indexer = null,
+        ?EmbeddingService $embeddings = null,
+    ) {
         $this->index = $index ?? new KnowledgeIndexRepository();
+        $this->embeddings = $embeddings ?? new EmbeddingService();
+        $this->source_indexer = $source_indexer ?? new KnowledgeSourceIndexer($this->index, null, $this->embeddings);
     }
 
     /**
@@ -49,6 +54,7 @@ final class KnowledgeIndexer {
             'add_attachment',
             'edit_attachment',
             'delete_attachment',
+            'switch_theme',
         ] as $hook) {
             add_action($hook, [self::class, 'mark_stale']);
         }
@@ -67,31 +73,32 @@ final class KnowledgeIndexer {
             new FilesystemSourceReader()->list_sources(),
         );
 
-        $this->index->clear_index();
-
+        $seen_source_ids = [];
         $indexed = 0;
         $chunks = 0;
+        $skipped = 0;
+        $embedded = 0;
 
         foreach ($sources as $source) {
-            $content = trim(wp_strip_all_tags((string) ($source['content'] ?? '')));
+            $result = $this->source_indexer->index($source, $now);
 
-            if ('' === $content) {
+            if (null === $result) {
                 continue;
             }
 
-            $index_id = $this->index->insert_source($source, $content, $now);
+            $seen_source_ids[] = $result['source_id'];
 
-            if ($index_id <= 0) {
+            if ('skipped' === $result['status']) {
+                ++$skipped;
                 continue;
             }
 
-            $indexed++;
-
-            foreach ($this->chunk_text($content) as $chunk_index => $chunk_text) {
-                $this->index->insert_chunk($index_id, $chunk_index, $chunk_text, $now);
-                $chunks++;
-            }
+            ++$indexed;
+            $chunks += $result['chunks'];
+            $embedded += $result['embedded'];
         }
+
+        $this->index->delete_sources_not_in($seen_source_ids);
 
         update_option('awpt_knowledge_last_indexed_at', $now, false);
         update_option('awpt_knowledge_last_error', '', false);
@@ -100,6 +107,8 @@ final class KnowledgeIndexer {
         return [
             'indexed_sources' => $indexed,
             'indexed_chunks' => $chunks,
+            'embedded_chunks' => $embedded,
+            'skipped_unchanged' => $skipped,
             'indexed_at' => $now,
         ];
     }
@@ -108,66 +117,6 @@ final class KnowledgeIndexer {
      * @return array<string, mixed>
      */
     public function status(): array {
-        Installer::create_tables();
-
-        $source_count = $this->index->count_sources();
-        $chunk_count = $this->index->count_chunks();
-        $source_kinds = $this->index->count_sources_by_kind();
-
-        return [
-            'source_count' => $source_count,
-            'source_kinds' => $source_kinds,
-            'chunk_count' => $chunk_count,
-            'stale' => '1' === (string) get_option('awpt_knowledge_stale', '0'),
-            'needs_rebuild' =>
-                0 === $source_count || 0 === $chunk_count || '1' === (string) get_option('awpt_knowledge_stale', '0'),
-            'last_indexed_at' => (string) get_option('awpt_knowledge_last_indexed_at', ''),
-            'last_error' => (string) get_option('awpt_knowledge_last_error', ''),
-            'embedding' => [
-                'available' => false,
-                'provider' => '',
-                'model' => '',
-                'label' => __(
-                    'Keyword retrieval active; embeddings are not configured yet.',
-                    'agent-wordpress-terminal',
-                ),
-            ],
-            'filesystem' => [
-                'allowed_roots' => new FilesystemSourceReader()->allowed_roots(),
-                'max_file_size' => (int) get_option('awpt_knowledge_max_file_size', 2_097_152),
-            ],
-            'repository' => new KnowledgeRepository()->status(),
-            'site_content_index' => array_merge(new KnowledgeRepository()->site_content_index_stats(), [
-                'indexed' => (int) ($source_kinds['wp_content'] ?? 0),
-            ]),
-        ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function chunk_text(string $content): array {
-        $normalized = preg_replace('/\s+/', ' ', $content);
-        $content = trim(is_string($normalized) ? $normalized : $content);
-        $length = mb_strlen($content, 'UTF-8');
-
-        if ($length <= self::CHUNK_SIZE) {
-            return [$content];
-        }
-
-        $chunks = [];
-        $offset = 0;
-
-        while ($offset < $length) {
-            $chunk = mb_substr($content, $offset, self::CHUNK_SIZE, 'UTF-8');
-
-            if ('' !== trim($chunk)) {
-                $chunks[] = trim($chunk);
-            }
-
-            $offset += self::CHUNK_SIZE - self::CHUNK_OVERLAP;
-        }
-
-        return $chunks;
+        return new KnowledgeIndexerStatus($this->index, $this->embeddings)->build();
     }
 }

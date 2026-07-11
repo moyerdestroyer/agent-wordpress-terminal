@@ -64,7 +64,7 @@ final class SearchKnowledge {
      * @param array<string, mixed> $input Ability input.
      */
     public function can_search(array $input): bool {
-        return current_user_can('manage_options') && '' !== trim((string) ($input['query'] ?? ''));
+        return current_user_can('edit_posts') && '' !== trim((string) ($input['query'] ?? ''));
     }
 
     /**

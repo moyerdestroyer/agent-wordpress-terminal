@@ -52,9 +52,13 @@ final class Adapter {
     }
 
     /**
-     * Execute a non-destructive MCP tool through integration filters.
+     * Execute an MCP tool through integration filters.
      *
-     * @param string               $tool_name MCP tool name.
+     * MCP parity: tools that WordPress MCP would run under the current user's
+     * capabilities are not re-gated behind AWPT staged approval here. Integrations
+     * (and ability `permission_callback`s) remain responsible for authz.
+     *
+     * @param string                  $tool_name MCP tool name.
      * @param array<array-key, mixed> $input Tool input.
      * @return array<array-key, mixed>|\WP_Error
      */
@@ -65,25 +69,15 @@ final class Adapter {
             return new \WP_Error('awpt_mcp_tool_not_found', __('MCP tool not found.', 'agent-wordpress-terminal'));
         }
 
-        if (
-            is_bool($tool['destructive'] ?? null) && $tool['destructive']
-            || is_bool($tool['requires_approval'] ?? null) && $tool['requires_approval']
-        ) {
-            return new \WP_Error('awpt_mcp_tool_requires_approval', __(
-                'This MCP tool requires an explicit staged approval workflow before execution.',
-                'agent-wordpress-terminal',
-            ));
-        }
-
         /**
          * Execute an MCP tool.
          *
          * Return an array result or WP_Error. The default null means no integration handled the tool.
          *
-         * @param mixed                $result Tool result.
-         * @param string               $tool_name Tool name.
+         * @param mixed                   $result Tool result.
+         * @param string                  $tool_name Tool name.
          * @param array<array-key, mixed> $input Tool input.
-         * @param array<string, mixed> $tool Tool metadata.
+         * @param array<string, mixed>    $tool Tool metadata.
          */
         $result = apply_filters('awpt_mcp_execute_tool', null, $tool_name, $input, $tool);
 
@@ -146,7 +140,7 @@ final class Adapter {
             'category' => sanitize_text_field((string) ($tool['category'] ?? 'mcp')),
             'input_schema' => $input_schema,
             'output_schema' => $output_schema,
-            'permission' => sanitize_text_field((string) ($tool['permission'] ?? 'manage_options')),
+            'permission' => sanitize_text_field((string) ($tool['permission'] ?? 'capability check')),
             'readonly' => array_key_exists('readonly', $tool) ? (bool) $tool['readonly'] : null,
             'destructive' => array_key_exists('destructive', $tool) ? (bool) $tool['destructive'] : null,
             'requires_approval' => array_key_exists('requires_approval', $tool)

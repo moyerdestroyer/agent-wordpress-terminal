@@ -38,6 +38,8 @@ export interface Message {
 export type ActionOperation =
 	| 'content_update'
 	| 'block_attrs_update'
+	| 'block_insert'
+	| 'block_remove'
 	| 'new_post'
 	| 'site_settings_update'
 	| 'theme_switch'
@@ -61,6 +63,9 @@ export interface ActionPayload {
 	block_path?: string;
 	block_name?: string;
 	expected_fingerprint?: string;
+	position?: string;
+	inserted_path?: string;
+	block?: Record<string, unknown>;
 	attrs?: Record<string, unknown>;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
@@ -118,13 +123,26 @@ export interface ToolInfo {
 	readonly?: boolean | null;
 	destructive?: boolean | null;
 	requires_approval?: boolean | null;
+	source?: 'ability' | 'mcp' | string;
+	enabled?: boolean;
+	never_auto?: boolean;
 }
 
 export interface ToolsResponse {
 	core: ToolInfo[];
 	plugin: ToolInfo[];
+	other?: ToolInfo[];
 	mcp: ToolInfo[];
+	disabled?: string[];
+	never_auto?: string[];
+	agent_enabled_count?: number;
 	environment?: EnvironmentStatus;
+}
+
+export interface ToolPreferencesResponse {
+	disabled: string[];
+	never_auto: string[];
+	tools?: ToolsResponse;
 }
 
 export interface KnowledgeStatus {
@@ -137,8 +155,10 @@ export interface KnowledgeStatus {
 	last_error: string;
 	embedding: {
 		available: boolean;
+		enabled?: boolean;
 		provider: string;
 		model: string;
+		embedded_chunks?: number;
 		label: string;
 	};
 	filesystem: {
@@ -157,6 +177,10 @@ export interface KnowledgeSettings {
 	roots: string[];
 	allowed_roots: string[];
 	max_file_size: number;
+	embeddings_enabled: boolean;
+	embeddings_available: boolean;
+	embedding_model: string;
+	embedding_provider: string;
 }
 
 export interface EnvironmentStatus {

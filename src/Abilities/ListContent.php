@@ -115,7 +115,7 @@ final class ListContent {
     public function can_list(array $input): bool {
         unset($input);
 
-        return current_user_can('manage_options');
+        return current_user_can('edit_posts');
     }
 
     /**

@@ -36,6 +36,22 @@ final class KnowledgePostSourceMapper {
             $content = trim($content . "\n\n" . $excerpt);
         }
 
+        if ('attachment' === $post->post_type) {
+            $alt = (string) get_post_meta($post->ID, '_wp_attachment_image_alt', true);
+            $caption = wp_strip_all_tags((string) wp_get_attachment_caption($post->ID));
+            $parts = array_filter(
+                [$content, $excerpt, $alt, $caption],
+                static fn(string $part): bool => '' !== trim($part),
+            );
+            $content = implode("\n\n", $parts);
+
+            $pdf_text = $this->attachment_pdf_text($post->ID);
+
+            if ('' !== $pdf_text) {
+                $content = trim($content . "\n\n" . $pdf_text);
+            }
+        }
+
         return [
             'kind' => $kind,
             'source_id' => $kind . ':' . $post->ID,
@@ -69,5 +85,21 @@ final class KnowledgePostSourceMapper {
         }
 
         return sprintf('%s #%d', $post->post_type, $post->ID);
+    }
+
+    private function attachment_pdf_text(int $post_id): string {
+        $mime = (string) get_post_mime_type($post_id);
+
+        if (!str_contains(strtolower($mime), 'pdf')) {
+            return '';
+        }
+
+        $path = get_attached_file($post_id);
+
+        if (!is_string($path) || !is_readable($path)) {
+            return '';
+        }
+
+        return new PdfTextExtractor()->extract($path);
     }
 }

@@ -63,8 +63,19 @@ final class KnowledgeIndexRepository {
         return (int) $wpdb->insert_id;
     }
 
-    public function insert_chunk(int $index_id, int $chunk_index, string $chunk_text, string $now): void {
+    /**
+     * @param list<float>|null $embedding Optional embedding vector for hybrid retrieval.
+     */
+    public function insert_chunk(
+        int $index_id,
+        int $chunk_index,
+        string $chunk_text,
+        string $now,
+        ?array $embedding = null,
+    ): void {
         $wpdb = WpDb::get();
+        $has_embedding = null !== $embedding && [] !== $embedding;
+        $embedding_json = $has_embedding ? wp_json_encode(array_values($embedding)) : null;
 
         $wpdb->insert(
             $wpdb->prefix . 'awpt_knowledge_chunks',
@@ -72,13 +83,60 @@ final class KnowledgeIndexRepository {
                 'index_id' => $index_id,
                 'chunk_index' => $chunk_index,
                 'chunk_text' => $chunk_text,
-                'embedding_json' => null,
-                'metadata_json' => wp_json_encode(['retrieval' => 'keyword']),
+                'embedding_json' => $embedding_json,
+                'metadata_json' => wp_json_encode([
+                    'retrieval' => $has_embedding ? 'hybrid' : 'keyword',
+                ]),
                 'char_count' => mb_strlen($chunk_text, 'UTF-8'),
                 'created_at' => $now,
             ],
             format: ['%d', '%d', '%s', '%s', '%s', '%d', '%s'],
         );
+    }
+
+    /**
+     * Load chunks that already have stored embeddings (capped for in-process similarity).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function list_chunks_with_embeddings(int $limit = 2000): array {
+        $wpdb = WpDb::get();
+        $limit = max(1, min($limit, 5000));
+        $sql = "SELECT c.id, c.chunk_text, c.chunk_index, c.embedding_json,
+				i.source_kind, i.source_id, i.source_post_id, i.label, i.uri, i.metadata_json
+			FROM {$wpdb->prefix}awpt_knowledge_chunks c
+			INNER JOIN {$wpdb->prefix}awpt_knowledge_index i ON i.id = c.index_id
+			WHERE c.embedding_json IS NOT NULL AND c.embedding_json != ''
+			ORDER BY c.id DESC
+			LIMIT %d";
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $limit), output: \ARRAY_A);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function count_chunks_with_embeddings(): int {
+        $wpdb = WpDb::get();
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM %i WHERE embedding_json IS NOT NULL AND embedding_json != ''",
+            $wpdb->prefix . 'awpt_knowledge_chunks',
+        ));
+    }
+
+    public function content_hash_for_source_id(string $source_id): ?string {
+        return new KnowledgeIndexMaintenance()->content_hash_for_source_id($source_id);
+    }
+
+    public function delete_source_by_source_id(string $source_id): void {
+        new KnowledgeIndexMaintenance()->delete_source_by_source_id($source_id);
+    }
+
+    /**
+     * @param list<string> $source_ids
+     */
+    public function delete_sources_not_in(array $source_ids): void {
+        new KnowledgeIndexMaintenance()->delete_sources_not_in($source_ids);
     }
 
     public function count_sources(): int {

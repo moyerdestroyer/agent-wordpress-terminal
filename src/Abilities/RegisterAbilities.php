@@ -49,18 +49,24 @@ final class RegisterAbilities {
         }
 
         new ReadContent()->register();
-        new ReadSettings()->register();
         new ReadThemes()->register();
-        new ReadUsers()->register();
+        new ReadThemeJson()->register();
         new ReadBlockTree()->register();
+        new GetBlock()->register();
+        new ListBlocks()->register();
+        new RenderBlock()->register();
         new AnalyzePage()->register();
         new PreviewPost()->register();
         new SearchContent()->register();
         new ListContent()->register();
+        new ListTemplates()->register();
+        new ReadTemplate()->register();
         new SearchKnowledge()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
         new ProposeBlockAttrsUpdate()->register();
+        new ProposeBlockInsert()->register();
+        new ProposeBlockRemove()->register();
         new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();

@@ -22,9 +22,14 @@ if (!defined('ABSPATH')) {
  */
 final class ContentUpdateActionApplier {
     private BlockAttrsUpdateActionApplier $block_attrs;
+    private BlockStructureUpdateActionApplier $block_structure;
 
-    public function __construct(?BlockAttrsUpdateActionApplier $block_attrs = null) {
+    public function __construct(
+        ?BlockAttrsUpdateActionApplier $block_attrs = null,
+        ?BlockStructureUpdateActionApplier $block_structure = null,
+    ) {
         $this->block_attrs = $block_attrs ?? new BlockAttrsUpdateActionApplier();
+        $this->block_structure = $block_structure ?? new BlockStructureUpdateActionApplier();
     }
 
     /**
@@ -52,6 +57,14 @@ final class ContentUpdateActionApplier {
 
         if (ActionOperations::BLOCK_ATTRS_UPDATE === $operation) {
             $rebuilt = $this->block_attrs->content_from_payload($post_id, $payload);
+
+            if (is_wp_error($rebuilt)) {
+                return $rebuilt;
+            }
+
+            $update['post_content'] = $rebuilt;
+        } elseif (ActionOperations::BLOCK_INSERT === $operation || ActionOperations::BLOCK_REMOVE === $operation) {
+            $rebuilt = $this->block_structure->content_from_payload($post_id, $payload);
 
             if (is_wp_error($rebuilt)) {
                 return $rebuilt;

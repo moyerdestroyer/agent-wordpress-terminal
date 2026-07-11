@@ -649,7 +649,7 @@ export function Terminal(): JSX.Element {
 					{sidebarTab === 'knowledge' ? (
 						<KnowledgePanel />
 					) : (
-						<ToolsSidebar tools={tools} mcpStatus={mcpStatus} />
+						<ToolsSidebar tools={tools} mcpStatus={mcpStatus} onToolsChange={setTools} />
 					)}
 
 					<div style={{ marginTop: 16 }}>

@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\MCP\Adapter;
 use AWPT\Support\ProposalAbilities;
 
 if (!defined('ABSPATH')) {
@@ -17,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Runs safe AWPT abilities requested by provider tool calls.
+ * Runs discovered abilities and MCP tools requested by provider tool calls.
  */
 final class ProviderToolCallExecutor {
     /**
@@ -149,7 +150,9 @@ final class ProviderToolCallExecutor {
             ];
         }
 
-        $result = new ToolExecutor()->execute($tool_name, $input);
+        $result = $tool_registry->is_ability($tool_name)
+            ? new ToolExecutor()->execute($tool_name, $input)
+            : new Adapter()->execute_tool($tool_name, $input);
 
         if (is_wp_error($result)) {
             $attribution = new \AWPT\Support\Diagnostics\ErrorPathAttributor()->from_text($result->get_error_message());

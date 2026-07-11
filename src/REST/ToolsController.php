@@ -12,14 +12,14 @@ namespace AWPT\REST;
 
 use AWPT\MCP\Adapter;
 use AWPT\MCP\StatusService;
-use AWPT\Support\Environment;
+use AWPT\Support\ToolPreferences;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /**
- * Exposes registered abilities and MCP status.
+ * Exposes registered abilities, MCP tools, and enable/disable preferences.
  */
 final class ToolsController {
     /**
@@ -39,6 +39,34 @@ final class ToolsController {
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'list_awpt_tools'],
                 'permission_callback' => [$this, 'can_manage'],
+            ],
+        ]);
+
+        register_rest_route(AWPT_REST_NAMESPACE, '/tools/preferences', [
+            [
+                'methods' => \WP_REST_Server::READABLE,
+                'callback' => [$this, 'get_preferences'],
+                'permission_callback' => [$this, 'can_manage'],
+            ],
+            [
+                'methods' => \WP_REST_Server::EDITABLE,
+                'callback' => [$this, 'update_preferences'],
+                'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'disabled' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'required' => false,
+                    ],
+                    'name' => [
+                        'type' => 'string',
+                        'required' => false,
+                    ],
+                    'enabled' => [
+                        'type' => 'boolean',
+                        'required' => false,
+                    ],
+                ],
             ],
         ]);
 
@@ -73,119 +101,60 @@ final class ToolsController {
         ]);
     }
 
-    /**
-     * Permission check.
-     */
     public function can_manage(): bool {
         return current_user_can('manage_options');
     }
 
-    /**
-     * List registered WordPress abilities grouped by source.
-     *
-     * @return \WP_REST_Response
-     */
     public function list_tools(): \WP_REST_Response {
-        return new \WP_REST_Response($this->tools_payload(include_all_abilities: true), 200);
+        return new \WP_REST_Response(new ToolsPayloadBuilder()->full(), 200);
     }
 
     public function list_awpt_tools(): \WP_REST_Response {
-        return new \WP_REST_Response($this->tools_payload(include_all_abilities: false), 200);
+        return new \WP_REST_Response(new ToolsPayloadBuilder()->awpt_only(), 200);
+    }
+
+    public function get_preferences(): \WP_REST_Response {
+        $prefs = new ToolPreferences();
+
+        return new \WP_REST_Response([
+            'disabled' => $prefs->disabled_names(),
+            'never_auto' => ToolPreferences::NEVER_AUTO_EXECUTE,
+        ], 200);
     }
 
     /**
-     * @return array<string, mixed>
+     * @param \WP_REST_Request $request Request object.
      */
-    private function tools_payload(bool $include_all_abilities): array {
-        $tools = [
-            'core' => [],
-            'plugin' => [],
-            'mcp' => $include_all_abilities ? new Adapter()->list_tools() : [],
-            'environment' => Environment::status(),
-        ];
+    public function update_preferences(\WP_REST_Request $request): \WP_REST_Response {
+        $prefs = new ToolPreferences();
+        $name = $request->get_param('name');
+        $enabled = $request->get_param('enabled');
 
-        if (!function_exists('wp_get_abilities')) {
-            return $tools;
+        if (is_string($name) && '' !== $name && true === $enabled) {
+            $disabled = $prefs->enable_tool($name);
+        } elseif (is_string($name) && '' !== $name && false === $enabled) {
+            $disabled = $prefs->disable_tool($name);
+        } else {
+            $disabled_param = $request->get_param('disabled');
+            $disabled = $prefs->set_disabled(is_array($disabled_param) ? $disabled_param : []);
         }
 
-        foreach (wp_get_abilities() as $ability) {
-            $name = $ability->get_name();
-            $item = $this->ability_item($ability, $include_all_abilities);
-
-            if (str_starts_with($name, 'core/')) {
-                if ($include_all_abilities) {
-                    $tools['core'][] = $item;
-                }
-                continue;
-            }
-
-            if (str_starts_with($name, 'awpt/')) {
-                $tools['plugin'][] = $item;
-            }
-        }
-
-        return $tools;
+        return new \WP_REST_Response([
+            'disabled' => $disabled,
+            'never_auto' => ToolPreferences::NEVER_AUTO_EXECUTE,
+            'tools' => new ToolsPayloadBuilder()->full(),
+        ], 200);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function ability_item(object $ability, bool $include_schemas): array {
-        $item = [
-            'name' => $ability->get_name(),
-            'label' => $ability->get_label(),
-            'description' => $ability->get_description(),
-            'category' => $ability->get_category(),
-            'input_schema' => null,
-            'output_schema' => null,
-            'permission' => null,
-            'readonly' => null,
-            'destructive' => null,
-            'requires_approval' => null,
-        ];
-
-        if ($include_schemas) {
-            $item['input_schema'] = method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : null;
-            $item['output_schema'] = method_exists($ability, 'get_output_schema')
-                ? $ability->get_output_schema()
-                : null;
-        }
-
-        if (method_exists($ability, 'get_meta')) {
-            $meta = $ability->get_meta();
-            $annotations = $meta['annotations'] ?? [];
-
-            if (is_array($annotations)) {
-                $item['readonly'] = $annotations['readonly'] ?? null;
-                $item['destructive'] = $annotations['destructive'] ?? null;
-                $item['requires_approval'] = $annotations['requires_approval'] ?? null;
-            }
-        }
-
-        return $item;
-    }
-
-    /**
-     * Return MCP connection status.
-     *
-     * @return \WP_REST_Response
-     */
     public function mcp_status(): \WP_REST_Response {
         return new \WP_REST_Response(new StatusService()->get_status(), 200);
     }
 
-    /**
-     * Return MCP tool metadata.
-     *
-     * @return \WP_REST_Response
-     */
     public function mcp_tools(): \WP_REST_Response {
         return new \WP_REST_Response(new Adapter()->list_tools(), 200);
     }
 
     /**
-     * Execute a non-destructive MCP tool.
-     *
      * @param \WP_REST_Request $request Request object.
      * @return \WP_REST_Response|\WP_Error
      */

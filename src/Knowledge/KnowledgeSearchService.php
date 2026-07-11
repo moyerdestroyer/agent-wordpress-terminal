@@ -17,32 +17,49 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Searches AWPT's local Knowledge index.
+ * Searches AWPT's local Knowledge index (keyword, optional hybrid RRF).
  */
 final class KnowledgeSearchService {
     private KnowledgeSearchRanker $ranker;
     private KnowledgeIndexRepository $index;
+    private KnowledgeSemanticRanker $semantic;
+    private KnowledgeRrfFusion $fusion;
 
-    public function __construct(?KnowledgeSearchRanker $ranker = null, ?KnowledgeIndexRepository $index = null) {
+    public function __construct(
+        ?KnowledgeSearchRanker $ranker = null,
+        ?KnowledgeIndexRepository $index = null,
+        ?KnowledgeSemanticRanker $semantic = null,
+        ?KnowledgeRrfFusion $fusion = null,
+    ) {
         $this->ranker = $ranker ?? new KnowledgeSearchRanker();
         $this->index = $index ?? new KnowledgeIndexRepository();
+        $this->semantic = $semantic ?? new KnowledgeSemanticRanker();
+        $this->fusion = $fusion ?? new KnowledgeRrfFusion();
     }
 
     /**
      * @return list<array<string, mixed>>
      */
     public function search(string $query, int $limit = 6): array {
-        $tokens = $this->ranker->tokens(trim($query));
+        $query = trim($query);
+        $limit = max(1, min($limit, 12));
+        $tokens = $this->ranker->tokens($query);
+        $keyword_ranked = [] === $tokens ? [] : $this->rank_keyword_rows($this->index->search_chunks($tokens), $tokens);
+        $semantic_ranked = $this->semantic->rank($query);
 
-        if ([] === $tokens) {
+        if ([] === $keyword_ranked && [] === $semantic_ranked) {
             return [];
         }
 
-        $ranked = $this->rank_rows($this->index->search_chunks($tokens), $tokens);
+        if ([] === $semantic_ranked) {
+            return array_slice($keyword_ranked, 0, $limit);
+        }
 
-        usort($ranked, static fn(array $left, array $right): int => $right['score'] <=> $left['score']);
+        if ([] === $keyword_ranked) {
+            return array_slice($semantic_ranked, 0, $limit);
+        }
 
-        return array_slice($ranked, 0, max(1, min($limit, 12)));
+        return $this->fusion->fuse($keyword_ranked, $semantic_ranked, $limit);
     }
 
     public function format_context_for_prompt(string $query): string {
@@ -73,16 +90,21 @@ final class KnowledgeSearchService {
      * @param list<string>               $tokens
      * @return list<array<string, mixed>>
      */
-    private function rank_rows(array $rows, array $tokens): array {
+    private function rank_keyword_rows(array $rows, array $tokens): array {
         $ranked = [];
 
         foreach ($rows as $row) {
             $result = $this->ranker->format_result($row, $tokens);
 
-            if (null !== $result) {
-                $ranked[] = $result;
+            if (null === $result) {
+                continue;
             }
+
+            $result['match'] = 'keyword';
+            $ranked[] = $result;
         }
+
+        usort($ranked, static fn(array $left, array $right): int => $right['score'] <=> $left['score']);
 
         return $ranked;
     }

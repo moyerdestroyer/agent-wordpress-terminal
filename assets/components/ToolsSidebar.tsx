@@ -1,9 +1,12 @@
+import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
+import { updateToolEnabled } from '../api';
 import type { EnvironmentStatus, McpStatus, ToolInfo, ToolsResponse } from '../types';
 
 interface ToolsSidebarProps {
 	tools: ToolsResponse | null;
 	mcpStatus: McpStatus | null;
+	onToolsChange?: (tools: ToolsResponse) => void;
 }
 
 function statusText(items: ToolInfo[]): string {
@@ -11,20 +14,31 @@ function statusText(items: ToolInfo[]): string {
 		return __('Not available', 'agent-wordpress-terminal');
 	}
 
+	const enabled = items.filter((tool) => tool.enabled !== false && !tool.never_auto).length;
+
 	return sprintf(
-		/* translators: %d: tool count */
-		__('%d available', 'agent-wordpress-terminal'),
+		/* translators: 1: enabled tool count, 2: total tool count */
+		__('%1$d of %2$d enabled', 'agent-wordpress-terminal'),
+		enabled,
 		items.length,
 	);
 }
 
 function toolMode(tool: ToolInfo): string {
+	if (tool.never_auto) {
+		return __('Human-only', 'agent-wordpress-terminal');
+	}
+
+	if (tool.enabled === false) {
+		return __('Off', 'agent-wordpress-terminal');
+	}
+
 	if (tool.destructive) {
 		return __('Write', 'agent-wordpress-terminal');
 	}
 
 	if (tool.requires_approval) {
-		return __('Approval', 'agent-wordpress-terminal');
+		return __('Stage', 'agent-wordpress-terminal');
 	}
 
 	return tool.readonly
@@ -42,7 +56,17 @@ function toolPermission(tool: ToolInfo): string | null {
 	return permission;
 }
 
-function ToolGroup({ title, items }: { title: string; items: ToolsResponse['core'] }): JSX.Element {
+function ToolGroup({
+	title,
+	items,
+	busyName,
+	onToggle,
+}: {
+	title: string;
+	items: ToolInfo[];
+	busyName: string | null;
+	onToggle: (tool: ToolInfo, enabled: boolean) => void;
+}): JSX.Element {
 	return (
 		<div className="awpt-tool-group">
 			<div className="awpt-tool-group__header">
@@ -54,24 +78,48 @@ function ToolGroup({ title, items }: { title: string; items: ToolsResponse['core
 			) : (
 				items.map((tool) => {
 					const permission = toolPermission(tool);
+					const canToggle = !tool.never_auto;
 
 					return (
-						<div className="awpt-tool-item" key={tool.name}>
+						<div
+							className={`awpt-tool-item${tool.enabled === false ? ' awpt-tool-item--disabled' : ''}`}
+							key={tool.name}
+						>
 							<div className="awpt-tool-item__main">
 								<strong>{tool.name}</strong>
 								<span>{toolMode(tool)}</span>
 							</div>
-							{tool.requires_approval || tool.destructive || permission ? (
-								<div className="awpt-tool-item__meta">
-									{tool.requires_approval ? (
-										<span>{__('Needs approval', 'agent-wordpress-terminal')}</span>
-									) : null}
-									{tool.destructive ? (
-										<span>{__('Destructive', 'agent-wordpress-terminal')}</span>
-									) : null}
-									{permission ? <span>{permission}</span> : null}
-								</div>
+							{tool.description ? (
+								<p className="awpt-tool-item__description">{tool.description}</p>
 							) : null}
+							<div className="awpt-tool-item__meta">
+								{tool.requires_approval ? (
+									<span>{__('Stages approval', 'agent-wordpress-terminal')}</span>
+								) : null}
+								{tool.destructive ? (
+									<span>{__('Destructive', 'agent-wordpress-terminal')}</span>
+								) : null}
+								{permission ? <span>{permission}</span> : null}
+								{canToggle ? (
+									<label className="awpt-tool-item__toggle">
+										<input
+											type="checkbox"
+											checked={tool.enabled !== false}
+											disabled={busyName === tool.name}
+											onChange={(event) => {
+												onToggle(tool, event.currentTarget.checked);
+											}}
+										/>
+										<span>
+											{tool.enabled === false
+												? __('Enable for agent', 'agent-wordpress-terminal')
+												: __('Enabled for agent', 'agent-wordpress-terminal')}
+										</span>
+									</label>
+								) : (
+									<span>{__('Always human-only', 'agent-wordpress-terminal')}</span>
+								)}
+							</div>
 						</div>
 					);
 				})
@@ -118,30 +166,80 @@ function EnvironmentGroup({ environment }: { environment?: EnvironmentStatus }):
 	);
 }
 
-export function ToolsSidebar({ tools, mcpStatus }: ToolsSidebarProps): JSX.Element {
-	const total = (tools?.core.length ?? 0) + (tools?.plugin.length ?? 0) + (tools?.mcp.length ?? 0);
+export function ToolsSidebar({ tools, mcpStatus, onToolsChange }: ToolsSidebarProps): JSX.Element {
+	const [busyName, setBusyName] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const core = tools?.core ?? [];
+	const plugin = tools?.plugin ?? [];
+	const other = tools?.other ?? [];
+	const mcp = tools?.mcp ?? [];
+	const total = core.length + plugin.length + other.length + mcp.length;
+	const enabled =
+		tools?.agent_enabled_count ??
+		[...core, ...plugin, ...other, ...mcp].filter(
+			(tool) => tool.enabled !== false && !tool.never_auto,
+		).length;
+
+	async function handleToggle(tool: ToolInfo, enabledNext: boolean): Promise<void> {
+		setBusyName(tool.name);
+		setError(null);
+
+		try {
+			const response = await updateToolEnabled(tool.name, enabledNext);
+
+			if (response.tools && onToolsChange) {
+				onToolsChange(response.tools);
+			}
+		} catch (toggleError) {
+			setError(
+				toggleError instanceof Error
+					? toggleError.message
+					: __('Could not update tool preference.', 'agent-wordpress-terminal'),
+			);
+		} finally {
+			setBusyName(null);
+		}
+	}
 
 	return (
 		<div>
 			<div className="awpt-tool-summary">
-				<strong>{__('Tool availability', 'agent-wordpress-terminal')}</strong>
+				<strong>{__('Connected tools', 'agent-wordpress-terminal')}</strong>
 				<span>
 					{sprintf(
-						/* translators: %d: total tool count */
-						__('%d registered for agent use', 'agent-wordpress-terminal'),
+						/* translators: 1: enabled count, 2: total discovered */
+						__('%1$d enabled · %2$d discovered', 'agent-wordpress-terminal'),
+						enabled,
 						total,
 					)}
 				</span>
 			</div>
+			<p className="awpt-tool-summary__hint">
+				{__(
+					'Any plugin or theme ability and connected MCP tool is available to the agent. Uncheck tools to hide them from chat.',
+					'agent-wordpress-terminal',
+				)}
+			</p>
+			{error ? <p className="awpt-error">{error}</p> : null}
 			<EnvironmentGroup environment={tools?.environment} />
 
 			<ToolGroup
 				title={__('Core Abilities', 'agent-wordpress-terminal')}
-				items={tools?.core ?? []}
+				items={core}
+				busyName={busyName}
+				onToggle={handleToggle}
 			/>
 			<ToolGroup
-				title={__('Plugin Abilities', 'agent-wordpress-terminal')}
-				items={tools?.plugin ?? []}
+				title={__('AWPT Abilities', 'agent-wordpress-terminal')}
+				items={plugin}
+				busyName={busyName}
+				onToggle={handleToggle}
+			/>
+			<ToolGroup
+				title={__('Other plugin & theme abilities', 'agent-wordpress-terminal')}
+				items={other}
+				busyName={busyName}
+				onToggle={handleToggle}
 			/>
 
 			<div className="awpt-tool-group">
@@ -169,7 +267,12 @@ export function ToolsSidebar({ tools, mcpStatus }: ToolsSidebarProps): JSX.Eleme
 				)}
 			</div>
 
-			<ToolGroup title={__('MCP Tools', 'agent-wordpress-terminal')} items={tools?.mcp ?? []} />
+			<ToolGroup
+				title={__('MCP-only tools', 'agent-wordpress-terminal')}
+				items={mcp}
+				busyName={busyName}
+				onToggle={handleToggle}
+			/>
 		</div>
 	);
 }

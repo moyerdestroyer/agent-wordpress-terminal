@@ -54,6 +54,7 @@ final class ProviderMessageBuilder {
             DiagnosisInstructions::system_prompt_line(),
             $this->get_open_incidents_context($session_id),
             new ToolCatalogFormatter()->get_system_prompt_catalog(),
+            $this->get_theme_context(),
             new KnowledgeRepository()->format_guidelines_for_prompt(),
             $this->get_knowledge_summary($session_id),
         ]);
@@ -155,5 +156,78 @@ final class ProviderMessageBuilder {
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Bounded theme.json summary so the agent knows design tokens without a tool round-trip.
+     */
+    private function get_theme_context(): string {
+        $stylesheet = get_stylesheet();
+        $theme = wp_get_theme($stylesheet);
+        $name = $theme->exists() ? $theme->get('Name') : $stylesheet;
+        $path = trailingslashit(get_stylesheet_directory()) . 'theme.json';
+
+        if (!is_readable($path)) {
+            return sprintf(
+                'Active theme: %s (%s). No theme.json found; use awpt/read-theme-json or theme files under the theme directory when design context is needed.',
+                $name,
+                $stylesheet,
+            );
+        }
+
+        $raw = file_get_contents($path);
+
+        if (!is_string($raw) || '' === trim($raw)) {
+            return sprintf('Active theme: %s (%s). theme.json unreadable.', $name, $stylesheet);
+        }
+
+        $decoded_raw = json_decode($raw, true);
+
+        if (!is_array($decoded_raw)) {
+            return sprintf('Active theme: %s (%s). theme.json is not valid JSON.', $name, $stylesheet);
+        }
+
+        /** @var array<string, mixed> $decoded */
+        $decoded = $decoded_raw;
+        $settings = is_array($decoded['settings'] ?? null) ? $decoded['settings'] : [];
+        $summary = [
+            'version' => $decoded['version'] ?? null,
+            'color_palette' => is_array($settings['color'] ?? null) ? $settings['color']['palette'] ?? null : null,
+            'color_gradients' => is_array($settings['color'] ?? null) ? $settings['color']['gradients'] ?? null : null,
+            'font_families' => is_array($settings['typography'] ?? null)
+                ? $settings['typography']['fontFamilies'] ?? null
+                : null,
+            'font_sizes' => is_array($settings['typography'] ?? null)
+                ? $settings['typography']['fontSizes'] ?? null
+                : null,
+            'spacing_sizes' => is_array($settings['spacing'] ?? null)
+                ? $settings['spacing']['spacingSizes'] ?? null
+                : null,
+            'layout' => $settings['layout'] ?? null,
+            'custom_templates' => $decoded['customTemplates'] ?? null,
+            'template_parts' => $decoded['templateParts'] ?? null,
+        ];
+
+        // Drop empty keys to keep the prompt small.
+        $summary = array_filter(
+            $summary,
+            static fn(mixed $value): bool => null !== $value && [] !== $value && '' !== $value,
+        );
+        $encoded = wp_json_encode($summary, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($encoded)) {
+            return sprintf('Active theme: %s (%s).', $name, $stylesheet);
+        }
+
+        if (strlen($encoded) > 3500) {
+            $encoded = mb_substr($encoded, 0, 3500, 'UTF-8') . '…';
+        }
+
+        return sprintf(
+            "Active theme: %s (%s). Design tokens from theme.json (use awpt/read-theme-json for the full file):\n%s",
+            $name,
+            $stylesheet,
+            $encoded,
+        );
     }
 }

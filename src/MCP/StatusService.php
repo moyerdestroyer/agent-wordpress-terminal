@@ -27,12 +27,14 @@ final class StatusService {
         $connected = (bool) apply_filters('awpt_mcp_connected', false);
         $server = (string) apply_filters('awpt_mcp_server_url', '');
         $tool_count = count(new Adapter()->list_tools());
+        $stored_sync = (string) get_option('awpt_mcp_last_sync', '');
+        $last_sync = (string) apply_filters('awpt_mcp_last_sync', $stored_sync);
 
         return [
             'connected' => $connected,
             'server_url' => $server,
             'tool_count' => $tool_count,
-            'last_sync' => get_option('awpt_mcp_last_sync', ''),
+            'last_sync' => $last_sync,
             'label' => $connected
                 ? __('Connected', 'agent-wordpress-terminal')
                 : __('Disconnected', 'agent-wordpress-terminal'),

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Agent tool registry.
+ * Agent tool registry — discovers site-wide abilities and MCP tools.
  *
  * @package AWPT
  */
@@ -10,45 +10,41 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-use AWPT\Abilities\AbilitySchemas;
 use AWPT\Support\ProposalAbilities;
+use AWPT\Support\ToolPreferences;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /**
- * Converts safe AWPT abilities into chat completion tools.
+ * Builds provider tools from every registered WordPress ability and connected MCP tool.
+ *
+ * Plugins/themes register Abilities (or MCP integrations hook `awpt_mcp_tools`);
+ * AWPT offers them to the agent unless the admin disables them. A small deny-list
+ * (`awpt/apply-action`) stays human-only.
  */
 final class ToolRegistry {
+    private ToolPreferences $preferences;
+
+    private ToolNameMapper $names;
+
+    private ToolDiscovery $discovery;
+
     /**
-     * Read-only abilities that may run during provider response generation.
+     * @var array<string, true>|null
      */
-    private const AUTO_TOOL_MAP = [
-        'awpt__read_content' => 'awpt/read-content',
-        'awpt__read_settings' => 'awpt/read-settings',
-        'awpt__read_themes' => 'awpt/read-themes',
-        'awpt__read_users' => 'awpt/read-users',
-        'awpt__read_block_tree' => 'awpt/read-block-tree',
-        'awpt__analyze_page' => 'awpt/analyze-page',
-        'awpt__preview_post' => 'awpt/preview-post',
-        'awpt__search_content' => 'awpt/search-content',
-        'awpt__list_content' => 'awpt/list-content',
-        'awpt__search_knowledge' => 'awpt/search-knowledge',
-        'awpt__read_knowledge' => 'awpt/read-knowledge',
-        'awpt__propose_content_update' => 'awpt/propose-content-update',
-        'awpt__propose_block_attrs_update' => 'awpt/propose-block-attrs-update',
-        'awpt__propose_new_post' => 'awpt/propose-new-post',
-        'awpt__propose_site_settings_update' => 'awpt/propose-site-settings-update',
-        'awpt__propose_theme_switch' => 'awpt/propose-theme-switch',
-        'awpt__propose_plugin_deactivate' => 'awpt/propose-plugin-deactivate',
-        'awpt__sideload_media' => 'awpt/sideload-media',
-        'awpt__read_error_log' => 'awpt/read-error-log',
-        'awpt__read_plugins' => 'awpt/read-plugins',
-        'awpt__read_site_health' => 'awpt/read-site-health',
-        'awpt__probe_url' => 'awpt/probe-url',
-        'awpt__diagnose_error' => 'awpt/diagnose-error',
-    ];
+    private ?array $discovered_set = null;
+
+    public function __construct(
+        ?ToolPreferences $preferences = null,
+        ?ToolNameMapper $names = null,
+        ?ToolDiscovery $discovery = null,
+    ) {
+        $this->preferences = $preferences ?? new ToolPreferences();
+        $this->names = $names ?? new ToolNameMapper();
+        $this->discovery = $discovery ?? new ToolDiscovery();
+    }
 
     /**
      * @return list<string>
@@ -57,114 +53,114 @@ final class ToolRegistry {
         return ProposalAbilities::names();
     }
 
-    /**
-     * Whether a successful execution of this ability should surface as a staged action.
-     */
     public static function is_proposal_ability(string $tool_name): bool {
         return ProposalAbilities::is_proposal($tool_name);
     }
 
     /**
-     * Return ability names that may run automatically during provider generation.
-     *
      * @return list<string>
      */
     public function get_auto_executable_ability_names(): array {
-        return array_values(self::AUTO_TOOL_MAP);
-    }
+        $names = [];
 
-    /**
-     * Return OpenAI-compatible function tools.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public function get_chat_completion_tools(): array {
-        if (!function_exists('wp_get_abilities')) {
-            return [];
-        }
-
-        $tools = [];
-
-        foreach (wp_get_abilities() as $ability) {
-            $name = $ability->get_name();
-            $function_name = $this->function_name_for_tool($name);
-
-            if (null === $function_name) {
+        foreach ($this->discovered_tool_names() as $tool_name) {
+            if (!$this->can_auto_execute($tool_name)) {
                 continue;
             }
 
-            $schema = method_exists($ability, 'get_input_schema')
-                ? $ability->get_input_schema()
-                : AbilitySchemas::empty_object_input();
-
-            $tools[] = [
-                'type' => 'function',
-                'function' => [
-                    'name' => $function_name,
-                    'description' => $ability->get_description(),
-                    'parameters' => AbilitySchemas::normalize_for_provider($schema),
-                ],
-            ];
+            $names[] = $tool_name;
         }
 
-        return $tools;
+        return $names;
     }
 
     /**
-     * Resolve an ability name to a provider function name.
-     *
-     * @param string $ability_name Ability name.
+     * @return array<int, array<string, mixed>>
      */
+    public function get_chat_completion_tools(): array {
+        return new ProviderToolsBuilder($this->discovery, $this->names)->build([$this, 'can_auto_execute']);
+    }
+
     public function function_name_for_ability(string $ability_name): ?string {
-        $function_name = array_search($ability_name, self::AUTO_TOOL_MAP, true);
-
-        if (is_string($function_name)) {
-            return $function_name;
+        if ('' === $ability_name || !$this->is_discovered($ability_name)) {
+            return null;
         }
 
-        if (array_key_exists($ability_name, self::AUTO_TOOL_MAP)) {
-            return $ability_name;
-        }
+        $function_name = $this->names->to_function_name($ability_name);
 
-        return null;
+        return '' !== $function_name ? $function_name : null;
     }
 
-    /**
-     * Resolve a provider function name to an ability name.
-     *
-     * @param string $function_name Provider function name.
-     */
     public function tool_name_for_function(string $function_name): ?string {
-        if (array_key_exists($function_name, self::AUTO_TOOL_MAP)) {
-            return self::AUTO_TOOL_MAP[$function_name];
-        }
-
         if (class_exists('WP_AI_Client_Ability_Function_Resolver') && str_starts_with($function_name, 'wpab__')) {
             $ability_name = \WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name($function_name);
 
             return $this->can_auto_execute($ability_name) ? $ability_name : null;
         }
 
+        $tool_name = $this->names->to_tool_name($function_name);
+
+        if ('' === $tool_name || !$this->is_discovered($tool_name)) {
+            return null;
+        }
+
+        return $tool_name;
+    }
+
+    public function can_auto_execute(string $tool_name): bool {
+        if ('' === $tool_name || $this->preferences->is_never_auto($tool_name)) {
+            return false;
+        }
+
+        if (!$this->preferences->is_enabled($tool_name)) {
+            return false;
+        }
+
+        return $this->is_discovered($tool_name);
+    }
+
+    public function preferred_site_info_ability(): ?string {
+        foreach (['core/read-settings', 'core/get-site-info'] as $ability_name) {
+            if ($this->can_auto_execute($ability_name)) {
+                return $ability_name;
+            }
+        }
+
         return null;
     }
 
-    /**
-     * Whether an ability is safe for automatic execution.
-     *
-     * @param string $tool_name Ability name.
-     */
-    public function can_auto_execute(string $tool_name): bool {
-        return in_array($tool_name, self::AUTO_TOOL_MAP, true);
+    public function is_ability(string $tool_name): bool {
+        return $this->discovery->is_ability($tool_name);
     }
 
     /**
-     * Resolve an ability name to a provider function name.
-     *
-     * @param string $tool_name Ability name.
+     * @return list<string>
      */
-    private function function_name_for_tool(string $tool_name): ?string {
-        $function_name = array_search($tool_name, self::AUTO_TOOL_MAP, true);
+    public function discovered_tool_names(): array {
+        return $this->discovery->all_names();
+    }
 
-        return is_string($function_name) ? $function_name : null;
+    private function is_discovered(string $tool_name): bool {
+        return array_key_exists($tool_name, $this->discovered_index());
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    /**
+     * @return array<string, true>
+     */
+    private function discovered_index(): array {
+        if (null === $this->discovered_set) {
+            $index = [];
+
+            foreach ($this->discovered_tool_names() as $name) {
+                $index[$name] = true;
+            }
+
+            $this->discovered_set = $index;
+        }
+
+        return $this->discovered_set;
     }
 }

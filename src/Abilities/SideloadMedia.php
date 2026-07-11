@@ -104,7 +104,7 @@ final class SideloadMedia {
     public function can_sideload(array $input): bool {
         unset($input);
 
-        return current_user_can('upload_files') && current_user_can('manage_options');
+        return current_user_can('upload_files');
     }
 
     /**

@@ -82,6 +82,38 @@ final class BlockTree {
     }
 
     /**
+     * Insert a block relative to a path and return serialized content.
+     *
+     * @param array<string, mixed> $new_block
+     * @return array{content: string, block: array<string, mixed>, path: string}|\WP_Error
+     */
+    public function insert_block(
+        string $path,
+        array $new_block,
+        string $position = BlockTreeStructureMutator::POSITION_AFTER,
+    ): array|\WP_Error {
+        return new BlockTreePathEditor()->insert_block($this->blocks, $path, $new_block, $position);
+    }
+
+    /**
+     * Remove a block by path and return serialized content.
+     *
+     * @return array{content: string, removed: array<string, mixed>}|\WP_Error
+     */
+    public function remove_block(string $path, string $expected_fingerprint = ''): array|\WP_Error {
+        return new BlockTreePathEditor()->remove_block($this->blocks, $path, $expected_fingerprint);
+    }
+
+    /**
+     * Flatten named blocks for list views.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function flat_list(?string $name_filter = null, int $max = 100): array {
+        return new BlockTreeFormatter()->flat_list($this->blocks, $name_filter, $max);
+    }
+
+    /**
      * Whether a block has a non-empty block name.
      *
      * @param array<string, mixed> $block

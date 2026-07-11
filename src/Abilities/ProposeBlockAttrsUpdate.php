@@ -111,7 +111,7 @@ final class ProposeBlockAttrsUpdate {
     public function can_propose(array $input): bool {
         $post_id = (int) ($input['post_id'] ?? 0);
 
-        return $post_id > 0 && current_user_can('edit_post', $post_id) && current_user_can('manage_options');
+        return $post_id > 0 && current_user_can('edit_post', $post_id);
     }
 
     /**
@@ -131,7 +131,7 @@ final class ProposeBlockAttrsUpdate {
             );
         }
 
-        if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
+        if (!$this->sessions->exists($session_id)) {
             return new \WP_Error(
                 code: 'awpt_session_not_found',
                 message: __('Session not found.', 'agent-wordpress-terminal'),
