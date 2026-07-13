@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Reads and summarizes the active theme theme.json settings.
  */
-final class ReadThemeJson {
+final class ReadThemeJson implements AbilityInterface {
     private const MAX_JSON_CHARS = 14_000;
 
     public function register(): void {

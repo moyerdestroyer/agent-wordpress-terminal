@@ -15,26 +15,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Normalizes WordPress AI Client result objects for ProviderRuntime.
+ * Normalizes WP AI Client results for ProviderRuntime.
  */
 final class WordPressAIClientResultParser {
-    /**
-     * Function call extractor.
-     */
-    private WordPressAIClientFunctionCallExtractor $function_calls;
-
-    /**
-     * @param WordPressAIClientFunctionCallExtractor|null $function_calls Optional extractor for testing.
-     */
-    public function __construct(?WordPressAIClientFunctionCallExtractor $function_calls = null) {
-        $this->function_calls = $function_calls ?? new WordPressAIClientFunctionCallExtractor();
-    }
-
-    /**
-     * Parse a provider result into AWPT's normalized response shape.
-     *
-     * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string}
-     */
     public function parse(mixed $result): array {
         if (is_wp_error($result)) {
             return [
@@ -44,11 +27,11 @@ final class WordPressAIClientResultParser {
             ];
         }
 
-        $raw_tool_calls = $this->function_calls->extract($result);
+        $raw_tool_calls = $this->extract_function_calls($result);
         $content = [] === $raw_tool_calls ? $this->extract_content($result) : '';
 
         if ([] === $raw_tool_calls && '' !== trim($content)) {
-            $embedded = new EmbeddedToolCallExtractor()->extract($content);
+            $embedded = $this->extract_embedded_tool_calls($content);
             $raw_tool_calls = $embedded['raw_tool_calls'];
             $content = $embedded['content'];
         }
@@ -61,8 +44,156 @@ final class WordPressAIClientResultParser {
     }
 
     /**
-     * Extract assistant text from a provider result.
+     * @return array<int, array<string, mixed>>
      */
+
+    private function extract_function_calls(mixed $result): array {
+        if (!is_object($result) || !method_exists($result, 'getCandidates')) {
+            return [];
+        }
+
+        $raw_tool_calls = [];
+        $candidates = $result->getCandidates();
+
+        if (!is_iterable($candidates)) {
+            return [];
+        }
+
+        foreach ($candidates as $candidate) {
+            if (!is_object($candidate) || !method_exists($candidate, 'getMessage')) {
+                continue;
+            }
+
+            $message = $candidate->getMessage();
+
+            if (!is_object($message) || !method_exists($message, 'getParts')) {
+                continue;
+            }
+
+            foreach ($message->getParts() as $part) {
+                $call = $this->extract_function_call_from_part($part);
+
+                if (null !== $call) {
+                    $raw_tool_calls[] = $call;
+                }
+            }
+        }
+
+        return $raw_tool_calls;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+
+    private function extract_function_call_from_part(mixed $part): ?array {
+        if (!is_object($part) || !method_exists($part, 'getFunctionCall')) {
+            return null;
+        }
+
+        $function_call = $part->getFunctionCall();
+
+        if (!is_object($function_call)) {
+            return null;
+        }
+
+        $name = method_exists($function_call, 'getName') ? (string) $function_call->getName() : '';
+        $id = method_exists($function_call, 'getId') ? (string) $function_call->getId() : '';
+        $args = method_exists($function_call, 'getArgs') ? $function_call->getArgs() : null;
+
+        if ('' === $name) {
+            return null;
+        }
+
+        $encoded = is_array($args) && [] !== $args ? wp_json_encode($args) : '{}';
+
+        return [
+            'id' => $id,
+            'function' => [
+                'name' => $name,
+                'arguments' => is_string($encoded) ? $encoded : '{}',
+            ],
+        ];
+    }
+
+    /**
+     * @return array{raw_tool_calls: array<int, array<string, mixed>>, content: string}
+     */
+
+    private function extract_embedded_tool_calls(string $content): array {
+        $raw_tool_calls = [];
+        $cleaned = $content;
+
+        $matches = [];
+        if (preg_match_all('/<tool_call>\s*(\{.*?\})\s*<\/tool_call>/s', $cleaned, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $decoded = json_decode($match[1] ?? '', true);
+
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                $arguments = is_array($decoded['arguments'] ?? null) ? $decoded['arguments'] : [];
+                /** @var array<string, mixed> $typed_arguments */
+                $typed_arguments = [];
+
+                foreach ($arguments as $key => $value) {
+                    if (is_string($key)) {
+                        $typed_arguments[$key] = $value;
+                    }
+                }
+
+                $call = $this->normalize_embedded_call((string) ($decoded['name'] ?? ''), $typed_arguments);
+
+                if (null !== $call) {
+                    $raw_tool_calls[] = $call;
+                }
+            }
+
+            $cleaned = trim((string) preg_replace('/<tool_call>\s*\{.*?\}\s*<\/tool_call>/s', '', $cleaned));
+        }
+
+        $matches = [];
+        if (preg_match_all('/<((?:awpt|core)\/[\w-]+)\s*\/?>(?:<\/\1>)?/i', $cleaned, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $call = $this->normalize_embedded_call($match[1] ?? '', []);
+
+                if (null !== $call) {
+                    $raw_tool_calls[] = $call;
+                }
+            }
+
+            $cleaned = trim((string) preg_replace('/<((?:awpt|core)\/[\w-]+)\s*\/?>(?:<\/\1>)?/i', '', $cleaned));
+        }
+
+        return [
+            'raw_tool_calls' => $raw_tool_calls,
+            'content' => trim($cleaned),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>|null
+     */
+
+    private function normalize_embedded_call(string $name, array $arguments): ?array {
+        $registry = new ToolRegistry();
+        $function_name = $registry->function_name_for_ability($name);
+
+        if (null === $function_name || null === $registry->tool_name_for_function($function_name)) {
+            return null;
+        }
+
+        return [
+            'id' => 'awpt_embedded_' . wp_generate_password(8, false),
+            'function' => [
+                'name' => $function_name,
+                'arguments' => wp_json_encode($arguments),
+            ],
+        ];
+    }
+
     private function extract_content(mixed $result): string {
         if (is_string($result)) {
             return $result;
@@ -74,64 +205,59 @@ final class WordPressAIClientResultParser {
 
         if (method_exists($result, 'toText')) {
             try {
-                return (string) call_user_func([$result, 'toText']);
+                return (string) $result->toText();
             } catch (\Throwable) {
                 return '';
             }
         }
 
         if (method_exists($result, 'get_text')) {
-            return (string) call_user_func([$result, 'get_text']);
+            return (string) $result->get_text();
         }
 
         return '';
     }
 
-    /**
-     * Extract model metadata from a provider result.
-     */
     private function extract_model(mixed $result): string {
         if (!is_object($result) || !method_exists($result, 'getModelMetadata')) {
             return '';
         }
 
-        $metadata = call_user_func([$result, 'getModelMetadata']);
+        $metadata = $result->getModelMetadata();
 
         if (!is_object($metadata) || !method_exists($metadata, 'getId')) {
             return '';
         }
 
-        return (string) call_user_func([$metadata, 'getId']);
+        return (string) $metadata->getId();
     }
 
-    /**
-     * Normalize provider WP_Error messages for downstream recovery.
-     */
     private function provider_error_content(\WP_Error $error): string {
         $message = $error->get_error_message();
 
-        if ($this->is_text_generation_model_error($message)) {
+        if ($this->is_text_generation_model_error_message($message)) {
             return __(
                 'The selected AI connector could not find a text-generation model for this request. Check Settings > Connectors or choose another provider in AWPT settings.',
                 'agent-wordpress-terminal',
             );
         }
 
-        if ($this->is_recoverable_provider_error($message)) {
+        if ((bool) preg_match('/no text content found|invalid schema|bad request/i', $message)) {
             return '';
         }
 
         return $message;
     }
 
-    /**
-     * Whether a provider error can be recovered via local tool execution.
-     */
-    private function is_recoverable_provider_error(string $message): bool {
-        return (bool) preg_match('/no text content found|invalid schema|bad request/i', $message);
+    public function is_text_generation_model_error(mixed $result): bool {
+        if (!is_wp_error($result)) {
+            return false;
+        }
+
+        return $this->is_text_generation_model_error_message($result->get_error_message());
     }
 
-    private function is_text_generation_model_error(string $message): bool {
+    private function is_text_generation_model_error_message(string $message): bool {
         return (bool) preg_match('/no models found.*text_generation|support text_generation/i', $message);
     }
 }

@@ -18,20 +18,18 @@ if (!defined('ABSPATH')) {
  * Lists readable WordPress content with filters, sorting, and inventory totals.
  */
 final class ContentListService {
-    private ContentSearchTypes $types;
-    private ContentListFilters $filters;
-    private ContentListQueryArgs $query_args;
-    private ContentListTotals $totals;
-    private ContentListItemFormatter $items;
-    private ContentListPostLoader $loader;
+    /**
+     * @var list<string>
+     */
+    private const STATUSES = ['publish', 'draft', 'pending', 'private', 'future'];
 
-    public function __construct() {
-        $this->types = new ContentSearchTypes();
+    private ContentSearchTypes $types;
+
+    private ContentListFilters $filters;
+
+    public function __construct(?ContentSearchTypes $types = null) {
+        $this->types = $types ?? new ContentSearchTypes();
         $this->filters = new ContentListFilters();
-        $this->query_args = new ContentListQueryArgs();
-        $this->totals = new ContentListTotals($this->types);
-        $this->items = new ContentListItemFormatter();
-        $this->loader = new ContentListPostLoader();
     }
 
     /**
@@ -50,26 +48,32 @@ final class ContentListService {
         $items = [];
 
         if (!class_exists('WP_Query')) {
+            /** @var array<string, mixed> $filters */
             return $this->empty_result($filters, $post_types);
         }
 
-        $query = new \WP_Query($this->query_args->build($filters, $post_types, $statuses));
+        $query = new \WP_Query($this->query_args($filters, $post_types, $statuses));
         /** @var list<\WP_Post|int|string> $query_posts */
         $query_posts = array_values($query->posts);
-        $post_ids = $this->query_args->post_ids_from_query($query_posts);
-        $posts = $this->loader->load($post_ids);
+        $post_ids = $this->post_ids_from_query($query_posts);
 
-        foreach ($posts as $post) {
+        foreach ($post_ids as $post_id) {
+            $post = get_post($post_id);
+
+            if (!$post instanceof \WP_Post) {
+                continue;
+            }
+
             if (!current_user_can('read_post', $post->ID) || array_key_exists($post->ID, $items)) {
                 continue;
             }
 
-            $items[$post->ID] = $this->items->from_post($post);
+            $items[$post->ID] = $this->item_from_post($post);
         }
 
         $count = count($items);
         $total = $include_total ? (int) $query->found_posts : $count;
-        $inventory = $include_totals ? $this->totals->inventory($post_types) : ['by_status' => [], 'by_type' => []];
+        $inventory = $include_totals ? $this->inventory($post_types) : ['by_status' => [], 'by_type' => []];
 
         return [
             'post_type' => $post_type,
@@ -82,6 +86,134 @@ final class ContentListService {
             'has_more' => $include_total && ($offset + $count) < $total,
             'totals_by_status' => $inventory['by_status'],
             'totals_by_type' => $this->should_include_type_totals($post_type, $post_types) ? $inventory['by_type'] : [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+
+    private function query_args(array $filters, array $post_types, array $statuses): array {
+        $args = [
+            'post_type' => $post_types,
+            'post_status' => $statuses,
+            'posts_per_page' => (int) $filters['limit'],
+            'offset' => (int) $filters['offset'],
+            'orderby' => (string) $filters['orderby'],
+            'order' => (string) $filters['order'],
+            'fields' => 'ids',
+            'no_found_rows' => !$filters['include_total'],
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
+        ];
+
+        $author_id = (int) ($filters['author_id'] ?? 0);
+        $search = (string) ($filters['search'] ?? '');
+
+        if ($author_id > 0) {
+            $args['author'] = $author_id;
+        }
+
+        if ('' !== $search) {
+            $args['s'] = $search;
+
+            if ($this->supports_title_only_search()) {
+                $args['search_columns'] = ['post_title', 'post_name'];
+            }
+        }
+
+        return $args;
+    }
+
+    /**
+     * @param list<\WP_Post|int|string> $posts
+     * @return list<int>
+     */
+    private function post_ids_from_query(array $posts): array {
+        $ids = [];
+
+        foreach ($posts as $post) {
+            if ($post instanceof \WP_Post) {
+                $ids[] = $post->ID;
+                continue;
+            }
+
+            $ids[] = (int) $post;
+        }
+
+        return array_values(array_filter($ids, static fn(int $id): bool => $id > 0));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function item_from_post(\WP_Post $post): array {
+        $author_id = (int) $post->post_author;
+
+        return [
+            'id' => $post->ID,
+            'title' => get_the_title($post),
+            'type' => $post->post_type,
+            'status' => $post->post_status,
+            'slug' => $post->post_name,
+            'author_id' => $author_id,
+            'author' => $this->author_display_name($author_id),
+            'created' => $post->post_date_gmt,
+            'modified' => $post->post_modified_gmt,
+            'excerpt' => trim($post->post_excerpt),
+            'url' => get_permalink($post),
+            'edit_url' => (string) get_edit_post_link($post->ID, 'raw'),
+        ];
+    }
+
+    private function author_display_name(int $author_id): string {
+        if ($author_id <= 0 || !function_exists('get_userdata')) {
+            return '';
+        }
+
+        $user = get_userdata($author_id);
+
+        return $user instanceof \WP_User ? $user->display_name : '';
+    }
+
+    /**
+     * @param list<string> $post_types
+     * @return array{by_status: array<string, int>, by_type: array<string, int>}
+     */
+    private function inventory(array $post_types): array {
+        if (!function_exists('wp_count_posts')) {
+            return [
+                'by_status' => [],
+                'by_type' => [],
+            ];
+        }
+
+        $types = [] !== $post_types ? $post_types : $this->types->from_requested('');
+        $by_status = [];
+        $by_type = [];
+
+        foreach ($types as $post_type) {
+            $counts = wp_count_posts($post_type);
+            $type_total = 0;
+
+            foreach (self::STATUSES as $status) {
+                $count = (int) ($counts->{$status} ?? 0);
+                $type_total += $count;
+
+                if ($count > 0) {
+                    $by_status[$status] = ($by_status[$status] ?? 0) + $count;
+                }
+            }
+
+            if ($type_total > 0) {
+                $by_type[$post_type] = $type_total;
+            }
+        }
+
+        return [
+            'by_status' => $by_status,
+            'by_type' => $by_type,
         ];
     }
 
@@ -111,6 +243,10 @@ final class ContentListService {
      */
     private function should_include_type_totals(string $requested_type, array $post_types): bool {
         return 'all' === $requested_type || count($post_types) > 1;
+    }
+
+    private function supports_title_only_search(): bool {
+        return class_exists('WP_Query') && version_compare(get_bloginfo('version'), '6.2', '>=');
     }
 
     /**

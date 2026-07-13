@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged installed-theme switch action.
  */
-final class ProposeThemeSwitch {
+final class ProposeThemeSwitch implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
 

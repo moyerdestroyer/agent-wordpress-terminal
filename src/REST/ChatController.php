@@ -19,7 +19,13 @@ if (!defined('ABSPATH')) {
 /**
  * Handles chat messages for agent sessions.
  */
-final class ChatController {
+final class ChatController extends RestController {
+    private AgentRuntime $runtime;
+
+    public function __construct(?AgentRuntime $runtime = null) {
+        $this->runtime = $runtime ?? new AgentRuntime();
+    }
+
     /**
      * Register routes.
      */
@@ -41,13 +47,6 @@ final class ChatController {
     }
 
     /**
-     * Permission check.
-     */
-    public function can_manage(): bool {
-        return current_user_can('manage_options');
-    }
-
-    /**
      * Send a user message and get an agent response.
      *
      * @param \WP_REST_Request $request Request object.
@@ -63,8 +62,7 @@ final class ChatController {
             ]);
         }
 
-        $runtime = new AgentRuntime();
-        $result = $runtime->handle_message($session_id, $message);
+        $result = $this->runtime->handle_message($session_id, $message);
 
         if (is_wp_error($result)) {
             return $result;

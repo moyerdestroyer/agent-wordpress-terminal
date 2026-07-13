@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns an agent-friendly page brief.
  */
-final class AnalyzePage {
+final class AnalyzePage implements AbilityInterface {
     /**
      * Register the ability.
      */

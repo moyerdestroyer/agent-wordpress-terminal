@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Server-side same-site URL probe for rendered errors.
  */
-final class ProbeUrl {
+final class ProbeUrl implements AbilityInterface {
     /**
      * Register the ability.
      */

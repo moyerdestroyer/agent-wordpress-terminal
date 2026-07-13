@@ -29,7 +29,9 @@ final class ToolRegistry {
 
     private ToolNameMapper $names;
 
-    private ToolDiscovery $discovery;
+    private AbilityToolDiscovery $abilities;
+
+    private McpOnlyToolDiscovery $mcp;
 
     /**
      * @var array<string, true>|null
@@ -39,11 +41,13 @@ final class ToolRegistry {
     public function __construct(
         ?ToolPreferences $preferences = null,
         ?ToolNameMapper $names = null,
-        ?ToolDiscovery $discovery = null,
+        ?AbilityToolDiscovery $abilities = null,
+        ?McpOnlyToolDiscovery $mcp = null,
     ) {
         $this->preferences = $preferences ?? new ToolPreferences();
         $this->names = $names ?? new ToolNameMapper();
-        $this->discovery = $discovery ?? new ToolDiscovery();
+        $this->abilities = $abilities ?? new AbilityToolDiscovery();
+        $this->mcp = $mcp ?? new McpOnlyToolDiscovery();
     }
 
     /**
@@ -78,7 +82,33 @@ final class ToolRegistry {
      * @return array<int, array<string, mixed>>
      */
     public function get_chat_completion_tools(): array {
-        return new ProviderToolsBuilder($this->discovery, $this->names)->build([$this, 'can_auto_execute']);
+        $tools = [];
+        $seen_functions = [];
+        $catalog = array_merge($this->ability_tools(), $this->mcp_only_tools());
+
+        foreach ($catalog as $tool) {
+            $function_name = $this->names->to_function_name($tool['name']);
+
+            if ('' === $function_name || array_key_exists($function_name, $seen_functions)) {
+                continue;
+            }
+
+            if (!$this->can_auto_execute($tool['name'])) {
+                continue;
+            }
+
+            $seen_functions[$function_name] = true;
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => $function_name,
+                    'description' => $tool['description'],
+                    'parameters' => $tool['parameters'],
+                ],
+            ];
+        }
+
+        return $tools;
     }
 
     public function function_name_for_ability(string $ability_name): ?string {
@@ -130,23 +160,50 @@ final class ToolRegistry {
     }
 
     public function is_ability(string $tool_name): bool {
-        return $this->discovery->is_ability($tool_name);
+        return $this->abilities->is_ability($tool_name);
     }
 
     /**
      * @return list<string>
      */
     public function discovered_tool_names(): array {
-        return $this->discovery->all_names();
+        $names = [];
+
+        foreach ($this->ability_tools() as $tool) {
+            $names[] = $tool['name'];
+        }
+
+        foreach ($this->mcp_only_tools() as $tool) {
+            $names[] = $tool['name'];
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>}>
+     */
+    private function ability_tools(): array {
+        return $this->abilities->tools();
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>}>
+     */
+    private function mcp_only_tools(): array {
+        $ability_names = [];
+
+        foreach ($this->ability_tools() as $tool) {
+            $ability_names[$tool['name']] = true;
+        }
+
+        return $this->mcp->tools($ability_names);
     }
 
     private function is_discovered(string $tool_name): bool {
         return array_key_exists($tool_name, $this->discovered_index());
     }
 
-    /**
-     * @return array<string, true>
-     */
     /**
      * @return array<string, true>
      */

@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 /**
  * Applies an approved staged action.
  */
-final class ApplyAction {
+final class ApplyAction implements AbilityInterface {
     private ActionRepository $actions;
     private ContentUpdateActionApplier $content_updates;
     private NewPostActionApplier $new_posts;

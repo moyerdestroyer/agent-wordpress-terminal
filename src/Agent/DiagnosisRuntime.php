@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Auto-diagnosis runtime for recorded incidents.
+ * Opt-in diagnosis runtime for recorded incidents.
  *
  * @package AWPT
  */
@@ -14,13 +14,14 @@ use AWPT\Database\IncidentRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\Diagnostics\DiagnosisInstructions;
+use AWPT\Support\IncidentRecorder;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /**
- * Runs a focused provider turn after an incident is recorded.
+ * Records tool failures and runs diagnosis when explicitly requested.
  */
 final class DiagnosisRuntime {
     private IncidentRepository $incidents;
@@ -38,9 +39,48 @@ final class DiagnosisRuntime {
     }
 
     /**
+     * Record the first failed tool call as an open incident (no nested agent turn).
+     *
+     * @param array<int, array<string, mixed>> $tool_calls
+     */
+    public function record_first_failure(int $session_id, array $tool_calls): ?int {
+        foreach ($tool_calls as $tool_call) {
+            if ('failed' !== (string) ($tool_call['status'] ?? '')) {
+                continue;
+            }
+
+            $incident_id = new IncidentRecorder()->from_tool_call($session_id, $tool_call);
+
+            if (null !== $incident_id) {
+                return $incident_id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Run diagnosis and persist incident/assistant messages to the transcript.
+     *
      * @return array<string, mixed>|\WP_Error
      */
-    public function run(int $session_id, int $incident_id, bool $persist_messages = true): array|\WP_Error {
+    public function run(int $session_id, int $incident_id): array|\WP_Error {
+        return $this->execute($session_id, $incident_id, true);
+    }
+
+    /**
+     * Run diagnosis without writing messages (nested/tool-loop use).
+     *
+     * @return array<string, mixed>|\WP_Error
+     */
+    public function run_without_transcript(int $session_id, int $incident_id): array|\WP_Error {
+        return $this->execute($session_id, $incident_id, false);
+    }
+
+    /**
+     * @return array<string, mixed>|\WP_Error
+     */
+    private function execute(int $session_id, int $incident_id, bool $persist_messages): array|\WP_Error {
         if (!$this->sessions->exists($session_id) || !current_user_can('manage_options')) {
             return new \WP_Error('awpt_session_not_found', __('Session not found.', 'agent-wordpress-terminal'));
         }
@@ -83,7 +123,7 @@ final class DiagnosisRuntime {
         }
 
         $result = new IntentToolCallEnricher()->enrich($messages, $result, $tool_registry);
-        $loop_result = new ProviderToolLoop()->run($session_id, $provider, $messages, $result, $tool_registry);
+        $loop_result = new ProviderRuntime()->run_tool_loop($session_id, $provider, $messages, $result, $tool_registry);
 
         $now = current_time('mysql');
         $content = (string) $loop_result['content'];
@@ -140,7 +180,7 @@ final class DiagnosisRuntime {
     private function incident_note(array $incident): string {
         return sprintf(
             /* translators: 1: incident kind, 2: source */
-            __('Incident recorded (%1$s via %2$s). Auto-diagnosis started.', 'agent-wordpress-terminal'),
+            __('Incident recorded (%1$s via %2$s). Diagnosis started.', 'agent-wordpress-terminal'),
             (string) ($incident['kind'] ?? 'error'),
             (string) ($incident['source'] ?? 'unknown'),
         );

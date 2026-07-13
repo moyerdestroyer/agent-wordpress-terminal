@@ -10,12 +10,12 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-use AWPT\Database\ActionPayloadSanitizers\BlockAttrsPayloadSanitizer;
+use AWPT\Database\ActionPayloadSanitizer;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
-use AWPT\Support\BlockTreeStructureMutator;
+use AWPT\Support\BlockTreeEditor;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
 /**
  * Stages insertion of a Gutenberg block at a path.
  */
-final class ProposeBlockInsert {
+final class ProposeBlockInsert implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;
@@ -140,10 +140,10 @@ final class ProposeBlockInsert {
         }
 
         $attrs = is_array($input['attrs'] ?? null)
-            ? new BlockAttrsPayloadSanitizer()->sanitize_map($input['attrs'])
+            ? new ActionPayloadSanitizer()->sanitize_attrs_map($input['attrs'])
             : [];
         $inner_html = wp_kses_post((string) ($input['inner_html'] ?? ''));
-        $block = new BlockTreeStructureMutator()->normalize_block([
+        $block = new BlockTreeEditor()->normalize_block([
             'blockName' => $block_name,
             'attrs' => $attrs,
             'innerHTML' => $inner_html,
@@ -151,7 +151,7 @@ final class ProposeBlockInsert {
             'innerContent' => [$inner_html],
         ]);
         $path = sanitize_text_field((string) ($input['block_path'] ?? ''));
-        $position = sanitize_key((string) ($input['position'] ?? BlockTreeStructureMutator::POSITION_AFTER));
+        $position = sanitize_key((string) ($input['position'] ?? BlockTree::POSITION_AFTER));
         $update = BlockTree::from_content($post->post_content)->insert_block($path, $block, $position);
 
         if (is_wp_error($update)) {

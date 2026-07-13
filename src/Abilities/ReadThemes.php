@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns installed theme summaries for agent analysis.
  */
-final class ReadThemes {
+final class ReadThemes implements AbilityInterface {
     /**
      * Register the ability.
      */

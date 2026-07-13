@@ -20,9 +20,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Records incidents and triggers auto-diagnosis.
+ * Records incidents; diagnosis runs only when auto_diagnose is true or via /diagnose.
  */
-final class IncidentsController {
+final class IncidentsController extends RestController {
     /**
      * Register routes.
      */
@@ -59,7 +59,7 @@ final class IncidentsController {
                     ],
                     'auto_diagnose' => [
                         'type' => 'boolean',
-                        'default' => true,
+                        'default' => false,
                     ],
                 ],
             ],
@@ -77,10 +77,6 @@ final class IncidentsController {
                 ],
             ],
         ]);
-    }
-
-    public function can_manage(): bool {
-        return current_user_can('manage_options');
     }
 
     /**

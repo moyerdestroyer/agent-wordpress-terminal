@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Reads a template or template part with block tree summary.
  */
-final class ReadTemplate {
+final class ReadTemplate implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/read-template',

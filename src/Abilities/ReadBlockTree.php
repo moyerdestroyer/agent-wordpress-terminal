@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns parsed Gutenberg block structure for a post.
  */
-final class ReadBlockTree {
+final class ReadBlockTree implements AbilityInterface {
     /**
      * Register the ability.
      */

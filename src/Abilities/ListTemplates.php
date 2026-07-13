@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Lists wp_template and wp_template_part posts for FSE themes.
  */
-final class ListTemplates {
+final class ListTemplates implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/list-templates',

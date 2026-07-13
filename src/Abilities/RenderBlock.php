@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Renders one block or a full post to HTML via render_block().
  */
-final class RenderBlock {
+final class RenderBlock implements AbilityInterface {
     private const MAX_HTML = 12_000;
 
     public function register(): void {

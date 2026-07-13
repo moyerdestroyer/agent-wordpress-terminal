@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns WordPress Site Health environment and test results.
  */
-final class ReadSiteHealth {
+final class ReadSiteHealth implements AbilityInterface {
     /**
      * Register the ability.
      */

@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Lists and browses WordPress content with filters, sorting, and inventory totals.
  */
-final class ListContent {
+final class ListContent implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/list-content',

@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Lists Gutenberg blocks in a post as a flat path index.
  */
-final class ListBlocks {
+final class ListBlocks implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/list-blocks',

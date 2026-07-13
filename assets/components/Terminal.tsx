@@ -57,44 +57,6 @@ function focusMeta(session: SessionSummary): string {
 		.join(' · ');
 }
 
-function mergeDiagnosisIntoState(
-	turnAt: string,
-	diagnosis: {
-		content?: string;
-		tool_calls?: ToolCall[];
-		actions?: ProposedAction[];
-	},
-	setMessages: (updater: (current: Message[]) => Message[]) => void,
-	setToolCalls: (updater: (current: ToolCall[]) => ToolCall[]) => void,
-	setActions: (updater: (current: ProposedAction[]) => ProposedAction[]) => void,
-): void {
-	if (diagnosis.content?.trim()) {
-		setMessages((current) => [
-			...current,
-			{
-				role: 'incident',
-				content: __('Incident auto-diagnosis started.', 'agent-wordpress-terminal'),
-				created_at: turnAt,
-			},
-			{ role: 'assistant', content: diagnosis.content, created_at: turnAt },
-		]);
-	}
-
-	if (diagnosis.tool_calls?.length) {
-		const turnToolCalls = diagnosis.tool_calls.map((call) => ({ ...call, created_at: turnAt }));
-		setToolCalls((current) => [...current, ...turnToolCalls]);
-		const proposalActions = proposalActionsFromToolCalls(turnToolCalls);
-
-		if (proposalActions.length > 0) {
-			setActions((current) => mergeProposalActions(current, proposalActions));
-		}
-	}
-
-	if (diagnosis.actions?.length) {
-		setActions((current) => mergeProposalActions(current, diagnosis.actions ?? []));
-	}
-}
-
 export function Terminal(): JSX.Element {
 	const [sessions, setSessions] = useState<SessionSummary[]>([]);
 	const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -173,23 +135,13 @@ export function Terminal(): JSX.Element {
 				return;
 			}
 
+			// Record only; diagnosis is opt-in via POST .../diagnose or auto_diagnose: true.
 			void reportIncident(activeSessionId, {
 				kind: 'js',
 				source,
 				error_text: errorText,
-				auto_diagnose: true,
-			})
-				.then((response) => {
-					const diagnosis = response.diagnosis_response;
-
-					if (!diagnosis) {
-						return;
-					}
-
-					const turnAt = new Date().toISOString();
-					mergeDiagnosisIntoState(turnAt, diagnosis, setMessages, setToolCalls, setActions);
-				})
-				.catch(() => {});
+				auto_diagnose: false,
+			}).catch(() => {});
 		};
 
 		const onError = (event: ErrorEvent): void => {
@@ -472,23 +424,16 @@ export function Terminal(): JSX.Element {
 		}
 
 		try {
-			const response = await reportIncident(activeSessionId, {
+			await reportIncident(activeSessionId, {
 				kind,
 				source: 'actions',
 				attempted_action: kind === 'preview_failure' ? 'preview' : 'apply',
 				action_id: action.id,
 				error_text: messageText,
-				auto_diagnose: true,
+				auto_diagnose: false,
 			});
-			const diagnosis = response.diagnosis_response;
-			const turnAt = new Date().toISOString();
-
-			if (diagnosis) {
-				mergeDiagnosisIntoState(turnAt, diagnosis, setMessages, setToolCalls, setActions);
-				return;
-			}
 		} catch {
-			// Fall back to a plain assistant error line.
+			// Still show the error line even if incident storage fails.
 		}
 
 		setMessages((current) => [...current, { role: 'assistant', content: messageText }]);

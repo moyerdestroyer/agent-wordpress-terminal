@@ -11,7 +11,6 @@ declare(strict_types=1);
 namespace AWPT\REST;
 
 use AWPT\MCP\Adapter;
-use AWPT\MCP\StatusService;
 use AWPT\Support\ToolPreferences;
 
 if (!defined('ABSPATH')) {
@@ -21,7 +20,7 @@ if (!defined('ABSPATH')) {
 /**
  * Exposes registered abilities, MCP tools, and enable/disable preferences.
  */
-final class ToolsController {
+final class ToolsController extends RestController {
     /**
      * Register routes.
      */
@@ -101,10 +100,6 @@ final class ToolsController {
         ]);
     }
 
-    public function can_manage(): bool {
-        return current_user_can('manage_options');
-    }
-
     public function list_tools(): \WP_REST_Response {
         return new \WP_REST_Response(new ToolsPayloadBuilder()->full(), 200);
     }
@@ -147,7 +142,7 @@ final class ToolsController {
     }
 
     public function mcp_status(): \WP_REST_Response {
-        return new \WP_REST_Response(new StatusService()->get_status(), 200);
+        return new \WP_REST_Response(new Adapter()->get_status(), 200);
     }
 
     public function mcp_tools(): \WP_REST_Response {

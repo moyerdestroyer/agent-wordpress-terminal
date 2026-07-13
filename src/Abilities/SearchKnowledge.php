@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Searches indexed Knowledge and read-only site sources.
  */
-final class SearchKnowledge {
+final class SearchKnowledge implements AbilityInterface {
     public function register(): void {
         wp_register_ability('awpt/search-knowledge', [
             'label' => __('Search Knowledge', 'agent-wordpress-terminal'),

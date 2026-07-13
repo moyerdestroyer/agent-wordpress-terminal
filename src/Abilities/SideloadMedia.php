@@ -26,7 +26,7 @@ if (!defined('ABSPATH')) {
  * attachment into a post still goes through the normal
  * propose-content-update → approve → apply flow.
  */
-final class SideloadMedia {
+final class SideloadMedia implements AbilityInterface {
     private MediaSideloadValidator $validator;
     private OpenGraphMediaUrlExtractor $og_extractor;
     private MessageUrlExtractor $message_url_extractor;

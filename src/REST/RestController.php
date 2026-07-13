@@ -19,6 +19,11 @@ if (!defined('ABSPATH')) {
  */
 abstract class RestController {
     /**
+     * Register REST API routes.
+     */
+    abstract public function register_routes(): void;
+
+    /**
      * Permission check for admin endpoints.
      */
     public function can_manage(): bool {

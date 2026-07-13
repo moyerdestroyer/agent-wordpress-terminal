@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Reads one Core Knowledge or legacy guideline post.
  */
-final class ReadKnowledge {
+final class ReadKnowledge implements AbilityInterface {
     public function register(): void {
         wp_register_ability('awpt/read-knowledge', [
             'label' => __('Read Knowledge', 'agent-wordpress-terminal'),

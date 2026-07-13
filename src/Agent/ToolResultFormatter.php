@@ -18,6 +18,12 @@ if (!defined('ABSPATH')) {
  * Builds readable assistant text when provider follow-up is empty.
  */
 final class ToolResultFormatter {
+    private ToolResultContentFormatter $content;
+
+    public function __construct(?ToolResultContentFormatter $content = null) {
+        $this->content = $content ?? new ToolResultContentFormatter();
+    }
+
     /**
      * Format successful tool calls into assistant-visible text.
      *
@@ -41,7 +47,7 @@ final class ToolResultFormatter {
             }
 
             if (in_array($status, ['failed', 'rejected'], true)) {
-                $sections[] = new ToolResultFailureFormatter()->format_tool_call($tool_call);
+                $sections[] = $this->format_failure($tool_call);
             }
         }
 
@@ -59,49 +65,102 @@ final class ToolResultFormatter {
     }
 
     /**
-     * Format one tool call.
-     *
      * @param array<string, mixed> $tool_call Tool call record.
      */
     private function format_tool_call(array $tool_call): string {
         $tool = (string) ($tool_call['tool'] ?? '');
         $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
 
-        if ('awpt/knowledge-auto-retrieval' === $tool) {
-            return new ToolResultKnowledgeFormatter()->format($output);
-        }
+        $content_section = $this->content->format($tool, $output);
 
-        if ('awpt/search-content' === $tool) {
-            return new ToolResultContentSearchFormatter()->format($output);
-        }
-
-        if ('awpt/list-content' === $tool) {
-            return new ToolResultContentListFormatter()->format($output);
-        }
-
-        if (in_array($tool, ['awpt/read-content', 'awpt/read-block-tree'], true)) {
-            return new ToolResultContentReadFormatter()->format($tool, $output);
-        }
-
-        if ('awpt/read-site-health' === $tool) {
-            return new ToolResultSiteHealthFormatter()->format($output);
+        if ('' !== $content_section) {
+            return $content_section;
         }
 
         if ('awpt/diagnose-error' === $tool) {
-            return new ToolResultFailureFormatter()->format_diagnosis($output);
+            return $this->format_diagnosis($output);
         }
 
         if (ToolRegistry::is_proposal_ability($tool)) {
-            return new ToolResultProposalFormatter()->format($tool, $output);
+            return $this->format_proposal($tool, $output);
         }
 
         return $this->format_generic_tool($tool, $output);
     }
 
     /**
-     * Format generic tool output.
-     *
-     * @param array<string, mixed> $output Tool output.
+     * @param array<string, mixed> $tool_call
+     */
+    private function format_failure(array $tool_call): string {
+        $tool = (string) ($tool_call['tool'] ?? '');
+        $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
+        $error = (string) ($output['error'] ?? $tool_call['status'] ?? 'failed');
+
+        return sprintf(
+            /* translators: 1: tool name, 2: error message */
+            __('Tool %1$s failed: %2$s', 'agent-wordpress-terminal'),
+            $tool,
+            $error,
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $output
+     */
+    private function format_diagnosis(array $output): string {
+        $lines = [(string) ($output['summary'] ?? __('Diagnosis complete.', 'agent-wordpress-terminal'))];
+        $suspects = is_array($output['suspects'] ?? null) ? $output['suspects'] : [];
+
+        foreach ($suspects as $suspect) {
+            if (!is_array($suspect)) {
+                continue;
+            }
+
+            $lines[] = sprintf(
+                '- %s %s (%s)',
+                (string) ($suspect['kind'] ?? 'unknown'),
+                (string) ($suspect['slug'] ?? ''),
+                (string) ($suspect['confidence'] ?? ''),
+            );
+        }
+
+        $remediations = is_array($output['suggested_remediations'] ?? null) ? $output['suggested_remediations'] : [];
+
+        if ([] !== $remediations) {
+            $lines[] = __('Suggested next steps:', 'agent-wordpress-terminal');
+
+            foreach ($remediations as $hint) {
+                if (!is_array($hint)) {
+                    continue;
+                }
+
+                $lines[] = sprintf('- %s: %s', (string) ($hint['type'] ?? 'hint'), (string) ($hint['reason'] ?? ''));
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<array-key, mixed> $output
+     */
+    private function format_proposal(string $tool, array $output): string {
+        $title = (string) ($output['title'] ?? '');
+        $status = (string) ($output['status'] ?? 'proposed');
+        $id = (int) ($output['id'] ?? 0);
+
+        return sprintf(
+            /* translators: 1: tool name, 2: action ID, 3: action title, 4: status */
+            __('%1$s staged action #%2$d: %3$s (%4$s).', 'agent-wordpress-terminal'),
+            $tool,
+            $id,
+            '' !== $title ? $title : __('Untitled action', 'agent-wordpress-terminal'),
+            $status,
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $output
      */
     private function format_generic_tool(string $tool, array $output): string {
         return sprintf(

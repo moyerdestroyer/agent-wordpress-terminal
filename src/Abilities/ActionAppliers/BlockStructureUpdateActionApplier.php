@@ -12,7 +12,7 @@ namespace AWPT\Abilities\ActionAppliers;
 
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
-use AWPT\Support\BlockTreeStructureMutator;
+use AWPT\Support\BlockTreeEditor;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -57,8 +57,8 @@ final class BlockStructureUpdateActionApplier {
                 }
             }
 
-            $block = new BlockTreeStructureMutator()->normalize_block($typed);
-            $position = (string) ($payload['position'] ?? BlockTreeStructureMutator::POSITION_AFTER);
+            $block = new BlockTreeEditor()->normalize_block($typed);
+            $position = (string) ($payload['position'] ?? BlockTree::POSITION_AFTER);
             $result = $tree->insert_block($path, $block, $position);
 
             return is_wp_error($result) ? $result : $result['content'];

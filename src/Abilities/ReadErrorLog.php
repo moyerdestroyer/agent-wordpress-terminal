@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns recent PHP error log lines for agent diagnosis.
  */
-final class ReadErrorLog {
+final class ReadErrorLog implements AbilityInterface {
     /**
      * Register the ability.
      */

@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns preview URL and iframe metadata.
  */
-final class PreviewPost {
+final class PreviewPost implements AbilityInterface {
     /**
      * Register the ability.
      */

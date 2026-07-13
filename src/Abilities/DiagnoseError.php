@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 /**
  * Orchestrates error diagnosis from logs, attribution, plugins, site health, and URL probes.
  */
-final class DiagnoseError {
+final class DiagnoseError implements AbilityInterface {
     private SessionRepository $sessions;
 
     public function __construct(?SessionRepository $sessions = null) {

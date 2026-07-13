@@ -8,10 +8,10 @@
 
 declare(strict_types=1);
 
-use AWPT\Support\Diagnostics\SiteHealthCorrelator;
+use AWPT\Support\Diagnostics\SiteHealthReader;
 
 function test_site_health_reader_correlation(): void {
-    $reader = new SiteHealthCorrelator();
+    $reader = new SiteHealthReader();
     $tests = [
         [
             'slug' => 'loopback_requests',

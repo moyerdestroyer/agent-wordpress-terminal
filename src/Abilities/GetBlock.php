@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns one Gutenberg block by dotted path.
  */
-final class GetBlock {
+final class GetBlock implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/get-block',

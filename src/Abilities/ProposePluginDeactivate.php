@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged plugin deactivation action.
  */
-final class ProposePluginDeactivate {
+final class ProposePluginDeactivate implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
 

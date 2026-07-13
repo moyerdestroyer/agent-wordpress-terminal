@@ -62,6 +62,45 @@ final class MessageRepository {
     }
 
     /**
+     * Fetch session transcript messages, oldest first.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function session_messages(int $session_id, int $limit = 30): array {
+        $wpdb = WpDb::get();
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT role, content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d ORDER BY id DESC LIMIT %d",
+                $session_id,
+                $limit,
+            ),
+            ARRAY_A,
+        );
+
+        if (!$rows) {
+            return [];
+        }
+
+        return array_reverse(array_map(static fn(array $row): array => [
+            'role' => (string) $row['role'],
+            'content' => (string) $row['content'],
+        ], $rows));
+    }
+
+    /**
+     * Fetch the most recent user message for a session.
+     */
+    public function latest_user_message(int $session_id): string {
+        $wpdb = WpDb::get();
+
+        return (string) $wpdb->get_var($wpdb->prepare(
+            "SELECT content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT 1",
+            $session_id,
+        ));
+    }
+
+    /**
      * Fetch the most recent user message bodies for a session, oldest first. Used to
      * recover ground-truth URLs a model may have mistyped when reproducing them in a
      * tool call.

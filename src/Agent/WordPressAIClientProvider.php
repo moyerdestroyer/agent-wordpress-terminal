@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Abilities\AbilitySchemas;
 use AWPT\Support\ConnectorCatalog;
 
 if (!defined('ABSPATH')) {
@@ -18,23 +19,17 @@ if (!defined('ABSPATH')) {
 
 /**
  * Uses WordPress Core's AI Client and Connectors infrastructure when available.
+ *
+ * Optional path — baseline chat remains ChatCompletionsProvider + OpenAI/OpenRouter.
  */
 final class WordPressAIClientProvider implements ProviderInterface {
-    /**
-     * Selected connector ID.
-     */
     private string $connector_id;
 
-    /**
-     * @param string $connector_id Connector registry ID.
-     */
     public function __construct(string $connector_id) {
         $this->connector_id = sanitize_key($connector_id);
     }
 
     /**
-     * Complete a chat request through wp_ai_client_prompt().
-     *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      * @param array<int, array<string, mixed>> $tools Available tools.
      * @return array<string, mixed>|\WP_Error
@@ -77,17 +72,13 @@ final class WordPressAIClientProvider implements ProviderInterface {
             break;
         }
 
-        $tool_registry = new ToolRegistry();
-        $result = new WordPressAIClientPromptRunner()->generate(
+        $result = new WordPressAIClientRunner()->generate(
             $messages,
             $this->connector_id,
-            $tool_registry->get_auto_executable_ability_names(),
+            new ToolRegistry()->get_auto_executable_ability_names(),
         );
 
         if ($result['no_text_generation_model']) {
-            // Surface this as a distinct, catchable failure so ProviderRuntime can fail
-            // over to a guaranteed direct-key provider instead of showing a dead-end,
-            // jargon-heavy error for what may have been the simplest possible request.
             return new \WP_Error(
                 'awpt_connector_no_text_generation',
                 '' !== $result['content']
@@ -112,16 +103,47 @@ final class WordPressAIClientProvider implements ProviderInterface {
         ];
     }
 
-    /**
-     * Provider identifier.
-     */
     public function get_name(): string {
         return new ConnectorCatalog()->get_provider_label($this->connector_id);
     }
 
     /**
-     * Build a normalized provider response.
+     * Shared helper for settings UI preflight.
      *
+     * @param list<string> $ability_names
+     * @return list<object>
+     */
+    public static function build_function_declarations(array $ability_names): array {
+        if (!function_exists('wp_get_ability') || !class_exists('WP_AI_Client_Ability_Function_Resolver')) {
+            return [];
+        }
+
+        $declarations = [];
+
+        foreach ($ability_names as $ability_name) {
+            $ability = wp_get_ability($ability_name);
+
+            if (null === $ability) {
+                continue;
+            }
+
+            $function_name = \WP_AI_Client_Ability_Function_Resolver::ability_name_to_function_name($ability_name);
+            $raw_schema = method_exists($ability, 'get_input_schema')
+                ? $ability->get_input_schema()
+                : AbilitySchemas::empty_object_input();
+            $normalized_schema = AbilitySchemas::normalize_for_provider($raw_schema);
+
+            $declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
+                $function_name,
+                $ability->get_description(),
+                $normalized_schema,
+            );
+        }
+
+        return $declarations;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function response(string $content): array {

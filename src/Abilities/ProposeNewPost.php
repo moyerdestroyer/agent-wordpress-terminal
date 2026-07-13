@@ -26,7 +26,7 @@ if (!defined('ABSPATH')) {
  * Use this instead of awpt/propose-content-update when there is no existing post to
  * edit — propose-content-update can only ever modify a post that already exists.
  */
-final class ProposeNewPost {
+final class ProposeNewPost implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;

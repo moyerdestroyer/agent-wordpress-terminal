@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns installed plugin inventory for agent diagnosis.
  */
-final class ReadPlugins {
+final class ReadPlugins implements AbilityInterface {
     /**
      * Register the ability.
      */

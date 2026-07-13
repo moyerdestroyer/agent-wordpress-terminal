@@ -11,8 +11,8 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\Database\IncidentRepository;
+use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
-use AWPT\Database\WpDb;
 use AWPT\Knowledge\KnowledgeRepository;
 use AWPT\Knowledge\KnowledgeSearchCache;
 use AWPT\Support\Diagnostics\DiagnosisInstructions;
@@ -25,6 +25,12 @@ if (!defined('ABSPATH')) {
  * Assembles system instructions and session history for provider calls.
  */
 final class ProviderMessageBuilder {
+    private MessageRepository $messages;
+
+    public function __construct(?MessageRepository $messages = null) {
+        $this->messages = $messages ?? new MessageRepository();
+    }
+
     /**
      * Build provider messages with terminal instructions and visible sources.
      *
@@ -74,26 +80,7 @@ final class ProviderMessageBuilder {
      * @return array<int, array<string, string>>
      */
     private function get_session_messages(int $session_id): array {
-        $wpdb = WpDb::get();
-
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT role, content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d ORDER BY id DESC LIMIT 30",
-                $session_id,
-            ),
-            ARRAY_A,
-        );
-
-        if (!$rows) {
-            return [];
-        }
-
-        $rows = array_reverse($rows);
-
-        return array_map(static fn(array $row): array => [
-            'role' => (string) $row['role'],
-            'content' => (string) $row['content'],
-        ], $rows);
+        return $this->messages->session_messages($session_id);
     }
 
     /**
@@ -102,14 +89,9 @@ final class ProviderMessageBuilder {
      * @param int $session_id Session ID.
      */
     private function get_knowledge_summary(int $session_id): string {
-        $wpdb = WpDb::get();
+        $message = $this->messages->latest_user_message($session_id);
 
-        $message = $wpdb->get_var($wpdb->prepare(
-            "SELECT content FROM {$wpdb->prefix}awpt_messages WHERE session_id = %d AND role = 'user' ORDER BY id DESC LIMIT 1",
-            $session_id,
-        ));
-
-        return new KnowledgeSearchCache()->format_context_for_prompt((string) $message);
+        return new KnowledgeSearchCache()->format_context_for_prompt($message);
     }
 
     private function get_focus_context(int $session_id): string {

@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Finds editable/readable WordPress content by natural identifiers.
  */
-final class SearchContent {
+final class SearchContent implements AbilityInterface {
     public function register(): void {
         AbilityRegistrar::register([
             'name' => 'awpt/search-content',

@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 /**
  * Returns readable post/page content for agent analysis.
  */
-final class ReadContent {
+final class ReadContent implements AbilityInterface {
     private ReadablePostMeta $meta;
 
     public function __construct(?ReadablePostMeta $meta = null) {

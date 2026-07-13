@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged site settings update action.
  */
-final class ProposeSiteSettingsUpdate {
+final class ProposeSiteSettingsUpdate implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private SiteSettingsWhitelist $whitelist;

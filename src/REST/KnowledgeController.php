@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 /**
  * Exposes Knowledge status, settings, and rebuild.
  */
-final class KnowledgeController {
+final class KnowledgeController extends RestController {
     public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/knowledge/status', [
             [
@@ -52,10 +52,6 @@ final class KnowledgeController {
                 'permission_callback' => [$this, 'can_manage'],
             ],
         ]);
-    }
-
-    public function can_manage(): bool {
-        return current_user_can('manage_options');
     }
 
     public function status(): \WP_REST_Response {

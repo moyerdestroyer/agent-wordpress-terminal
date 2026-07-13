@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 /**
  * Creates a staged content update action without saving the post.
  */
-final class ProposeContentUpdate {
+final class ProposeContentUpdate implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;

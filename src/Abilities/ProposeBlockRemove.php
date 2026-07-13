@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 /**
  * Stages removal of a Gutenberg block by path.
  */
-final class ProposeBlockRemove {
+final class ProposeBlockRemove implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;

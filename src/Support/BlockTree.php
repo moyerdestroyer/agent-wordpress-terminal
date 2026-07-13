@@ -18,6 +18,10 @@ if (!defined('ABSPATH')) {
  * Wraps parse_blocks() output with typed accessors.
  */
 final class BlockTree {
+    public const POSITION_BEFORE = 'before';
+    public const POSITION_AFTER = 'after';
+    public const POSITION_APPEND = 'append';
+
     /**
      * @param array<int, array<string, mixed>> $blocks
      */
@@ -52,14 +56,14 @@ final class BlockTree {
      * @return array<int, array<string, mixed>>
      */
     public function normalized(): array {
-        return new BlockTreeFormatter()->normalized($this->blocks);
+        return new BlockTreeView()->normalized($this->blocks);
     }
 
     /**
      * Count named blocks recursively.
      */
     public function count(): int {
-        return new BlockTreeFormatter()->count($this->blocks);
+        return new BlockTreeView()->count($this->blocks);
     }
 
     /**
@@ -68,7 +72,7 @@ final class BlockTree {
      * @return array<string, mixed>|null
      */
     public function get_block(string $path): ?array {
-        return new BlockTreePathEditor()->get_block($this->blocks, $path);
+        return new BlockTreeEditor()->get_block($this->blocks, $path);
     }
 
     /**
@@ -78,7 +82,7 @@ final class BlockTree {
      * @return array{content: string, block: array<string, mixed>}|\WP_Error
      */
     public function update_attrs(string $path, array $attrs, string $expected_fingerprint = ''): array|\WP_Error {
-        return new BlockTreePathEditor()->update_attrs($this->blocks, $path, $attrs, $expected_fingerprint);
+        return new BlockTreeEditor()->update_attrs($this->blocks, $path, $attrs, $expected_fingerprint);
     }
 
     /**
@@ -90,9 +94,9 @@ final class BlockTree {
     public function insert_block(
         string $path,
         array $new_block,
-        string $position = BlockTreeStructureMutator::POSITION_AFTER,
+        string $position = self::POSITION_AFTER,
     ): array|\WP_Error {
-        return new BlockTreePathEditor()->insert_block($this->blocks, $path, $new_block, $position);
+        return new BlockTreeEditor()->insert_block($this->blocks, $path, $new_block, $position);
     }
 
     /**
@@ -101,7 +105,7 @@ final class BlockTree {
      * @return array{content: string, removed: array<string, mixed>}|\WP_Error
      */
     public function remove_block(string $path, string $expected_fingerprint = ''): array|\WP_Error {
-        return new BlockTreePathEditor()->remove_block($this->blocks, $path, $expected_fingerprint);
+        return new BlockTreeEditor()->remove_block($this->blocks, $path, $expected_fingerprint);
     }
 
     /**
@@ -110,7 +114,7 @@ final class BlockTree {
      * @return array<int, array<string, mixed>>
      */
     public function flat_list(?string $name_filter = null, int $max = 100): array {
-        return new BlockTreeFormatter()->flat_list($this->blocks, $name_filter, $max);
+        return new BlockTreeView()->flat_list($this->blocks, $name_filter, $max);
     }
 
     /**
@@ -128,6 +132,6 @@ final class BlockTree {
      * @param array<string, mixed> $block
      */
     public static function fingerprint(array $block): string {
-        return BlockTreeFormatter::fingerprint($block);
+        return BlockTreeView::fingerprint($block);
     }
 }

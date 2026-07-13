@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Normalizes list-content request filters.
+ * Content list filter normalization.
  *
  * @package AWPT
  */
@@ -28,12 +28,6 @@ final class ContentListFilters {
      */
     private const ORDERBY_FIELDS = ['modified', 'date', 'title', 'author', 'type'];
 
-    private ContentListAuthorResolver $authors;
-
-    public function __construct(?ContentListAuthorResolver $authors = null) {
-        $this->authors = $authors ?? new ContentListAuthorResolver();
-    }
-
     /**
      * @param array<string, mixed> $input
      * @return array<string, mixed>
@@ -52,7 +46,7 @@ final class ContentListFilters {
             'post_type' => sanitize_key((string) ($input['post_type'] ?? 'post')),
             'status' => sanitize_key((string) ($input['status'] ?? '')),
             'author' => $author,
-            'author_id' => $this->authors->resolve_id($author),
+            'author_id' => $this->resolve_author_id($author),
             'search' => $search,
             'orderby' => $this->resolve_orderby((string) ($input['orderby'] ?? 'modified')),
             'order' => $this->resolve_order((string) ($input['order'] ?? 'DESC')),
@@ -107,4 +101,43 @@ final class ContentListFilters {
     private function resolve_order(string $requested): string {
         return 'ASC' === strtoupper($requested) ? 'ASC' : 'DESC';
     }
+
+    private function resolve_author_id(string $author): int {
+        if ('' === $author) {
+            return 0;
+        }
+
+        if (ctype_digit($author)) {
+            return (int) $author;
+        }
+
+        if (!function_exists('get_user_by')) {
+            return 0;
+        }
+
+        foreach (['login', 'slug', 'display_name', 'email'] as $field) {
+            $user = get_user_by($field, $author);
+
+            if ($user instanceof \WP_User) {
+                return (int) $user->ID;
+            }
+        }
+
+        return 0;
+    }
+
+    private function author_display_name(int $author_id): string {
+        if ($author_id <= 0 || !function_exists('get_userdata')) {
+            return '';
+        }
+
+        $user = get_userdata($author_id);
+
+        return $user instanceof \WP_User ? $user->display_name : '';
+    }
+
+    /**
+     * @param list<string> $post_types
+     * @return array{by_status: array<string, int>, by_type: array<string, int>}
+     */
 }

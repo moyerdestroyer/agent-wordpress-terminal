@@ -10,10 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Support\Diagnostics;
 
-use AWPT\Support\Diagnostics\Hints\ActionHints;
-use AWPT\Support\Diagnostics\Hints\PluginDeactivateHint;
-use AWPT\Support\Diagnostics\Hints\UrlHealthHints;
-
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -35,10 +31,10 @@ final class RemediationHintBuilder {
         'deactivate_plugin',
     ];
 
-    private PluginInventory $inventory;
+    private RemediationHintRules $rules;
 
     public function __construct(?PluginInventory $inventory = null) {
-        $this->inventory = $inventory ?? new PluginInventory();
+        $this->rules = new RemediationHintRules($inventory);
     }
 
     /**
@@ -47,15 +43,7 @@ final class RemediationHintBuilder {
      */
     public function build(array $context): array {
         $hints = array_values(array_filter(
-            [
-                UrlHealthHints::probe_url($context),
-                UrlHealthHints::check_site_health($context),
-                ActionHints::fix_content($context),
-                ActionHints::retry_action($context),
-                UrlHealthHints::increase_memory($context),
-                ActionHints::switch_theme($context),
-                PluginDeactivateHint::build($context, $this->inventory),
-            ],
+            $this->rules->candidates($context),
             static fn(?array $hint): bool => null !== $hint,
         ));
 

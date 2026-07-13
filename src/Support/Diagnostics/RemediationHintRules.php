@@ -1,31 +1,50 @@
 <?php
 
 /**
- * Plugin deactivation remediation hint.
+ * Individual remediation hint rules.
  *
  * @package AWPT
  */
 
 declare(strict_types=1);
 
-namespace AWPT\Support\Diagnostics\Hints;
-
-use AWPT\Support\Diagnostics\PluginInventory;
+namespace AWPT\Support\Diagnostics;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /**
- * deactivate_plugin hint rule (gated behind unambiguous attribution).
+ * Builds optional remediation hints from diagnosis context.
  */
-final class PluginDeactivateHint {
+final class RemediationHintRules {
+    private PluginInventory $inventory;
+
+    private RemediationBasicHints $basic;
+
+    public function __construct(?PluginInventory $inventory = null) {
+        $this->inventory = $inventory ?? new PluginInventory();
+        $this->basic = new RemediationBasicHints();
+    }
+
     /**
      * @param array<string, mixed> $context
-     * @return array<string, mixed>|null
+     * @return list<?array<string, mixed>>
      */
-    public static function build(array $context, PluginInventory $inventory): ?array {
-        $primary = self::primary_suspect($context);
+    public function candidates(array $context): array {
+        return [
+            $this->basic->probe_url($context),
+            $this->basic->check_site_health($context),
+            $this->basic->fix_content($context),
+            $this->basic->retry_action($context),
+            $this->basic->increase_memory($context),
+            $this->basic->switch_theme($context),
+            $this->deactivate_plugin($context),
+        ];
+    }
+
+    private function deactivate_plugin(array $context): ?array {
+        $primary = $this->basic->primary_suspect($context);
 
         if (null === $primary || 'plugin' !== ($primary['kind'] ?? '') || 'high' !== ($primary['confidence'] ?? '')) {
             return null;
@@ -42,11 +61,11 @@ final class PluginDeactivateHint {
         $evidence_lines = is_array($context['evidence'] ?? null) ? $context['evidence'] : [];
         $evidence = array_values(array_map(static fn(mixed $line): string => (string) $line, $evidence_lines));
 
-        if (!self::evidence_mentions_plugin($evidence, $slug)) {
+        if (!$this->evidence_mentions_plugin($evidence, $slug)) {
             return null;
         }
 
-        $file = $inventory->file_for_slug($slug);
+        $file = $this->inventory->file_for_slug($slug);
 
         if (null === $file || str_contains($file, 'agent-wordpress-terminal/')) {
             return null;
@@ -72,22 +91,8 @@ final class PluginDeactivateHint {
      * @param array<string, mixed> $context
      * @return array<string, mixed>|null
      */
-    private static function primary_suspect(array $context): ?array {
-        $suspects = is_array($context['suspects'] ?? null) ? $context['suspects'] : [];
-        $primary = $suspects[0] ?? null;
 
-        if (!is_array($primary)) {
-            return null;
-        }
-
-        /** @var array<string, mixed> $primary */
-        return $primary;
-    }
-
-    /**
-     * @param list<string> $evidence
-     */
-    private static function evidence_mentions_plugin(array $evidence, string $slug): bool {
+    private function evidence_mentions_plugin(array $evidence, string $slug): bool {
         if ('' === $slug) {
             return false;
         }

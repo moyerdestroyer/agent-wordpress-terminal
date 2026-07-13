@@ -19,17 +19,9 @@ if (!defined('ABSPATH')) {
  */
 final class ContentSearchService {
     private ContentSearchTypes $types;
-    private ContentSearchExactResolver $exact;
-    private ContentSearchResultSet $results;
 
-    public function __construct(
-        ?ContentSearchTypes $types = null,
-        ?ContentSearchExactResolver $exact = null,
-        ?ContentSearchResultSet $results = null,
-    ) {
+    public function __construct(?ContentSearchTypes $types = null) {
         $this->types = $types ?? new ContentSearchTypes();
-        $this->exact = $exact ?? new ContentSearchExactResolver();
-        $this->results = $results ?? new ContentSearchResultSet();
     }
 
     /**
@@ -42,8 +34,8 @@ final class ContentSearchService {
         $post_types = $this->types->from_requested((string) ($input['post_type'] ?? ''));
         $results = [];
 
-        foreach ($this->exact->candidates($query, $post_types) as $post) {
-            $this->results->add($results, $post, 'exact', $limit);
+        foreach ($this->exact_candidates($query, $post_types) as $post) {
+            $this->add_result($results, $post, 'exact', $limit);
         }
 
         $this->add_text_search_results($results, $query, $post_types, $limit);
@@ -53,6 +45,92 @@ final class ContentSearchService {
             'results' => array_values($results),
             'count' => count($results),
         ];
+    }
+
+    /**
+     * @param list<string> $post_types
+     * @return list<\WP_Post>
+     */
+    private function exact_candidates(string $query, array $post_types): array {
+        return array_values(array_filter(
+            [
+                $this->post_from_id($query, $post_types),
+                $this->post_from_url($query, $post_types),
+                $this->post_from_slug($query, $post_types),
+            ],
+            static fn(mixed $post): bool => $post instanceof \WP_Post,
+        ));
+    }
+
+    /**
+     * @param list<string> $post_types
+     */
+    private function post_from_id(string $query, array $post_types): ?\WP_Post {
+        if (!ctype_digit($query)) {
+            return null;
+        }
+
+        $post = get_post((int) $query);
+
+        if (!$post instanceof \WP_Post || !$this->is_allowed_post($post, $post_types)) {
+            return null;
+        }
+
+        return $post;
+    }
+
+    /**
+     * @param list<string> $post_types
+     */
+    private function post_from_url(string $query, array $post_types): ?\WP_Post {
+        if ('' === $query || !str_contains($query, '://') || !function_exists('url_to_postid')) {
+            return null;
+        }
+
+        $post = get_post((int) url_to_postid($query));
+
+        if (!$post instanceof \WP_Post || !$this->is_allowed_post($post, $post_types)) {
+            return null;
+        }
+
+        return $post;
+    }
+
+    /**
+     * @param list<string> $post_types
+     */
+    private function post_from_slug(string $query, array $post_types): ?\WP_Post {
+        $slug = $this->slug_from_query($query);
+
+        if ('' === $slug || !function_exists('get_page_by_path')) {
+            return null;
+        }
+
+        $post = get_page_by_path($slug, OBJECT, $post_types);
+
+        return $post instanceof \WP_Post ? $post : null;
+    }
+
+    private function slug_from_query(string $query): string {
+        $query = trim($query);
+
+        if ('' === $query) {
+            return '';
+        }
+
+        if (str_contains($query, '://')) {
+            $path = (string) wp_parse_url($query, PHP_URL_PATH);
+            $query = basename(trim($path, '/'));
+        }
+
+        return sanitize_title($query);
+    }
+
+    /**
+     * @param list<string> $post_types
+     */
+    private function is_allowed_post(\WP_Post $post, array $post_types): bool {
+        return in_array($post->post_type, $post_types, true);
     }
 
     /**
@@ -87,8 +165,32 @@ final class ContentSearchService {
                 continue;
             }
 
-            $this->results->add($results, $post, 'search', $limit);
+            $this->add_result($results, $post, 'search', $limit);
         }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $results
+     */
+    private function add_result(array &$results, \WP_Post $post, string $matched_by, int $limit): void {
+        if (count($results) >= $limit || !current_user_can('read_post', $post->ID)) {
+            return;
+        }
+
+        if (array_key_exists($post->ID, $results)) {
+            return;
+        }
+
+        $results[$post->ID] = [
+            'id' => $post->ID,
+            'title' => get_the_title($post),
+            'type' => $post->post_type,
+            'status' => $post->post_status,
+            'slug' => $post->post_name,
+            'url' => get_permalink($post),
+            'edit_url' => (string) get_edit_post_link($post->ID, 'raw'),
+            'matched_by' => $matched_by,
+        ];
     }
 
     private function supports_title_only_search(): bool {

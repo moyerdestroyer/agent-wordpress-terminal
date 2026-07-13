@@ -8,17 +8,15 @@
 
 declare(strict_types=1);
 
-use AWPT\MCP\WordPressMcpAbilityCatalog;
 use AWPT\MCP\WordPressMcpBridge;
-use AWPT\MCP\WordPressMcpMeta;
 
 function test_wordpress_mcp_bridge_meta_helpers(): void {
-    Assert::false(WordPressMcpMeta::is_public([]), 'empty meta is not MCP-public');
-    Assert::false(WordPressMcpMeta::is_public(['mcp' => ['public' => false]]), 'explicit false is not MCP-public');
-    Assert::false(WordPressMcpMeta::is_public(['mcp' => 'yes']), 'non-array mcp meta is not MCP-public');
-    Assert::true(WordPressMcpMeta::is_public(['mcp' => ['public' => true]]), 'meta.mcp.public true is MCP-public');
+    Assert::false(WordPressMcpBridge::is_public([]), 'empty meta is not MCP-public');
+    Assert::false(WordPressMcpBridge::is_public(['mcp' => ['public' => false]]), 'explicit false is not MCP-public');
+    Assert::false(WordPressMcpBridge::is_public(['mcp' => 'yes']), 'non-array mcp meta is not MCP-public');
+    Assert::true(WordPressMcpBridge::is_public(['mcp' => ['public' => true]]), 'meta.mcp.public true is MCP-public');
 
-    $annotations = WordPressMcpMeta::annotations([
+    $annotations = WordPressMcpBridge::annotations([
         'annotations' => [
             'readonly' => true,
             'destructive' => false,
@@ -29,7 +27,7 @@ function test_wordpress_mcp_bridge_meta_helpers(): void {
     Assert::true(false === $annotations['destructive'], 'destructive annotation is preserved');
     Assert::true(true === $annotations['requires_approval'], 'requires_approval annotation is preserved');
 
-    $empty = WordPressMcpMeta::annotations([]);
+    $empty = WordPressMcpBridge::annotations([]);
     Assert::true(null === $empty['readonly'], 'missing annotations stay null');
     Assert::true(null === $empty['destructive'], 'missing destructive stays null');
     Assert::true(null === $empty['requires_approval'], 'missing requires_approval stays null');
@@ -55,8 +53,8 @@ function test_wordpress_mcp_bridge_unavailable_without_adapter(): void {
 }
 
 function test_wordpress_mcp_catalog_merge_dedupes_by_name(): void {
-    $list = new AWPT\MCP\WordPressMcpToolList();
-    $merged = $list->merge([
+    $bridge = new WordPressMcpBridge();
+    $merged = $bridge->merge_tools([
         ['name' => 'external/tool', 'description' => 'from another integration'],
         ['name' => 'external/tool', 'description' => 'duplicate should drop'],
         'not-an-array',

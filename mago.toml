@@ -35,8 +35,11 @@ integrations = ["wordpress"]
 [linter.rules]
 no-global = { enabled = false }
 no-empty = { level = "warning" }
-cyclomatic-complexity = { threshold = 35, level = "warning" }
-too-many-methods = { threshold = 15, level = "warning" }
+# Raised so related logic can live together instead of file-per-method micro-classes.
+# Scores are class-level control-flow heuristics, not security gates.
+kan-defect = { threshold = 8, level = "warning" }
+cyclomatic-complexity = { threshold = 60, level = "warning" }
+too-many-methods = { threshold = 25, level = "warning" }
 no-db-schema-change = { enabled = false }
 no-else-clause = { enabled = false }
 no-direct-db-query = { enabled = false }

@@ -10,7 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-use AWPT\Database\ActionPayloadSanitizers\BlockAttrsPayloadSanitizer;
+use AWPT\Database\ActionPayloadSanitizer;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 /**
  * Stages a surgical Gutenberg block attribute update.
  */
-final class ProposeBlockAttrsUpdate {
+final class ProposeBlockAttrsUpdate implements AbilityInterface {
     private ActionRepository $actions;
     private SessionRepository $sessions;
     private StagedPostPreview $preview;
@@ -140,7 +140,7 @@ final class ProposeBlockAttrsUpdate {
         }
 
         $attrs = is_array($input['attrs'] ?? null) ? $input['attrs'] : [];
-        $attrs = new BlockAttrsPayloadSanitizer()->sanitize_map($attrs);
+        $attrs = new ActionPayloadSanitizer()->sanitize_attrs_map($attrs);
 
         if ([] === $attrs) {
             return new \WP_Error(

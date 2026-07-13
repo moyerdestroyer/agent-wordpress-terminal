@@ -1,7 +1,7 @@
 <?php
 
 /**
- * REST-backed async Site Health test runner.
+ * REST-backed async Site Health tests.
  *
  * @package AWPT
  */
@@ -32,15 +32,9 @@ final class SiteHealthAsyncRunner {
         'page_cache',
     ];
 
-    /**
-     * @param array<string, array<string, mixed>> $async_definitions
-     * @param list<string>                        $filter_tests
-     * @return list<array{slug: string, label: string, status: string, description: string, actions: string}>
-     */
     public function run(array $async_definitions, array $filter_tests): array {
         $tests = [];
         $deadline = microtime(true) + self::ASYNC_BUDGET_SECONDS;
-        $normalizer = new SiteHealthResultNormalizer();
 
         foreach ($async_definitions as $slug => $definition) {
             if (microtime(true) >= $deadline) {
@@ -59,6 +53,10 @@ final class SiteHealthAsyncRunner {
                 continue;
             }
 
+            if (!is_string($slug) || !is_array($definition)) {
+                continue;
+            }
+            /** @var array<string, mixed> $definition */
             $rest_slug = $this->async_rest_slug($slug, $definition);
 
             if (null === $rest_slug) {
@@ -71,7 +69,7 @@ final class SiteHealthAsyncRunner {
                 continue;
             }
 
-            $tests[] = $normalizer->normalize($slug, $result);
+            $tests[] = $this->normalize_result((string) $slug, $result);
         }
 
         return $tests;
@@ -80,6 +78,7 @@ final class SiteHealthAsyncRunner {
     /**
      * @param array<string, mixed> $definition
      */
+
     private function async_rest_slug(string $slug, array $definition): ?string {
         if (in_array($slug, self::ASYNC_REST_SLUGS, true)) {
             return str_replace('_', '-', $slug);
@@ -101,6 +100,7 @@ final class SiteHealthAsyncRunner {
     /**
      * @return array<string, mixed>|null
      */
+
     private function run_async_rest_test(string $rest_slug): ?array {
         $request = new \WP_REST_Request('GET', '/wp-site-health/v1/tests/' . $rest_slug);
         $response = rest_do_request($request);
@@ -109,7 +109,7 @@ final class SiteHealthAsyncRunner {
             return [
                 'label' => $rest_slug,
                 'status' => 'critical',
-                'description' => $response->as_error()->get_error_message(),
+                'description' => (string) ($response->as_error()?->get_error_message() ?? ''),
                 'actions' => '',
                 'test' => $rest_slug,
             ];
@@ -117,8 +117,46 @@ final class SiteHealthAsyncRunner {
 
         $data = $response->get_data();
 
-        return is_array($data) ? $data : null;
+        if (!is_array($data)) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $normalized */
+        $normalized = [];
+
+        foreach ($data as $key => $value) {
+            if (is_string($key)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized;
     }
+
+    /**
+     * @param array<string, mixed> $result
+     * @return array{slug: string, label: string, status: string, description: string, actions: string}
+     */
+
+    private function normalize_result(string $slug, array $result): array {
+        $status = (string) ($result['status'] ?? 'good');
+
+        if (!in_array($status, ['good', 'recommended', 'critical'], true)) {
+            $status = 'good';
+        }
+
+        return [
+            'slug' => $slug,
+            'label' => (string) ($result['label'] ?? $slug),
+            'status' => $status,
+            'description' => mb_substr(wp_strip_all_tags((string) ($result['description'] ?? '')), 0, 500),
+            'actions' => mb_substr(wp_strip_all_tags((string) ($result['actions'] ?? '')), 0, 300),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
 
     private function is_development_environment(): bool {
         if (function_exists('wp_get_environment_type')) {

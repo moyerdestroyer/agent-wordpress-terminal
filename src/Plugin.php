@@ -10,18 +10,10 @@ declare(strict_types=1);
 
 namespace AWPT;
 
-use AWPT\Abilities\RegisterAbilities;
-use AWPT\Admin\Page;
 use AWPT\Database\Installer;
 use AWPT\Knowledge\KnowledgeIndexer;
-use AWPT\MCP\WordPressMcpBridge;
-use AWPT\REST\ActionsController;
-use AWPT\REST\ChatController;
-use AWPT\REST\IncidentsController;
-use AWPT\REST\KnowledgeController;
-use AWPT\REST\SessionsController;
-use AWPT\REST\ToolsController;
 use AWPT\Support\Environment;
+use AWPT\Support\ServiceProvider;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -38,6 +30,8 @@ final class Plugin {
      */
     private static ?self $instance = null;
 
+    private ServiceProvider $services;
+
     /**
      * Get the plugin instance.
      */
@@ -53,6 +47,7 @@ final class Plugin {
      * Boot plugin services.
      */
     public function boot(): void {
+        $this->services = new ServiceProvider();
         add_action('admin_notices', [Environment::class, 'render_admin_notices']);
         add_action('init', [$this, 'init']);
         add_action('rest_api_init', [$this, 'register_rest_routes']);
@@ -64,20 +59,17 @@ final class Plugin {
     public function init(): void {
         Installer::maybe_upgrade();
         KnowledgeIndexer::register_content_hooks();
-        new Page()->init();
-        new RegisterAbilities()->init();
-        new WordPressMcpBridge()->init();
+        $this->services->page()->init();
+        $this->services->register_abilities()->init();
+        $this->services->mcp_bridge()->init();
     }
 
     /**
      * Register REST API routes.
      */
     public function register_rest_routes(): void {
-        new SessionsController()->register_routes();
-        new ChatController()->register_routes();
-        new KnowledgeController()->register_routes();
-        new ActionsController()->register_routes();
-        new IncidentsController()->register_routes();
-        new ToolsController()->register_routes();
+        foreach ($this->services->rest_controllers() as $controller) {
+            $controller->register_routes();
+        }
     }
 }
