@@ -137,7 +137,7 @@ final class ProviderMessageBuilder {
             get_the_title($post),
             $post->post_type,
             $post->post_status,
-            (string) get_permalink($post),
+            get_permalink($post),
         );
     }
 

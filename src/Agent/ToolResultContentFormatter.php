@@ -368,6 +368,9 @@ final class ToolResultContentFormatter {
         return implode("\n", $lines);
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     private function list_items(mixed $value): array {
         if (!is_array($value)) {
             return [];
@@ -375,15 +378,32 @@ final class ToolResultContentFormatter {
 
         $items = [];
 
-        foreach ($value as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
+        foreach (array_keys($value) as $key) {
+            $row = $this->as_string_keyed_row($value[$key] ?? null);
 
-            $items[] = $item;
+            if (null !== $row) {
+                $items[] = $row;
+            }
         }
 
         return $items;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function as_string_keyed_row(mixed $value): ?array {
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $row = [];
+
+        foreach (array_keys($value) as $key) {
+            $row[(string) $key] = $value[$key] ?? null;
+        }
+
+        return $row;
     }
 
     private function excerpt(string $text, int $limit): string {

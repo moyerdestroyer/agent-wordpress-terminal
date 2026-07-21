@@ -219,17 +219,10 @@ final class ToolResultFormatter {
         $preview = [];
 
         foreach (array_slice($keys, 0, 8) as $key) {
-            $value = $output[$key];
+            $rendered = $this->preview_scalar($output[$key] ?? null);
 
-            if (is_string($value)) {
-                $preview[$key] = mb_strlen($value, 'UTF-8') > 160 ? mb_substr($value, 0, 160, 'UTF-8') . '…' : $value;
-                continue;
-            }
-
-            if (is_scalar($value) || null === $value) {
-                $preview[$key] = $value;
-            } elseif (is_array($value)) {
-                $preview[$key] = sprintf('[%d items]', count($value));
+            if (null !== $rendered) {
+                $preview[(string) $key] = $rendered;
             }
         }
 
@@ -246,5 +239,21 @@ final class ToolResultFormatter {
             $tool,
             $encoded,
         );
+    }
+
+    private function preview_scalar(mixed $value): bool|float|int|string|null {
+        if (is_string($value)) {
+            return mb_strlen($value, 'UTF-8') > 160 ? mb_substr($value, 0, 160, 'UTF-8') . '…' : $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value) || null === $value) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            return sprintf('[%d items]', count($value));
+        }
+
+        return null;
     }
 }

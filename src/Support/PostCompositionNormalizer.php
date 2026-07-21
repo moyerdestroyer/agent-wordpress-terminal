@@ -94,7 +94,7 @@ final class PostCompositionNormalizer {
             return;
         }
 
-        $actual_tag = strtolower((string) ($match[1] ?? ''));
+        $actual_tag = strtolower($match[1] ?? '');
         $allowed_tags = ['div', 'section', 'main', 'header', 'footer', 'aside', 'nav', 'article'];
 
         if (!in_array($actual_tag, $allowed_tags, true)) {
@@ -152,10 +152,12 @@ final class PostCompositionNormalizer {
             $updated = preg_replace_callback(
                 '/<img\b[^>]*>/i',
                 static function (array $match) use ($class_name, &$changed): string {
-                    $tag = (string) ($match[0] ?? '');
+                    $tag = $match[0] ?? '';
+
+                    $class_match = [];
 
                     if (preg_match('/\bclass=("|\')(.*?)\1/is', $tag, $class_match)) {
-                        $existing = (string) ($class_match[2] ?? '');
+                        $existing = $class_match[2] ?? '';
 
                         $existing_classes = preg_split('/\s+/', trim($existing));
 
@@ -167,7 +169,7 @@ final class PostCompositionNormalizer {
                             'class=' . $class_match[1] . trim($existing . ' ' . $class_name) . $class_match[1];
                         $changed = true;
 
-                        return str_replace((string) $class_match[0], $replacement, $tag);
+                        return str_replace($class_match[0], $replacement, $tag);
                     }
 
                     $changed = true;

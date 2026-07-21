@@ -59,7 +59,7 @@ final class PostCompositionValidator {
 
         if ('' !== $required_pattern_prefix) {
             $checks[] = $this->validate($content, [], [], $required_pattern_prefix, [
-                'pattern_name' => (string) ($requirements['pattern_name'] ?? ''),
+                'pattern_name' => $requirements['pattern_name'] ?? '',
             ]);
         }
 
@@ -111,7 +111,7 @@ final class PostCompositionValidator {
         string $required_pattern_prefix = '',
         array $requirements = [],
     ): ?\WP_Error {
-        $pattern_name = (string) ($requirements['pattern_name'] ?? '');
+        $pattern_name = $requirements['pattern_name'] ?? '';
         $required_minimum_library_images = max(0, (int) ($requirements['minimum_library_images'] ?? 0));
         $required_minimum_visuals = max(0, (int) ($requirements['minimum_visuals'] ?? 0));
         $featured_image_id = max(0, (int) ($requirements['featured_image_id'] ?? 0));
@@ -273,7 +273,7 @@ final class PostCompositionValidator {
                 $tag_match = [];
 
                 if (preg_match('/^<([a-z][a-z0-9-]*)\b/i', $inner_html, $tag_match)) {
-                    $actual_tag = strtolower((string) ($tag_match[1] ?? ''));
+                    $actual_tag = strtolower($tag_match[1] ?? '');
 
                     if ($expected_tag !== $actual_tag) {
                         return new \WP_Error(
@@ -423,6 +423,8 @@ final class PostCompositionValidator {
 
             if (in_array($name, ['core/image', 'core/cover'], true)) {
                 $id = (int) ($attrs['id'] ?? $attrs['mediaId'] ?? 0);
+
+                $matches = [];
 
                 if ($id <= 0 && preg_match('/\bwp-image-(\d+)\b/', $inner_html, $matches)) {
                     $id = (int) ($matches[1] ?? 0);

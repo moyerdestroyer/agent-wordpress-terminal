@@ -85,7 +85,7 @@ final class ListBlocks implements AbilityInterface {
 
         $name = sanitize_text_field((string) ($input['name'] ?? ''));
         $max = (int) ($input['max'] ?? 100);
-        $tree = BlockTree::from_content((string) $post->post_content);
+        $tree = BlockTree::from_content($post->post_content);
         $blocks = $tree->flat_list('' !== $name ? $name : null, $max);
 
         return [

@@ -41,8 +41,8 @@ final class SiteHealthReader {
             ));
         }
 
-        $scope = (string) ($options['scope'] ?? 'summary');
-        $run_async = (bool) ($options['run_async'] ?? 'full' === $scope);
+        $scope = $options['scope'] ?? 'summary';
+        $run_async = $options['run_async'] ?? 'full' === $scope;
         $filter_tests = is_array($options['tests'] ?? null) ? $options['tests'] : [];
 
         if ('environment_only' === $scope) {
@@ -162,7 +162,7 @@ final class SiteHealthReader {
             }
 
             /** @var array<string, mixed> $result */
-            $tests[] = $this->normalize_result((string) $slug, $result);
+            $tests[] = $this->normalize_result($slug, $result);
         }
 
         return $tests;

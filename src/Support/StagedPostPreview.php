@@ -189,7 +189,7 @@ final class StagedPostPreview {
         $preview_url = get_preview_post_link($post);
 
         if (!is_string($preview_url) || '' === $preview_url) {
-            $preview_url = (string) get_permalink($post);
+            $preview_url = get_permalink($post);
         }
 
         if ('' === $preview_url) {

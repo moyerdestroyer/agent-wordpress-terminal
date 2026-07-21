@@ -77,6 +77,8 @@ final class OpenGraphMediaUrlExtractor {
         ];
 
         foreach ($patterns as $pattern) {
+            $matches = [];
+
             if (preg_match($pattern, $html, $matches)) {
                 return html_entity_decode($matches[1], ENT_QUOTES);
             }

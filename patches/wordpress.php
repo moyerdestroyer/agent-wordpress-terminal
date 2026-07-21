@@ -60,4 +60,21 @@ namespace {
          */
         public function get_param($key): mixed {}
     }
+
+    /**
+     * Default OBJECT output used throughout AWPT. ARRAY_A/ARRAY_N are unused here;
+     * keeping the return as WP_Post|null matches our call sites and runtime default.
+     *
+     * @param int|WP_Post|null $post
+     * @param string           $output
+     * @param string           $filter
+     */
+    function get_post($post = null, $output = OBJECT, $filter = 'raw'): ?WP_Post {}
+
+    /**
+     * @param string $url
+     * @param int    $component
+     * @return array<string, int|string>|string|int|false|null
+     */
+    function wp_parse_url($url, $component = -1): array|string|int|false|null {}
 }

@@ -78,11 +78,11 @@ final class AnalyzePage implements AbilityInterface {
             return new \WP_Error('awpt_post_not_found', __('Post not found.', 'agent-wordpress-terminal'));
         }
 
-        $blocks = parse_blocks((string) $post->post_content);
+        $blocks = parse_blocks($post->post_content);
         $block_tree = new ReadBlockTree()->execute(['id' => $post_id]);
-        $plain_text = wp_strip_all_tags((string) $post->post_content);
+        $plain_text = wp_strip_all_tags($post->post_content);
         $headings = $this->extract_headings($blocks);
-        $shortcodes = $this->extract_shortcodes((string) $post->post_content);
+        $shortcodes = $this->extract_shortcodes($post->post_content);
         $forms = $this->detect_forms($blocks);
         $custom = $this->detect_custom_blocks($blocks);
         $risk_level = $this->assess_risk($forms, $shortcodes, $custom);

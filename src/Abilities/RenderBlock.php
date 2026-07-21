@@ -86,7 +86,7 @@ final class RenderBlock implements AbilityInterface {
             ));
         }
 
-        $tree = BlockTree::from_content((string) $post->post_content);
+        $tree = BlockTree::from_content($post->post_content);
         $html = '';
         $block_name = null;
         $rendered = 0;

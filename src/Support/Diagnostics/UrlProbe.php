@@ -38,7 +38,7 @@ final class UrlProbe {
         }
 
         $status_code = (int) wp_remote_retrieve_response_code($response);
-        $body = (string) wp_remote_retrieve_body($response);
+        $body = wp_remote_retrieve_body($response);
         $content_type = (string) wp_remote_retrieve_header($response, 'content-type');
         $snippets = $this->extract_error_snippets($body);
         $attribution = $this->attributor->from_text(implode("\n", $snippets));
@@ -60,6 +60,7 @@ final class UrlProbe {
      */
     private function extract_error_snippets(string $body): array {
         $snippets = [];
+        $matches = [];
 
         if (preg_match_all(
             '/(?:PHP (?:Fatal error|Warning|Notice)[^<]{0,400}|There has been a critical error[^<]{0,200})/i',
@@ -67,7 +68,7 @@ final class UrlProbe {
             $matches,
         )) {
             foreach ($matches[0] as $match) {
-                $snippet = trim(wp_strip_all_tags((string) $match));
+                $snippet = trim(wp_strip_all_tags($match));
 
                 if ('' !== $snippet) {
                     $snippets[] = mb_substr($snippet, 0, 500);

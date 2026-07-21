@@ -127,7 +127,7 @@ final class DiagnosisRuntime {
         ]);
 
         $now = current_time('mysql');
-        $content = (string) $loop_result['content'];
+        $content = $loop_result['content'];
 
         if ('' === trim($content)) {
             $content = new ToolResultFormatter()->format_for_transcript($loop_result['tool_calls'], '');

@@ -45,20 +45,8 @@ final class ProposalRequestContext {
             $input['available_attachment_ids'] = array_values(array_unique($ids));
             // Composer paste means the admin already chose these assets for this turn.
             // Promote them to required inline evidence so featured-image-only proposals fail closed.
-            $existing_required = is_array($input['required_attachment_ids'] ?? null)
-                ? $input['required_attachment_ids']
-                : [];
-            $merged = [];
-
-            foreach ([...$existing_required, ...$ids] as $raw_id) {
-                $id = absint(is_scalar($raw_id) ? $raw_id : 0);
-
-                if ($id > 0) {
-                    $merged[] = $id;
-                }
-            }
-
-            $input['required_attachment_ids'] = array_values(array_unique($merged));
+            $existing_required = $this->positive_ids($input['required_attachment_ids'] ?? null);
+            $input['required_attachment_ids'] = array_values(array_unique([...$existing_required, ...$ids]));
         }
 
         // Surface the auto-bound revise target on the tool input (transcript + ability).
@@ -75,5 +63,30 @@ final class ProposalRequestContext {
         }
 
         return $input;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function positive_ids(mixed $value): array {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach (array_keys($value) as $key) {
+            $id = $this->positive_id($value[$key] ?? null);
+
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function positive_id(mixed $value): int {
+        return absint(is_scalar($value) ? $value : 0);
     }
 }

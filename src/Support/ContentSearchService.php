@@ -119,7 +119,8 @@ final class ContentSearchService {
         }
 
         if (str_contains($query, '://')) {
-            $path = (string) wp_parse_url($query, PHP_URL_PATH);
+            $path = wp_parse_url($query, PHP_URL_PATH);
+            $path = is_string($path) ? $path : '';
             $query = basename(trim($path, '/'));
         }
 

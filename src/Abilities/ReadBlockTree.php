@@ -82,7 +82,7 @@ final class ReadBlockTree implements AbilityInterface {
             return new \WP_Error('awpt_post_not_found', __('Post not found.', 'agent-wordpress-terminal'));
         }
 
-        $tree = BlockTree::from_content((string) $post->post_content);
+        $tree = BlockTree::from_content($post->post_content);
 
         return [
             'blocks' => $tree->normalized(),

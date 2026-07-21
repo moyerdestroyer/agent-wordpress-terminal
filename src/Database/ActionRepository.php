@@ -225,12 +225,12 @@ final class ActionRepository {
             ));
 
             if ([] !== $title_matches) {
-                return max(0, (int) ($title_matches[0]['id'] ?? 0));
+                return max(0, $title_matches[0]['id']);
             }
         }
 
         if (1 === count($typed)) {
-            return max(0, (int) ($typed[0]['id'] ?? 0));
+            return max(0, $typed[0]['id']);
         }
 
         return 0;

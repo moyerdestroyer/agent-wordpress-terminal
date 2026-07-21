@@ -58,7 +58,7 @@ final class ErrorPathAttributor {
         $evidence = [];
 
         foreach ($lines as $line) {
-            $line = trim((string) $line);
+            $line = trim($line);
 
             if ('' === $line) {
                 continue;
@@ -98,19 +98,21 @@ final class ErrorPathAttributor {
         ];
 
         foreach ($patterns as $kind => $pattern) {
+            $matches = [];
+
             if (!preg_match_all($pattern, $text, $matches, \PREG_SET_ORDER)) {
                 continue;
             }
 
             foreach ($matches as $match) {
-                $slug = sanitize_key((string) ($match[1] ?? ''));
+                $slug = sanitize_key($match[1] ?? '');
 
                 if ('' === $slug || array_key_exists($kind . ':' . $slug, $seen)) {
                     continue;
                 }
 
                 $seen[$kind . ':' . $slug] = true;
-                $file = $this->redact_path((string) ($match[0] ?? ''));
+                $file = $this->redact_path($match[0] ?? '');
 
                 $suspects[] = [
                     'kind' => $kind,

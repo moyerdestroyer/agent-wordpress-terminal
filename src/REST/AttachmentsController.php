@@ -43,7 +43,7 @@ final class AttachmentsController extends RestController {
             );
         }
         /** @var array{error?: int, name?: string, size?: int, tmp_name?: string, type?: string} $file */
-        if (!str_starts_with((string) ($file['type'] ?? ''), 'image/')) {
+        if (!str_starts_with($file['type'] ?? '', 'image/')) {
             return new \WP_Error(
                 'awpt_attachment_type',
                 __('Only image attachments are supported.', 'agent-wordpress-terminal'),
@@ -63,7 +63,7 @@ final class AttachmentsController extends RestController {
         $attachment_id = wp_insert_attachment(
             [
                 'post_mime_type' => (string) $upload['type'],
-                'post_title' => sanitize_file_name((string) ($file['name'] ?? 'Attachment')),
+                'post_title' => sanitize_file_name($file['name'] ?? 'Attachment'),
                 'post_status' => 'inherit',
             ],
             (string) $upload['file'],

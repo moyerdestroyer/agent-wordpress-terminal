@@ -10,19 +10,19 @@ count = 1
 file = "src/Abilities/ActionAppliers/BlockAttrsUpdateActionApplier.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
+count = 1
 
 [[issues]]
 file = "src/Abilities/ActionAppliers/BlockStructureUpdateActionApplier.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 4
+count = 3
 
 [[issues]]
 file = "src/Abilities/ActionAppliers/ContentUpdateActionApplier.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
+count = 1
 
 [[issues]]
 file = "src/Abilities/ActionAppliers/NewPostActionApplier.php"
@@ -49,127 +49,25 @@ message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage:
 count = 1
 
 [[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_permalink`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_the_title`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-property-access"
-message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
-count = 2
-
-[[issues]]
 file = "src/Abilities/DiagnoseError.php"
 code = "possibly-invalid-argument"
 message = 'Possible argument type mismatch for argument #2 of `AWPT\Support\Diagnostics\SiteHealthReader::correlate_tests`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
 count = 1
 
 [[issues]]
-file = "src/Abilities/GetBlock.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ListBlocks.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ListBlocks.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 1
-
-[[issues]]
-file = "src/Abilities/OpenGraphMediaUrlExtractor.php"
-code = "possibly-undefined-variable"
-message = "Variable `$matches` might not have been defined on all execution paths leading to this point."
-count = 1
-
-[[issues]]
-file = "src/Abilities/PreviewPost.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_permalink`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/PreviewPost.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_preview_post_link`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/PreviewPost.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_the_title`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 2
-
-[[issues]]
-file = "src/Abilities/PreviewPost.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/PreviewPost.php"
-code = "mixed-property-access"
-message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ProposeBlockAttrsUpdate.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ProposeBlockInsert.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ProposeBlockRemove.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Abilities/ProposeContentUpdate.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
+count = 1
 
 [[issues]]
 file = "src/Abilities/ProposeGlobalStylesUpdate.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
+count = 1
 
 [[issues]]
 file = "src/Abilities/ProposeNewPost.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
-file = "src/Abilities/ProposePatternInsert.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
@@ -179,48 +77,6 @@ file = "src/Abilities/ProposePluginDeactivate.php"
 code = "invalid-return-statement"
 message = '''Invalid return type for function `AWPT\Abilities\ProposePluginDeactivate::find_plugin`: expected `array{'active': bool, 'file': string, 'name': string, 'slug': string}|null`, but found `array{'active': bool, 'file': string, 'name': string, 'network_active': bool, 'slug': string, 'version': string}`.'''
 count = 1
-
-[[issues]]
-file = "src/Abilities/ProposeTemplateUpdate.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadBlockTree.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadBlockTree.php"
-code = "mixed-property-access"
-message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadContent.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_permalink`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadContent.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `get_the_title`: expected `WP_Post|int`, but found `truthy-mixed`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadContent.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadContent.php"
-code = "mixed-property-access"
-message = "Attempting to access a property on a non-object type (`truthy-mixed`)."
-count = 6
 
 [[issues]]
 file = "src/Abilities/ReadGlobalStyles.php"
@@ -241,33 +97,9 @@ message = "Casting `mixed` to `bool`."
 count = 1
 
 [[issues]]
-file = "src/Abilities/ReadTemplate.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadTemplate.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
-
-[[issues]]
 file = "src/Abilities/ReadThemeJson.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/RenderBlock.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Abilities/RenderBlock.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
 count = 1
 
 [[issues]]
@@ -287,12 +119,6 @@ file = "src/Agent/AbilityToolDiscovery.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
 count = 3
-
-[[issues]]
-file = "src/Agent/AbilityToolDiscovery.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
 
 [[issues]]
 file = "src/Agent/AbilityToolDiscovery.php"
@@ -386,12 +212,6 @@ count = 1
 
 [[issues]]
 file = "src/Agent/DiagnosisRuntime.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
 code = "redundant-condition"
 message = "Redundant ternary operator: condition is always truthy."
 count = 1
@@ -430,12 +250,6 @@ count = 1
 file = "src/Agent/ProviderMessageBuilder.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
-file = "src/Agent/ProviderMessageBuilder.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
 count = 1
 
 [[issues]]
@@ -449,12 +263,6 @@ file = "src/Agent/ProviderRuntime.php"
 code = "mixed-assignment"
 message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
 count = 1
-
-[[issues]]
-file = "src/Agent/ProviderRuntime.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
 
 [[issues]]
 file = "src/Agent/ProviderRuntime.php"
@@ -553,12 +361,6 @@ message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringa
 count = 1
 
 [[issues]]
-file = "src/Agent/SlashCommandRouter.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Agent/ToolExecutor.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -586,19 +388,7 @@ count = 1
 file = "src/Agent/ToolResultContentFormatter.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 5
-
-[[issues]]
-file = "src/Agent/ToolResultContentFormatter.php"
-code = "possibly-invalid-argument"
-message = 'Possible argument type mismatch for argument #1 of `AWPT\Agent\ToolResultContentFormatter::flatten_blocks`: expected `list<array<array-key, mixed>>`, but possibly received `array<array-key, mixed>`.'
-count = 1
-
-[[issues]]
-file = "src/Agent/ToolResultContentFormatter.php"
-code = "possibly-invalid-argument"
-message = 'Possible argument type mismatch for argument #1 of `AWPT\Agent\ToolResultContentFormatter::flatten_blocks`: expected `list<array<array-key, mixed>>`, but possibly received `non-empty-array<array-key, mixed>`.'
-count = 1
+count = 2
 
 [[issues]]
 file = "src/Agent/ToolResultFormatter.php"
@@ -745,12 +535,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/Database/SessionRepository.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Knowledge/EmbeddingApiClient.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -790,12 +574,6 @@ count = 1
 file = "src/Knowledge/KnowledgeRepository.php"
 code = "invalid-type-cast"
 message = "Casting `mixed` to `array`."
-count = 1
-
-[[issues]]
-file = "src/Knowledge/KnowledgeRepository.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
 
 [[issues]]
@@ -883,12 +661,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/REST/AttachmentsController.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
-
-[[issues]]
 file = "src/REST/CapturesController.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -898,12 +670,6 @@ count = 1
 file = "src/REST/ChatController.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/REST/ChatController.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
 count = 1
 
 [[issues]]
@@ -1208,12 +974,6 @@ count = 1
 
 [[issues]]
 file = "src/Support/ContentListService.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Support/ContentListService.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
 count = 2
@@ -1229,12 +989,6 @@ file = "src/Support/ContentListService.php"
 code = "string-member-selector"
 message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
 count = 1
-
-[[issues]]
-file = "src/Support/ContentSearchService.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
 
 [[issues]]
 file = "src/Support/ContentTargetResolver.php"
@@ -1277,18 +1031,6 @@ file = "src/Support/Diagnostics/ErrorLogReader.php"
 code = "redundant-type-comparison"
 message = "Redundant type assertion: `$path` is already `truthy-string`."
 count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/ErrorPathAttributor.php"
-code = "possibly-undefined-variable"
-message = "Variable `$matches` might not have been defined on all execution paths leading to this point."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/ErrorPathAttributor.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 3
 
 [[issues]]
 file = "src/Support/Diagnostics/PluginInventory.php"
@@ -1411,12 +1153,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 2
 
 [[issues]]
-file = "src/Support/Diagnostics/SameSiteUrlPolicy.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
 file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
 code = "docblock-type-mismatch"
 message = "Docblock return type `array<string, mixed>` is incompatible with native return type `bool`."
@@ -1454,20 +1190,8 @@ count = 1
 
 [[issues]]
 file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 3
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
 code = "redundant-logical-operation"
 message = "Redundant `&&` operation: left operand is evaluated and right operand is always falsy."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
-code = "reference-to-undefined-variable"
-message = "Reference created from a previously undefined variable `$matches`."
 count = 1
 
 [[issues]]
@@ -1532,18 +1256,6 @@ count = 1
 
 [[issues]]
 file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "redundant-cast"
-message = "Redundant cast to `(bool)`: the expression already has this type."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
 code = "redundant-logical-operation"
 message = "Redundant `&&` operation: left operand is evaluated and right operand is always falsy."
 count = 2
@@ -1559,18 +1271,6 @@ file = "src/Support/Diagnostics/UrlProbe.php"
 code = "possibly-null-array-access"
 message = "Cannot perform array access on possibly `null` value."
 count = 2
-
-[[issues]]
-file = "src/Support/Diagnostics/UrlProbe.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 2
-
-[[issues]]
-file = "src/Support/Diagnostics/UrlProbe.php"
-code = "reference-to-undefined-variable"
-message = "Reference created from a previously undefined variable `$matches`."
-count = 1
 
 [[issues]]
 file = "src/Support/IncidentRecorder.php"
@@ -1591,12 +1291,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/Support/MessageUrlExtractor.php"
-code = "reference-to-undefined-variable"
-message = "Reference created from a previously undefined variable `$matches`."
-count = 1
-
-[[issues]]
 file = "src/Support/NewPostStagingDraft.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
@@ -1606,12 +1300,6 @@ count = 1
 file = "src/Support/PatternCatalog.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
-file = "src/Support/PatternCatalog.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
 count = 1
 
 [[issues]]
@@ -1633,18 +1321,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 2
 
 [[issues]]
-file = "src/Support/PostCompositionNormalizer.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 4
-
-[[issues]]
-file = "src/Support/PostCompositionNormalizer.php"
-code = "reference-to-undefined-variable"
-message = "Reference created from a previously undefined variable `$class_match`."
-count = 1
-
-[[issues]]
 file = "src/Support/PostCompositionValidator.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -1663,40 +1339,10 @@ message = "Possibly undefined array key 'minimum_visuals' accessed on `array{'fe
 count = 1
 
 [[issues]]
-file = "src/Support/PostCompositionValidator.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 3
-
-[[issues]]
-file = "src/Support/PostCompositionValidator.php"
-code = "reference-to-undefined-variable"
-message = "Reference created from a previously undefined variable `$matches`."
-count = 1
-
-[[issues]]
 file = "src/Support/ReadablePostMeta.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 2
-
-[[issues]]
-file = "src/Support/SessionTitleSuggester.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Support/StagedPostPreview.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
-file = "src/Support/StagedPostPreview.php"
-code = "redundant-cast"
-message = "Redundant cast to `(string)`: the expression already has this type."
-count = 1
 
 [[issues]]
 file = "src/Support/ToolPreferences.php"

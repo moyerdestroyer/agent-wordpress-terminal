@@ -26,6 +26,8 @@ final class MessageUrlExtractor {
      * @return list<string>
      */
     public function extract(string $text): array {
+        $matches = [];
+
         if (!preg_match_all('/https?:\/\/[^\s<>"]+/i', $text, $matches)) {
             return [];
         }

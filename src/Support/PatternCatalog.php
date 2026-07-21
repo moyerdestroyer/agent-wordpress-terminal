@@ -220,7 +220,7 @@ final class PatternCatalog {
             'name' => 'reusable/' . $post->ID,
             'title' => get_the_title($post),
             'description' => __('Reusable block', 'agent-wordpress-terminal'),
-            'content' => (string) $post->post_content,
+            'content' => $post->post_content,
             'categories' => ['reusable'],
             'blockTypes' => [],
             'postTypes' => [],

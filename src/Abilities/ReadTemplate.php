@@ -71,7 +71,7 @@ final class ReadTemplate implements AbilityInterface {
             ]);
         }
 
-        $tree = BlockTree::from_content((string) $post->post_content);
+        $tree = BlockTree::from_content($post->post_content);
 
         return [
             'id' => $post_id,
@@ -81,7 +81,7 @@ final class ReadTemplate implements AbilityInterface {
             'status' => $post->post_status,
             'theme' => (string) get_post_meta($post->ID, 'theme', true),
             'area' => (string) get_post_meta($post->ID, 'area', true),
-            'content' => (string) $post->post_content,
+            'content' => $post->post_content,
             'block_count' => $tree->count(),
             'blocks' => $tree->flat_list(null, 80),
         ];

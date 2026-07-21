@@ -69,7 +69,7 @@ final class SiteHealthAsyncRunner {
                 continue;
             }
 
-            $tests[] = $this->normalize_result((string) $slug, $result);
+            $tests[] = $this->normalize_result($slug, $result);
         }
 
         return $tests;
@@ -90,8 +90,10 @@ final class SiteHealthAsyncRunner {
             return null;
         }
 
+        $matches = [];
+
         if (preg_match('~wp-site-health/v1/tests/([^/?#]+)~', $test, $matches)) {
-            return (string) $matches[1];
+            return $matches[1];
         }
 
         return null;
@@ -109,7 +111,7 @@ final class SiteHealthAsyncRunner {
             return [
                 'label' => $rest_slug,
                 'status' => 'critical',
-                'description' => (string) ($response->as_error()?->get_error_message() ?? ''),
+                'description' => $response->as_error()?->get_error_message() ?? '',
                 'actions' => '',
                 'test' => $rest_slug,
             ];

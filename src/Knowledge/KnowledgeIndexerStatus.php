@@ -29,7 +29,20 @@ final class KnowledgeIndexerStatus {
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     source_count: int,
+     *     source_kinds: array<string, int|string>,
+     *     chunk_count: int,
+     *     stale: bool,
+     *     needs_rebuild: bool,
+     *     last_indexed_at: string,
+     *     last_error: string,
+     *     progress: array<string, mixed>,
+     *     embedding: array<string, mixed>,
+     *     filesystem: array{allowed_roots: mixed, max_file_size: int},
+     *     repository: array<string, mixed>,
+     *     site_content_index: array<string, mixed>
+     * }
      */
     public function build(): array {
         $source_count = $this->index->count_sources();
@@ -37,13 +50,14 @@ final class KnowledgeIndexerStatus {
         $counts = KnowledgeIndexer::cached_counts();
         $chunk_count = $counts['chunk_count'];
         $embedded_count = $counts['embedded_chunks'];
+        $stale = '1' === (string) get_option('awpt_knowledge_stale', '0');
 
         return [
             'source_count' => $source_count,
             'source_kinds' => $source_kinds,
             'chunk_count' => $chunk_count,
-            'stale' => '1' === (string) get_option('awpt_knowledge_stale', '0'),
-            'needs_rebuild' => 0 === $source_count || '1' === (string) get_option('awpt_knowledge_stale', '0'),
+            'stale' => $stale,
+            'needs_rebuild' => 0 === $source_count || $stale,
             'last_indexed_at' => (string) get_option('awpt_knowledge_last_indexed_at', ''),
             'last_error' => (string) get_option('awpt_knowledge_last_error', ''),
             'progress' => KnowledgeIndexer::progress(),

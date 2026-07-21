@@ -119,7 +119,7 @@ final class ProviderRuntime {
             'turn_context' => $turn_context,
         ]);
 
-        $content = trim((string) $loop_result['content']);
+        $content = trim($loop_result['content']);
         $tool_calls = is_array($loop_result['tool_calls'] ?? null) ? $loop_result['tool_calls'] : [];
         $knowledge_trace = $this->knowledge_trace($session_id);
 
@@ -642,7 +642,7 @@ final class ProviderRuntime {
                 continue;
             }
 
-            $parts = [['type' => 'text', 'text' => (string) $messages[$index]['content']]];
+            $parts = [['type' => 'text', 'text' => $messages[$index]['content']]];
 
             foreach ($attachments as $attachment) {
                 if (is_array($attachment) && '' !== (string) ($attachment['url'] ?? '')) {

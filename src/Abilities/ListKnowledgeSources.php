@@ -80,12 +80,12 @@ final class ListKnowledgeSources implements AbilityInterface {
 
         return [
             'retrieval_available' => KnowledgeIndexer::retrieval_is_available(),
-            'stale' => (bool) ($status['stale'] ?? false),
-            'needs_rebuild' => (bool) ($status['needs_rebuild'] ?? false),
-            'source_count' => (int) ($status['source_count'] ?? 0),
-            'chunk_count' => (int) ($status['chunk_count'] ?? 0),
-            'source_kinds' => is_array($status['source_kinds'] ?? null) ? $status['source_kinds'] : [],
-            'last_indexed_at' => (string) ($status['last_indexed_at'] ?? ''),
+            'stale' => $status['stale'],
+            'needs_rebuild' => $status['needs_rebuild'],
+            'source_count' => $status['source_count'],
+            'chunk_count' => $status['chunk_count'],
+            'source_kinds' => $status['source_kinds'],
+            'last_indexed_at' => $status['last_indexed_at'],
             'samples' => $index->sample_source_labels($sample, $kind),
             'hint' => __(
                 'Search with awpt/search-knowledge using tokens from sample labels (e.g. theme:docs or a path fragment). Then awpt/read-theme-file with a relative path from a theme: label.',

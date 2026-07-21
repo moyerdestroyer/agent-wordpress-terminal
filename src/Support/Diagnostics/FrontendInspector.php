@@ -40,7 +40,7 @@ final class FrontendInspector {
         $status_code = (int) wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $header = wp_remote_retrieve_header($response, 'content-type');
-        $content_type = is_array($header) ? (string) ($header[0] ?? '') : (string) $header;
+        $content_type = is_array($header) ? (string) ($header[0] ?? '') : $header;
         $selector = trim($selector);
         $snippet_chars = max(1_000, min(8_000, $snippet_chars));
         $class_inventory = $this->class_inventory($body);
@@ -132,7 +132,14 @@ final class FrontendInspector {
 
     /**
      * @param list<array{class: string, count: int}> $inventory
-     * @return array<string, mixed>
+     * @return array{
+     *     interesting_classes: list<string>,
+     *     has_position_sticky: bool,
+     *     has_columns: bool,
+     *     has_site_header: bool,
+     *     sticky_style_hint: string|null,
+     *     has_admin_bar_offset_var: bool
+     * }
      */
     private function layout_signals(string $html, array $inventory): array {
         $classes = array_column($inventory, 'class');
@@ -210,7 +217,14 @@ final class FrontendInspector {
 
     /**
      * @param list<array{class: string, count: int}> $inventory
-     * @param array<string, mixed>                   $layout_signals
+     * @param array{
+     *     interesting_classes: list<string>,
+     *     has_position_sticky: bool,
+     *     has_columns: bool,
+     *     has_site_header: bool,
+     *     sticky_style_hint: string|null,
+     *     has_admin_bar_offset_var: bool
+     * } $layout_signals
      * @return list<array{tool: string, input: array<string, mixed>}>
      */
     private function recommended_next_tools(array $inventory, array $layout_signals): array {
@@ -224,10 +238,8 @@ final class FrontendInspector {
             }
         }
 
-        foreach (is_array($layout_signals['interesting_classes'] ?? null)
-            ? $layout_signals['interesting_classes']
-            : [] as $class) {
-            if (is_string($class) && '' !== $class) {
+        foreach ($layout_signals['interesting_classes'] as $class) {
+            if ('' !== $class) {
                 $terms[] = $class;
             }
         }

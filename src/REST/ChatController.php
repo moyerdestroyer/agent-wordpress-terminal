@@ -82,7 +82,7 @@ final class ChatController extends RestController {
         $session_id = (int) $request->get_param('session_id');
         $message = (string) $request->get_param('message');
         $attachments = $this->sanitize_attachments($request->get_param('attachments'));
-        $turn_id = (string) sanitize_key((string) $request->get_param('turn_id'));
+        $turn_id = sanitize_key((string) $request->get_param('turn_id'));
         $turn_id = '' !== $turn_id ? $turn_id : (string) wp_generate_uuid4();
 
         if ('' === trim($message) && [] === $attachments) {
