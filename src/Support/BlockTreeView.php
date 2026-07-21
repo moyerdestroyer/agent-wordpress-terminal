@@ -157,11 +157,10 @@ final class BlockTreeView {
      */
     private function summarize_attrs(array $attrs, bool $include_array_counts): array {
         $summary = [];
+        $attrs = ArrayKey::string_map($attrs);
 
-        foreach ($attrs as $key => $value) {
-            if (!is_string($key)) {
-                continue;
-            }
+        foreach (array_keys($attrs) as $key) {
+            $value = ArrayKey::passthrough($attrs[$key] ?? null);
 
             if (is_scalar($value) || null === $value) {
                 $summary[$key] = $value;
@@ -178,33 +177,9 @@ final class BlockTreeView {
 
     /**
      * @param array<string, mixed> $block
-     * @return array<int|string, array<string, mixed>>
+     * @return list<array<string, mixed>>
      */
     private function inner_blocks(array $block): array {
-        $inner_blocks = $block['innerBlocks'] ?? [];
-
-        if (!is_array($inner_blocks)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($inner_blocks as $key => $inner_block) {
-            if (!is_array($inner_block)) {
-                continue;
-            }
-
-            $string_keyed = [];
-
-            foreach ($inner_block as $item_key => $item) {
-                if (is_string($item_key)) {
-                    $string_keyed[$item_key] = $item;
-                }
-            }
-
-            $normalized[$key] = $string_keyed;
-        }
-
-        return $normalized;
+        return ArrayKey::list_of_maps($block['innerBlocks'] ?? null);
     }
 }

@@ -85,7 +85,7 @@ final class ToolResultListFormatter {
             (string) ($filters['order'] ?? 'DESC'),
         );
 
-        foreach (array_slice($items, 0, 10) as $item) {
+        foreach (array_slice(\AWPT\Support\ArrayKey::list_of_maps($items), 0, 10) as $item) {
             $lines[] = $this->format_content_list_item($item);
         }
 

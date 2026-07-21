@@ -76,31 +76,7 @@ final class BlockTreePathHelpers {
      */
 
     public function inner_blocks(array $block): array {
-        $inner_blocks = $block['innerBlocks'] ?? [];
-
-        if (!is_array($inner_blocks)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($inner_blocks as $key => $inner_block) {
-            if (!is_array($inner_block)) {
-                continue;
-            }
-
-            $string_keyed = [];
-
-            foreach ($inner_block as $item_key => $item) {
-                if (is_string($item_key)) {
-                    $string_keyed[$item_key] = $item;
-                }
-            }
-
-            $normalized[$key] = $string_keyed;
-        }
-
-        return $normalized;
+        return ArrayKey::list_of_maps($block['innerBlocks'] ?? null);
     }
 
     /**

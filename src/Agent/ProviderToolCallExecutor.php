@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\MCP\Adapter;
+use AWPT\Support\ArrayKey;
 use AWPT\Support\ProposalAbilities;
 
 if (!defined('ABSPATH')) {
@@ -48,15 +49,20 @@ final class ProviderToolCallExecutor {
         $messages = [];
         $visual_messages = [];
 
-        $valid_calls = array_values(array_filter($raw_tool_calls, 'is_array'));
+        $valid_calls = [];
+
+        foreach (array_keys($raw_tool_calls) as $key) {
+            $call = ArrayKey::as_map_or_null(ArrayKey::passthrough($raw_tool_calls[$key] ?? null));
+
+            if (null !== $call) {
+                $valid_calls[] = $call;
+            }
+        }
+
         $total = count($valid_calls);
 
         foreach ($valid_calls as $index => $raw_tool_call) {
-            if (!is_array($raw_tool_call) || !$this->is_string_keyed_array($raw_tool_call)) {
-                continue;
-            }
-
-            $function = is_array($raw_tool_call['function'] ?? null) ? $raw_tool_call['function'] : [];
+            $function = ArrayKey::as_map($raw_tool_call['function'] ?? null);
             $function_name = (string) ($function['name'] ?? '');
             $tool_name = $tool_registry->tool_name_for_function($function_name) ?? $function_name;
             $progress_label = $this->progress_label($tool_name);
@@ -135,7 +141,7 @@ final class ProviderToolCallExecutor {
         array $turn_context,
     ): array {
         $provider_call_id = (string) ($raw_tool_call['id'] ?? '');
-        $function = is_array($raw_tool_call['function'] ?? null) ? $raw_tool_call['function'] : [];
+        $function = ArrayKey::as_map($raw_tool_call['function'] ?? null);
         $function_name = (string) ($function['name'] ?? '');
         $tool_name = $tool_registry->tool_name_for_function($function_name);
         $input = $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}'));
@@ -145,7 +151,7 @@ final class ProviderToolCallExecutor {
         }
 
         if ('awpt/propose-new-post' === $tool_name) {
-            $input = new ProposalRequestContext()->enrich($session_id, $input, $turn_context);
+            $input = ArrayKey::string_map(new ProposalRequestContext()->enrich($session_id, $input, $turn_context));
 
             $pattern_name = (string) ($input['pattern_name'] ?? '');
             $pattern_mode = (string) ($input['pattern_mode'] ?? '');
@@ -160,7 +166,7 @@ final class ProviderToolCallExecutor {
 
         [$status, $output] = $this->run_safe_tool($tool_name, $function_name, $input, $tool_registry);
 
-        if ('success' === $status && 'awpt/read-pattern' === $tool_name && is_array($output)) {
+        if ('success' === $status && 'awpt/read-pattern' === $tool_name) {
             $pattern_name = (string) ($output['name'] ?? $input['name'] ?? '');
 
             if ('' !== $pattern_name) {
@@ -169,9 +175,9 @@ final class ProviderToolCallExecutor {
         }
         $tool = $tool_name ?? $function_name;
         $truncator = new ToolResultTruncator();
-        $provider_output = is_array($output) ? $truncator->for_provider($tool, $output) : $output;
-        $storage_output = is_array($output) ? $truncator->for_storage($tool, $output) : $output;
-        $visual_message = 'success' === $status && is_array($output)
+        $provider_output = $truncator->for_provider($tool, $output);
+        $storage_output = $truncator->for_storage($tool, $output);
+        $visual_message = 'success' === $status
             ? new MediaLibraryVisualEvidence()->build($tool, $input, $output)
             : null;
         $tool_call = [
@@ -257,22 +263,14 @@ final class ProviderToolCallExecutor {
      * @param string $arguments Raw JSON arguments.
      * @return array<array-key, mixed>
      */
+    /**
+     * @return array<string, mixed>
+     */
     private function decode_tool_arguments(string $arguments): array {
-        $decoded = json_decode($arguments, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return ArrayKey::as_map(json_decode($arguments, true));
     }
 
     /**
      * @param array<array-key, mixed> $value Raw array.
      */
-    private function is_string_keyed_array(array $value): bool {
-        foreach (array_keys($value) as $key) {
-            if (!is_string($key)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

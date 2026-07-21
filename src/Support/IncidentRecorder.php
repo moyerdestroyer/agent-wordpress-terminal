@@ -91,7 +91,9 @@ final class IncidentRecorder {
             'kind' => sanitize_key((string) ($payload['kind'] ?? 'js')),
             'source' => sanitize_text_field((string) ($payload['source'] ?? 'awpt-admin')),
             'attempted_action' => sanitize_key((string) ($payload['attempted_action'] ?? '')),
-            'action_id' => absint($payload['action_id'] ?? 0) > 0 ? absint($payload['action_id']) : null,
+            'action_id' => \AWPT\Support\ArrayKey::as_int($payload['action_id'] ?? 0) > 0
+                ? \AWPT\Support\ArrayKey::as_int($payload['action_id'] ?? 0)
+                : null,
             'error_text' => $error_text,
         ]);
     }

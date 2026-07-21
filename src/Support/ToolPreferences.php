@@ -37,19 +37,9 @@ final class ToolPreferences {
      * @return list<string>
      */
     public function disabled_names(): array {
-        $raw = get_option(self::OPTION, []);
-
-        if (!is_array($raw)) {
-            return [];
-        }
-
         $names = [];
 
-        foreach ($raw as $name) {
-            if (!is_string($name)) {
-                continue;
-            }
-
+        foreach (ArrayKey::list_of_strings(get_option(self::OPTION, [])) as $name) {
             $clean = sanitize_text_field($name);
 
             if ('' !== $clean && !$this->is_never_auto($clean)) {
@@ -87,11 +77,7 @@ final class ToolPreferences {
     public function set_disabled(array $names): array {
         $clean = [];
 
-        foreach ($names as $name) {
-            if (!is_string($name)) {
-                continue;
-            }
-
+        foreach (ArrayKey::list_of_strings($names) as $name) {
             $value = sanitize_text_field($name);
 
             if ('' === $value || $this->is_never_auto($value)) {
@@ -109,15 +95,17 @@ final class ToolPreferences {
 
     /** @return list<string> */
     public function trusted_mutating_names(): array {
-        $raw = get_option(self::TRUSTED_MUTATING_OPTION, []);
+        $names = [];
 
-        if (!is_array($raw)) {
-            return [];
+        foreach (ArrayKey::list_of_strings(get_option(self::TRUSTED_MUTATING_OPTION, [])) as $name) {
+            $clean = sanitize_text_field($name);
+
+            if ('' !== $clean) {
+                $names[] = $clean;
+            }
         }
 
-        return array_values(array_unique(array_filter(array_map(static fn(mixed $name): string => is_string($name)
-            ? sanitize_text_field($name)
-            : '', $raw))));
+        return array_values(array_unique($names));
     }
 
     public function is_trusted_mutating(string $tool_name): bool {

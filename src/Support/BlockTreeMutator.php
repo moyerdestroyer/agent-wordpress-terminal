@@ -178,31 +178,16 @@ final class BlockTreeMutator {
 
     public function normalize_block(array $block): array {
         $name = is_string($block['blockName'] ?? null) ? $block['blockName'] : '';
-        $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
+        $attrs = ArrayKey::as_map($block['attrs'] ?? null);
         $inner_html = is_string($block['innerHTML'] ?? null) ? $block['innerHTML'] : '';
         $inner_blocks = [];
 
-        if (is_array($block['innerBlocks'] ?? null)) {
-            foreach ($block['innerBlocks'] as $inner) {
-                if (!is_array($inner)) {
-                    continue;
-                }
-
-                /** @var array<string, mixed> $inner_block */
-                $inner_block = [];
-
-                foreach ($inner as $key => $value) {
-                    if (is_string($key)) {
-                        $inner_block[$key] = $value;
-                    }
-                }
-
-                if (!BlockTree::has_block_name($inner_block)) {
-                    continue;
-                }
-
-                $inner_blocks[] = $this->normalize_block($inner_block);
+        foreach (ArrayKey::list_of_maps($block['innerBlocks'] ?? null) as $inner_block) {
+            if (!BlockTree::has_block_name($inner_block)) {
+                continue;
             }
+
+            $inner_blocks[] = $this->normalize_block($inner_block);
         }
 
         $inner_content = is_array($block['innerContent'] ?? null) ? $block['innerContent'] : null;

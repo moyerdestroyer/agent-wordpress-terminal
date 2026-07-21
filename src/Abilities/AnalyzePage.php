@@ -120,7 +120,10 @@ final class AnalyzePage implements AbilityInterface {
                 $headings[] = wp_strip_all_tags((string) ($block['innerHTML'] ?? ''));
             }
 
-            $headings = array_merge($headings, $this->extract_headings($block['innerBlocks'] ?? []));
+            $headings = array_merge(
+                $headings,
+                $this->extract_headings(\AWPT\Support\ArrayKey::list_of_maps($block['innerBlocks'] ?? null)),
+            );
         }
 
         return array_values(array_filter($headings));
@@ -155,7 +158,10 @@ final class AnalyzePage implements AbilityInterface {
                 $forms[] = $name;
             }
 
-            $forms = array_merge($forms, $this->detect_forms($block['innerBlocks'] ?? []));
+            $forms = array_merge(
+                $forms,
+                $this->detect_forms(\AWPT\Support\ArrayKey::list_of_maps($block['innerBlocks'] ?? null)),
+            );
         }
 
         return array_values(array_unique($forms));
@@ -177,7 +183,10 @@ final class AnalyzePage implements AbilityInterface {
                 $custom[] = $name;
             }
 
-            $custom = array_merge($custom, $this->detect_custom_blocks($block['innerBlocks'] ?? []));
+            $custom = array_merge(
+                $custom,
+                $this->detect_custom_blocks(\AWPT\Support\ArrayKey::list_of_maps($block['innerBlocks'] ?? null)),
+            );
         }
 
         return array_values(array_unique($custom));

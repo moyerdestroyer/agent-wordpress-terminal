@@ -136,7 +136,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         if ($status < 200 || $status >= 300) {
             return new \WP_Error(
                 'awpt_provider_request_failed',
-                $this->format_error_message($status, is_array($data) ? $data : [], $body),
+                $this->format_error_message($status, \AWPT\Support\ArrayKey::as_map($data), $body),
                 ['status' => $status],
             );
         }

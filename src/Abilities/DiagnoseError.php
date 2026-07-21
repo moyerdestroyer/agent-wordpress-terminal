@@ -99,7 +99,7 @@ final class DiagnoseError implements AbilityInterface {
         $site_health_reader = new SiteHealthReader();
         $site_health = $site_health_reader->summary();
         $site_health = is_wp_error($site_health) ? [] : $site_health;
-        $site_health_tests = is_array($site_health['tests'] ?? null) ? $site_health['tests'] : [];
+        $site_health_tests = \AWPT\Support\ArrayKey::list_of_maps($site_health['tests'] ?? null);
         $relevant_tests = $site_health_reader->correlate_tests($attribution['error_type'], $site_health_tests);
 
         $probe = null;

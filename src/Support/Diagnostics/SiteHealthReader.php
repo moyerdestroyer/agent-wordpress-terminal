@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Support\Diagnostics;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -54,17 +56,41 @@ final class SiteHealthReader {
             ];
         }
 
-        $definitions = \WP_Site_Health::get_instance()->get_tests();
-        /** @var array<string, array<string, mixed>> $direct */
-        $direct = is_array($definitions['direct'] ?? null) ? $definitions['direct'] : [];
-        /** @var array<string, array<string, mixed>> $async */
-        $async = is_array($definitions['async'] ?? null) ? $definitions['async'] : [];
-        $tests = $this->run_direct_tests($direct, $filter_tests);
+        $site_health = \WP_Site_Health::get_instance();
+
+        if (!$site_health instanceof \WP_Site_Health) {
+            return new \WP_Error('awpt_site_health_unavailable', __(
+                'WordPress Site Health is not available.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
+        $definitions = ArrayKey::as_map($site_health->get_tests());
+        $direct = [];
+        $async = [];
+
+        foreach (ArrayKey::as_map($definitions['direct'] ?? null) as $slug => $definition) {
+            $row = ArrayKey::as_map_or_null($definition);
+
+            if (null !== $row) {
+                $direct[$slug] = $row;
+            }
+        }
+
+        foreach (ArrayKey::as_map($definitions['async'] ?? null) as $slug => $definition) {
+            $row = ArrayKey::as_map_or_null($definition);
+
+            if (null !== $row) {
+                $async[$slug] = $row;
+            }
+        }
+
+        $tests = $this->run_direct_tests($direct, ArrayKey::list_of_strings($filter_tests));
         $overall = $this->count_statuses($tests);
 
         if ($run_async && ('full' === $scope || [] !== $filter_tests)) {
-            $async_tests = new SiteHealthAsyncRunner()->run($async, $filter_tests);
-            $tests = array_merge($tests, $async_tests);
+            $async_tests = new SiteHealthAsyncRunner()->run($async, ArrayKey::list_of_strings($filter_tests));
+            $tests = [...$tests, ...$async_tests];
             $async_counts = $this->count_statuses($async_tests);
             $overall['good'] += $async_counts['good'];
             $overall['recommended'] += $async_counts['recommended'];
@@ -196,8 +222,8 @@ final class SiteHealthReader {
 
         $database_extension = 'unknown';
 
-        if ($wpdb->db_version()) {
-            $database_extension = $wpdb->use_mysqli ? 'mysqli' : 'mysql';
+        if ($wpdb instanceof \wpdb && $wpdb->db_version()) {
+            $database_extension = function_exists('mysqli_connect') ? 'mysqli' : 'mysql';
         }
 
         return [
@@ -216,9 +242,9 @@ final class SiteHealthReader {
      * @return array{issues: array{good: int, recommended: int, critical: int}}|array{}
      */
     private function cached_issue_counts(): array {
-        $cached = get_transient('health-check-site-status-result');
+        $cached = ArrayKey::as_map_or_null(get_transient('health-check-site-status-result'));
 
-        if (!is_array($cached)) {
+        if (null === $cached) {
             return [];
         }
 

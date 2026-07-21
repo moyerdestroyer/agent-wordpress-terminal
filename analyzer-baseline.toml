@@ -13,12 +13,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/Abilities/ActionAppliers/BlockStructureUpdateActionApplier.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
-
-[[issues]]
 file = "src/Abilities/ActionAppliers/ContentUpdateActionApplier.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -28,30 +22,6 @@ count = 1
 file = "src/Abilities/ActionAppliers/NewPostActionApplier.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_custom_blocks`: expected `array<int|string, array<string, mixed>>`, but found `nonnull`.'
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::detect_forms`: expected `array<int|string, array<string, mixed>>`, but found `nonnull`.'
-count = 1
-
-[[issues]]
-file = "src/Abilities/AnalyzePage.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #1 of `AWPT\Abilities\AnalyzePage::extract_headings`: expected `array<int|string, array<string, mixed>>`, but found `nonnull`.'
-count = 1
-
-[[issues]]
-file = "src/Abilities/DiagnoseError.php"
-code = "possibly-invalid-argument"
-message = 'Possible argument type mismatch for argument #2 of `AWPT\Support\Diagnostics\SiteHealthReader::correlate_tests`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
 count = 1
 
 [[issues]]
@@ -128,20 +98,8 @@ count = 1
 
 [[issues]]
 file = "src/Agent/AgentRuntime.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #2 of `AWPT\Database\MessageRepository::store_tool_calls`: expected `array<int, mixed>`, but found `nonnull`.'
-count = 1
-
-[[issues]]
-file = "src/Agent/AgentRuntime.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Agent/ChatCompletionsProvider.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #2 of `AWPT\Agent\ChatCompletionsProvider::format_error_message`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
 count = 1
 
 [[issues]]
@@ -176,44 +134,8 @@ count = 3
 
 [[issues]]
 file = "src/Agent/DiagnosisRuntime.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #1 of `AWPT\Agent\DiagnosisRuntime::incident_note`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #1 of `AWPT\Agent\DiagnosisRuntime::incident_prompt`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #2 of `AWPT\Agent\DiagnosisRuntime::incident_prompt`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #2 of `AWPT\Database\IncidentRepository::mark_diagnosed`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
 code = "possibly-false-operand"
 message = "Possibly false right operand used in string concatenation (type `false|non-empty-string`)."
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "redundant-condition"
-message = "Redundant ternary operator: condition is always truthy."
-count = 1
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "redundant-type-comparison"
-message = "Redundant type assertion: `$diagnosis` is already `array<array-key, mixed>`."
 count = 1
 
 [[issues]]
@@ -278,74 +200,14 @@ count = 1
 
 [[issues]]
 file = "src/Agent/ProviderToolCallExecutor.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #1 of `AWPT\Agent\ProviderToolCallExecutor::execute_single_tool_call`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #3 of `AWPT\Agent\ProviderToolCallExecutor::run_safe_tool`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
+count = 1
 
 [[issues]]
 file = "src/Agent/ProviderToolCallExecutor.php"
 code = "redundant-comparison"
 message = "Redundant `!==` comparison: left-hand side is always not identical to right-hand side."
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-condition"
-message = "Redundant ternary operator: condition is always truthy."
-count = 2
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-logical-operation"
-message = "Redundant `&&` operation: left operand is evaluated and right operand is always truthy."
-count = 2
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-logical-operation"
-message = "Redundant `||` operation: left operand is always false and right operand is evaluated."
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-type-comparison"
-message = "Redundant condition: variable `$raw_tool_call` (type `array<array-key, mixed>`) is already known to be `array<array-key, mixed>`."
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-type-comparison"
-message = "Redundant type assertion: `$output` is already `array<string, mixed>`."
-count = 4
-
-[[issues]]
-file = "src/Agent/ProviderToolCallExecutor.php"
-code = "redundant-type-comparison"
-message = "Redundant type assertion: `$raw_tool_call` is already `array<array-key, mixed>`."
-count = 1
-
-[[issues]]
-file = "src/Agent/SlashCommandRouter.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #2 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
-count = 1
-
-[[issues]]
-file = "src/Agent/SlashCommandRouter.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #3 of `sprintf`: expected `Stringable|null|scalar`, but found `mixed`."
 count = 1
 
 [[issues]]
@@ -386,15 +248,9 @@ count = 3
 
 [[issues]]
 file = "src/Agent/ToolResultListFormatter.php"
-code = "mixed-argument"
-message = 'Invalid argument type for argument #1 of `AWPT\Agent\ToolResultListFormatter::format_content_list_item`: expected `array<array-key, mixed>`, but found `mixed`.'
-count = 1
-
-[[issues]]
-file = "src/Agent/ToolResultListFormatter.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 4
+count = 3
 
 [[issues]]
 file = "src/Agent/ToolResultTruncator.php"
@@ -448,12 +304,6 @@ count = 1
 file = "src/Database/ActionContentPayloadSanitizer.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 6
-
-[[issues]]
-file = "src/Database/IncidentRepository.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `absint`: expected `('T.absint() extends int)|array<array-key, mixed>|null|resource|scalar`, but found `nonnull`."
 count = 1
 
 [[issues]]
@@ -566,15 +416,9 @@ count = 1
 
 [[issues]]
 file = "src/MCP/Adapter.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #1 of `AWPT\MCP\Adapter::normalize_tool`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/MCP/Adapter.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
+count = 2
 
 [[issues]]
 file = "src/MCP/Adapter.php"
@@ -619,18 +463,6 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/REST/IncidentsController.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `rest_sanitize_boolean`: expected `('T.rest_sanitize_boolean() extends bool|int|string)`, but found `mixed`."
-count = 1
-
-[[issues]]
-file = "src/REST/IncidentsController.php"
-code = "template-constraint-violation"
-message = "Argument type mismatch for template `T`."
-count = 1
-
-[[issues]]
 file = "src/REST/KnowledgeController.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
@@ -655,22 +487,10 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/Support/ArrayKey.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Support/BlockTree.php"
 code = "mixed-assignment"
 message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
 count = 1
-
-[[issues]]
-file = "src/Support/BlockTreeMutator.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
 
 [[issues]]
 file = "src/Support/BlockTreeMutator.php"
@@ -679,27 +499,9 @@ message = "Potential unintended modification: This variable may still hold a ref
 count = 1
 
 [[issues]]
-file = "src/Support/BlockTreePathHelpers.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
-file = "src/Support/BlockTreePathHelpers.php"
-code = "mixed-assignment"
-message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Support/BlockTreeView.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
-
-[[issues]]
-file = "src/Support/BlockTreeView.php"
-code = "mixed-assignment"
-message = "Assigning `nonnull` type to a variable may lead to unexpected behavior."
 count = 1
 
 [[issues]]
@@ -788,12 +590,6 @@ count = 3
 
 [[issues]]
 file = "src/Support/Diagnostics/RemediationHintRules.php"
-code = "less-specific-argument"
-message = 'Argument type mismatch for argument #1 of `AWPT\Support\Diagnostics\RemediationBasicHints::primary_suspect`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/RemediationHintRules.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
@@ -802,7 +598,7 @@ count = 1
 file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
+count = 2
 
 [[issues]]
 file = "src/Support/Diagnostics/SiteHealthAsyncRunner.php"
@@ -824,12 +620,6 @@ count = 4
 
 [[issues]]
 file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "mixed-method-access"
-message = "Attempting to access a method on a non-object type (`mixed`)."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
 code = "mixed-operand"
 message = "Invalid right operand: type `nonnull` cannot be reliably used in string concatenation."
 count = 1
@@ -838,24 +628,6 @@ count = 1
 file = "src/Support/Diagnostics/SiteHealthReader.php"
 code = "mixed-operand"
 message = "Right operand in `&&` operation has `mixed` type."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "mixed-property-access"
-message = "Attempting to access a property on a non-object type (`mixed`)."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "possible-method-access-on-null"
-message = "Attempting to call a method on `null`."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "possibly-invalid-argument"
-message = 'Possible argument type mismatch for argument #1 of `AWPT\Support\Diagnostics\SiteHealthReader::count_statuses`: expected `list<array<string, mixed>>`, but possibly received `array<array-key, mixed>`.'
 count = 1
 
 [[issues]]
@@ -875,18 +647,6 @@ file = "src/Support/Diagnostics/UrlProbe.php"
 code = "possibly-null-array-access"
 message = "Cannot perform array access on possibly `null` value."
 count = 2
-
-[[issues]]
-file = "src/Support/IncidentRecorder.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `absint`: expected `('T.absint() extends int)|array<array-key, mixed>|null|resource|scalar`, but found `mixed`."
-count = 1
-
-[[issues]]
-file = "src/Support/IncidentRecorder.php"
-code = "mixed-argument"
-message = "Invalid argument type for argument #1 of `absint`: expected `('T.absint() extends int)|array<array-key, mixed>|null|resource|scalar`, but found `nonnull`."
-count = 1
 
 [[issues]]
 file = "src/Support/Json.php"
@@ -947,9 +707,3 @@ file = "src/Support/ReadablePostMeta.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 2
-
-[[issues]]
-file = "src/Support/ToolPreferences.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 4

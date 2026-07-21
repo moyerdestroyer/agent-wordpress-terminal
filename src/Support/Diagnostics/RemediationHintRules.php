@@ -47,7 +47,7 @@ final class RemediationHintRules {
     }
 
     private function deactivate_plugin(array $context): ?array {
-        $primary = $this->basic->primary_suspect($context);
+        $primary = $this->basic->primary_suspect(\AWPT\Support\ArrayKey::string_map($context));
 
         if (null === $primary || 'plugin' !== ($primary['kind'] ?? '') || 'high' !== ($primary['confidence'] ?? '')) {
             return null;

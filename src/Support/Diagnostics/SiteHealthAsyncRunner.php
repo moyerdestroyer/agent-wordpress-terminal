@@ -32,7 +32,13 @@ final class SiteHealthAsyncRunner {
         'page_cache',
     ];
 
+    /**
+     * @param array<string, array<string, mixed>> $async_definitions
+     * @param list<string>                        $filter_tests
+     * @return list<array{slug: string, label: string, status: string, description: string, actions: string}>
+     */
     public function run(array $async_definitions, array $filter_tests): array {
+        /** @var list<array{slug: string, label: string, status: string, description: string, actions: string}> $tests */
         $tests = [];
         $deadline = microtime(true) + self::ASYNC_BUDGET_SECONDS;
 
@@ -53,10 +59,6 @@ final class SiteHealthAsyncRunner {
                 continue;
             }
 
-            if (!is_string($slug) || !is_array($definition)) {
-                continue;
-            }
-            /** @var array<string, mixed> $definition */
             $rest_slug = $this->async_rest_slug($slug, $definition);
 
             if (null === $rest_slug) {

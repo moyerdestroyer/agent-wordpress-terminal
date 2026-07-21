@@ -114,7 +114,7 @@ final class IncidentsController extends RestController {
             'incident' => new IncidentRepository()->get($incident_id),
         ];
 
-        if (rest_sanitize_boolean($request->get_param('auto_diagnose'))) {
+        if (\AWPT\Support\ArrayKey::rest_bool($request->get_param('auto_diagnose'))) {
             $diagnosis = new DiagnosisRuntime()->run($session_id, $incident_id);
 
             if (!is_wp_error($diagnosis)) {

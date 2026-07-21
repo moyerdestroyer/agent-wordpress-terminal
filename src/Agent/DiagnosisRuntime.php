@@ -13,6 +13,7 @@ namespace AWPT\Agent;
 use AWPT\Database\IncidentRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\ArrayKey;
 use AWPT\Support\Diagnostics\DiagnosisInstructions;
 use AWPT\Support\IncidentRecorder;
 
@@ -85,7 +86,8 @@ final class DiagnosisRuntime {
             return new \WP_Error('awpt_session_not_found', __('Session not found.', 'agent-wordpress-terminal'));
         }
 
-        $incident = $this->incidents->get($incident_id);
+        $incident_row = $this->incidents->get($incident_id);
+        $incident = null !== $incident_row ? ArrayKey::string_map($incident_row) : null;
 
         if (null === $incident || (int) ($incident['session_id'] ?? 0) !== $session_id) {
             return new \WP_Error('awpt_incident_not_found', __('Incident not found.', 'agent-wordpress-terminal'));
@@ -107,7 +109,7 @@ final class DiagnosisRuntime {
             'kind' => (string) ($incident['kind'] ?? ''),
         ]);
 
-        $diagnosis = is_wp_error($diagnosis_tool) ? [] : $diagnosis_tool;
+        $diagnosis = is_wp_error($diagnosis_tool) ? [] : ArrayKey::as_map($diagnosis_tool);
         $provider = new ProviderFactory()->make();
         $messages = new ProviderMessageBuilder()->build($session_id);
         $messages[] = [
@@ -139,7 +141,7 @@ final class DiagnosisRuntime {
             $this->messages->store_tool_calls($session_id, $loop_result['tool_calls'], $now);
         }
 
-        $this->incidents->mark_diagnosed($incident_id, is_array($diagnosis) ? $diagnosis : []);
+        $this->incidents->mark_diagnosed($incident_id, $diagnosis);
 
         return [
             'incident_id' => $incident_id,

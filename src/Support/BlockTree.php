@@ -33,14 +33,7 @@ final class BlockTree {
      * Parse post content into a block tree.
      */
     public static function from_content(string $content): self {
-        $blocks = parse_blocks($content);
-        $normalized = [];
-
-        foreach ($blocks as $block) {
-            $normalized[] = $block;
-        }
-
-        return new self($normalized);
+        return new self(ArrayKey::list_of_maps(parse_blocks($content)));
     }
 
     /**

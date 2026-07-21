@@ -367,8 +367,8 @@ final class SlashCommandRouter {
             'content' => sprintf(
                 /* translators: 1: post title, 2: preview URL */
                 __('Preview ready for %1$s: %2$s', 'agent-wordpress-terminal'),
-                $preview['title'],
-                $preview['preview_url'],
+                (string) ($preview['title'] ?? ''),
+                (string) ($preview['preview_url'] ?? ''),
             ),
             'tool_calls' => [[
                 'tool' => 'awpt/preview-post',

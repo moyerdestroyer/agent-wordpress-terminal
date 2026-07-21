@@ -68,7 +68,8 @@ final class AgentRuntime {
                 );
             }
 
-            $this->messages->store_tool_calls($session_id, $response['tool_calls'] ?? [], $now);
+            $tool_calls = is_array($response['tool_calls'] ?? null) ? array_values($response['tool_calls']) : [];
+            $this->messages->store_tool_calls($session_id, $tool_calls, $now);
         }
 
         $session_update = ['updated_at' => $now];

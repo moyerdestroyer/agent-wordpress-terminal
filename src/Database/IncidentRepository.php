@@ -27,7 +27,7 @@ final class IncidentRepository {
         $wpdb = WpDb::get();
         $now = current_time('mysql');
 
-        $action_id = absint($data['action_id'] ?? 0);
+        $action_id = \AWPT\Support\ArrayKey::as_int($data['action_id'] ?? 0);
         $row = [
             'session_id' => $session_id,
             'kind' => sanitize_key((string) ($data['kind'] ?? 'php')),

@@ -48,16 +48,7 @@ final class BlockStructureUpdateActionApplier {
         }
 
         if (ActionOperations::BLOCK_INSERT === $operation) {
-            $raw = is_array($payload['block'] ?? null) ? $payload['block'] : [];
-            $typed = [];
-
-            foreach ($raw as $key => $value) {
-                if (is_string($key)) {
-                    $typed[$key] = $value;
-                }
-            }
-
-            $block = new BlockTreeEditor()->normalize_block($typed);
+            $block = new BlockTreeEditor()->normalize_block(\AWPT\Support\ArrayKey::as_map($payload['block'] ?? null));
             $position = (string) ($payload['position'] ?? BlockTree::POSITION_AFTER);
             $result = $tree->insert_block($path, $block, $position);
 
@@ -65,23 +56,10 @@ final class BlockStructureUpdateActionApplier {
         }
 
         if (ActionOperations::PATTERN_INSERT === $operation) {
-            $raw_blocks = is_array($payload['blocks'] ?? null) ? $payload['blocks'] : [];
             $blocks = [];
 
-            foreach ($raw_blocks as $raw) {
-                if (!is_array($raw)) {
-                    continue;
-                }
-
-                $typed = [];
-
-                foreach ($raw as $key => $value) {
-                    if (is_string($key)) {
-                        $typed[$key] = $value;
-                    }
-                }
-
-                $blocks[] = new BlockTreeEditor()->normalize_block($typed);
+            foreach (\AWPT\Support\ArrayKey::list_of_maps($payload['blocks'] ?? null) as $raw) {
+                $blocks[] = new BlockTreeEditor()->normalize_block($raw);
             }
 
             $result = $tree->insert_blocks(

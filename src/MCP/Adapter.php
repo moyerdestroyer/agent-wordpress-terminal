@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\MCP;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -36,8 +38,10 @@ final class Adapter {
 
         $tools = [];
 
-        foreach ($raw_tools as $tool) {
-            if (!is_array($tool)) {
+        foreach (array_keys($raw_tools) as $key) {
+            $tool = ArrayKey::as_map_or_null(ArrayKey::passthrough($raw_tools[$key] ?? null));
+
+            if (null === $tool) {
                 continue;
             }
 
@@ -79,20 +83,22 @@ final class Adapter {
          * @param array<array-key, mixed> $input Tool input.
          * @param array<string, mixed>    $tool Tool metadata.
          */
-        $result = apply_filters('awpt_mcp_execute_tool', null, $tool_name, $input, $tool);
+        $result = ArrayKey::passthrough(apply_filters('awpt_mcp_execute_tool', null, $tool_name, $input, $tool));
 
         if (is_wp_error($result)) {
             return $result;
         }
 
-        if (!is_array($result)) {
+        $payload = ArrayKey::as_map_or_null($result);
+
+        if (null === $payload) {
             return new \WP_Error('awpt_mcp_tool_unhandled', __(
                 'No MCP integration handled this tool execution.',
                 'agent-wordpress-terminal',
             ));
         }
 
-        return $result;
+        return $payload;
     }
 
     /**

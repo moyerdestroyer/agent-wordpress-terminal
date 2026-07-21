@@ -229,13 +229,11 @@ final class ActionContentPayloadSanitizer {
         if (array_key_exists('blocks', $payload) && is_array($payload['blocks'])) {
             $blocks = [];
 
-            foreach ($payload['blocks'] as $block) {
-                if (is_array($block)) {
-                    $sanitized = $this->sanitize_block_definition($block);
+            foreach (\AWPT\Support\ArrayKey::list_of_maps($payload['blocks']) as $block) {
+                $sanitized = $this->sanitize_block_definition($block);
 
-                    if ('' !== $sanitized['blockName']) {
-                        $blocks[] = $sanitized;
-                    }
+                if ('' !== $sanitized['blockName']) {
+                    $blocks[] = $sanitized;
                 }
             }
 
@@ -245,8 +243,8 @@ final class ActionContentPayloadSanitizer {
         if (array_key_exists('inserted_paths', $payload) && is_array($payload['inserted_paths'])) {
             $paths = [];
 
-            foreach ($payload['inserted_paths'] as $path) {
-                $value = is_scalar($path) ? sanitize_text_field((string) $path) : '';
+            foreach (\AWPT\Support\ArrayKey::list_of_strings($payload['inserted_paths']) as $path) {
+                $value = sanitize_text_field($path);
 
                 if (1 === preg_match('/^\d+(?:\.\d+)*$/', $value)) {
                     $paths[] = $value;
@@ -287,14 +285,12 @@ final class ActionContentPayloadSanitizer {
 
     private function sanitize_block_definition(array $block): array {
         $name = sanitize_text_field((string) ($block['blockName'] ?? ''));
-        $attrs = is_array($block['attrs'] ?? null) ? $this->sanitize_attrs_map($block['attrs']) : [];
+        $attrs = $this->sanitize_attrs_map(\AWPT\Support\ArrayKey::as_map($block['attrs'] ?? null));
         $inner_html = is_string($block['innerHTML'] ?? null) ? wp_kses_post($block['innerHTML']) : '';
         $inner_blocks = [];
 
-        foreach (is_array($block['innerBlocks'] ?? null) ? $block['innerBlocks'] : [] as $inner) {
-            if (is_array($inner)) {
-                $inner_blocks[] = $this->sanitize_block_definition($inner);
-            }
+        foreach (\AWPT\Support\ArrayKey::list_of_maps($block['innerBlocks'] ?? null) as $inner) {
+            $inner_blocks[] = $this->sanitize_block_definition($inner);
         }
 
         return [
@@ -310,16 +306,17 @@ final class ActionContentPayloadSanitizer {
      * @param array<array-key, mixed> $meta
      * @return array<string, string|int|float|bool>
      */
-
     private function sanitize_meta_map(array $meta): array {
         $clean = [];
 
-        foreach ($meta as $key => $value) {
+        foreach (array_keys($meta) as $key) {
             $meta_key = sanitize_key((string) $key);
 
             if ('' === $meta_key) {
                 continue;
             }
+
+            $value = \AWPT\Support\ArrayKey::passthrough($meta[$key] ?? null);
 
             if (is_bool($value) || is_int($value) || is_float($value)) {
                 $clean[$meta_key] = $value;
@@ -336,8 +333,8 @@ final class ActionContentPayloadSanitizer {
         if (is_array($value)) {
             $clean = [];
 
-            foreach ($value as $key => $item) {
-                $clean[$key] = $this->sanitize_attr_value($item);
+            foreach (array_keys($value) as $key) {
+                $clean[$key] = $this->sanitize_attr_value(\AWPT\Support\ArrayKey::passthrough($value[$key] ?? null));
             }
 
             return $clean;
@@ -357,12 +354,12 @@ final class ActionContentPayloadSanitizer {
     public function sanitize_attrs_map(array $attrs): array {
         $clean = [];
 
-        foreach ($attrs as $key => $value) {
-            if (!is_string($key) || '' === $key) {
+        foreach (array_keys(\AWPT\Support\ArrayKey::string_map($attrs)) as $key) {
+            if ('' === $key) {
                 continue;
             }
 
-            $clean[$key] = $this->sanitize_attr_value($value);
+            $clean[$key] = $this->sanitize_attr_value(\AWPT\Support\ArrayKey::passthrough($attrs[$key] ?? null));
         }
 
         return $clean;
