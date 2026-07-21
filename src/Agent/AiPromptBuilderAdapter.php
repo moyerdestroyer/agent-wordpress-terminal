@@ -10,8 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-use AWPT\Support\ArrayKey;
-
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -62,57 +60,80 @@ final class AiPromptBuilderAdapter implements \AWPT_AI_Prompt_Builder {
     }
 
     public function is_supported_for_text_generation(): bool {
-        if (!method_exists($this->inner, 'is_supported_for_text_generation')) {
+        if (!$this->has_method('is_supported_for_text_generation')) {
             return true;
         }
 
-        return ArrayKey::rest_bool(call_user_func([$this->inner, 'is_supported_for_text_generation']));
+        try {
+            return true === $this->invoke('is_supported_for_text_generation', []);
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     public function generate_text_result(): object {
-        if (!method_exists($this->inner, 'generate_text_result')) {
+        if (!$this->has_method('generate_text_result')) {
             throw new \RuntimeException('AI Client builder does not support generate_text_result().');
         }
 
-        $result = ArrayKey::passthrough(call_user_func([$this->inner, 'generate_text_result']));
+        $object = $this->as_object($this->invoke('generate_text_result', []));
 
-        if (!is_object($result)) {
+        if (null === $object) {
             throw new \RuntimeException('AI Client generate_text_result() did not return an object.');
         }
 
-        return $result;
+        return $object;
     }
 
     public function generate_text(): string {
-        if (!method_exists($this->inner, 'generate_text')) {
+        if (!$this->has_method('generate_text')) {
             throw new \RuntimeException('AI Client builder does not support generate_text().');
         }
 
-        return (string) call_user_func([$this->inner, 'generate_text']);
+        return (string) $this->invoke('generate_text', []);
     }
 
     public function run(): mixed {
-        if (!method_exists($this->inner, 'run')) {
+        if (!$this->has_method('run')) {
             return null;
         }
 
-        return call_user_func([$this->inner, 'run']);
+        return $this->invoke('run', []);
     }
 
     /**
      * @param list<mixed> $args
      */
     private function forward(string $method, array $args): self {
-        if (!method_exists($this->inner, $method)) {
+        if (!$this->has_method($method)) {
             return $this;
         }
 
-        $result = ArrayKey::passthrough(call_user_func_array([$this->inner, $method], $args));
+        try {
+            $object = $this->as_object($this->invoke($method, $args));
+        } catch (\Throwable) {
+            return $this;
+        }
 
-        if (is_object($result)) {
-            $this->inner = $result;
+        if (null !== $object) {
+            $this->inner = $object;
         }
 
         return $this;
+    }
+
+    private function has_method(string $method): bool {
+        return method_exists($this->inner, $method);
+    }
+
+    /**
+     * @param list<mixed> $args
+     */
+    private function invoke(string $method, array $args): mixed {
+        return new \ReflectionMethod($this->inner, $method)->invokeArgs($this->inner, $args);
+    }
+
+    private function as_object(mixed $value): ?object {
+        return is_object($value) ? $value : null;
     }
 }
