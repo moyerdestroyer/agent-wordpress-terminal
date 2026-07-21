@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -36,11 +38,11 @@ final class AiPromptBuilderAdapter implements \AWPT_AI_Prompt_Builder {
     }
 
     public function using_function_declarations(object ...$declarations): self {
-        return $this->forward('using_function_declarations', $declarations);
+        return $this->forward('using_function_declarations', array_values($declarations));
     }
 
     public function using_abilities(string ...$ability_names): self {
-        return $this->forward('using_abilities', $ability_names);
+        return $this->forward('using_abilities', array_values($ability_names));
     }
 
     public function with_model_preference(array $models): self {
@@ -60,19 +62,19 @@ final class AiPromptBuilderAdapter implements \AWPT_AI_Prompt_Builder {
     }
 
     public function is_supported_for_text_generation(): bool {
-        if (!is_callable([$this->inner, 'is_supported_for_text_generation'])) {
+        if (!method_exists($this->inner, 'is_supported_for_text_generation')) {
             return true;
         }
 
-        return (bool) $this->inner->is_supported_for_text_generation();
+        return ArrayKey::rest_bool(call_user_func([$this->inner, 'is_supported_for_text_generation']));
     }
 
     public function generate_text_result(): object {
-        if (!is_callable([$this->inner, 'generate_text_result'])) {
+        if (!method_exists($this->inner, 'generate_text_result')) {
             throw new \RuntimeException('AI Client builder does not support generate_text_result().');
         }
 
-        $result = $this->inner->generate_text_result();
+        $result = ArrayKey::passthrough(call_user_func([$this->inner, 'generate_text_result']));
 
         if (!is_object($result)) {
             throw new \RuntimeException('AI Client generate_text_result() did not return an object.');
@@ -82,30 +84,30 @@ final class AiPromptBuilderAdapter implements \AWPT_AI_Prompt_Builder {
     }
 
     public function generate_text(): string {
-        if (!is_callable([$this->inner, 'generate_text'])) {
+        if (!method_exists($this->inner, 'generate_text')) {
             throw new \RuntimeException('AI Client builder does not support generate_text().');
         }
 
-        return (string) $this->inner->generate_text();
+        return (string) call_user_func([$this->inner, 'generate_text']);
     }
 
     public function run(): mixed {
-        if (!is_callable([$this->inner, 'run'])) {
+        if (!method_exists($this->inner, 'run')) {
             return null;
         }
 
-        return $this->inner->run();
+        return call_user_func([$this->inner, 'run']);
     }
 
     /**
      * @param list<mixed> $args
      */
     private function forward(string $method, array $args): self {
-        if (!is_callable([$this->inner, $method])) {
+        if (!method_exists($this->inner, $method)) {
             return $this;
         }
 
-        $result = $this->inner->{$method}(...$args);
+        $result = ArrayKey::passthrough(call_user_func_array([$this->inner, $method], $args));
 
         if (is_object($result)) {
             $this->inner = $result;
