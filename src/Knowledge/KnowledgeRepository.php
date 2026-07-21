@@ -20,11 +20,6 @@ if (!defined('ABSPATH')) {
 final class KnowledgeRepository {
     public const SITE_CONTENT_INDEX_CAP = 500;
 
-    private const CORE_POST_TYPE = 'wp_knowledge';
-    private const CORE_TAXONOMY = 'wp_knowledge_type';
-    private const LEGACY_POST_TYPE = 'wp_guideline';
-    private const LEGACY_TAXONOMY = 'wp_guideline_type';
-
     private KnowledgePostSourceMapper $mapper;
     private KnowledgeSiteContentTypes $site_content_types;
 
@@ -39,28 +34,23 @@ final class KnowledgeRepository {
     /**
      * Return active Knowledge backend metadata.
      *
-     * @return array{mode: string, label: string, core_available: bool, legacy_guidelines_available: bool}
+     * @return array{mode: string, label: string, core_available: bool, legacy_guidelines_available: bool, post_type: string}
      */
     public function status(): array {
-        $core = post_type_exists(self::CORE_POST_TYPE);
-        $legacy = post_type_exists(self::LEGACY_POST_TYPE);
+        $backends = $this->backends();
+        $active = $this->active_backend($backends);
+        $core = $this->backend_family_available($backends, 'core');
+        $legacy = $this->backend_family_available($backends, 'legacy');
 
-        if ($core) {
-            $mode = 'core';
-            $label = __('Core Knowledge', 'agent-wordpress-terminal');
-        } elseif ($legacy) {
-            $mode = 'legacy_guidelines';
-            $label = __('Legacy Guidelines', 'agent-wordpress-terminal');
-        } else {
-            $mode = 'fallback_index';
-            $label = __('AWPT index only', 'agent-wordpress-terminal');
-        }
+        $mode = null !== $active ? $active['mode'] : 'fallback_index';
+        $label = null !== $active ? $active['label'] : __('AWPT index only', 'agent-wordpress-terminal');
 
         return [
             'mode' => $mode,
             'label' => $label,
             'core_available' => $core,
             'legacy_guidelines_available' => $legacy,
+            'post_type' => null !== $active ? $active['post_type'] : '',
         ];
     }
 
@@ -70,15 +60,13 @@ final class KnowledgeRepository {
      * @return list<array<string, mixed>>
      */
     public function list_sources(): array {
-        if (post_type_exists(self::CORE_POST_TYPE)) {
-            return $this->list_post_sources(self::CORE_POST_TYPE, self::CORE_TAXONOMY, 'core_knowledge');
+        $backend = $this->active_backend($this->backends());
+
+        if (null === $backend) {
+            return [];
         }
 
-        if (post_type_exists(self::LEGACY_POST_TYPE)) {
-            return $this->list_post_sources(self::LEGACY_POST_TYPE, self::LEGACY_TAXONOMY, 'legacy_guideline');
-        }
-
-        return [];
+        return $this->list_post_sources($backend['post_type'], $backend['taxonomy'], $backend['kind']);
     }
 
     /**
@@ -118,16 +106,120 @@ final class KnowledgeRepository {
             ));
         }
 
-        if (!in_array($post->post_type, [self::CORE_POST_TYPE, self::LEGACY_POST_TYPE], true)) {
+        $backend = $this->backend_for_post_type($post->post_type);
+
+        if (null === $backend) {
             return new \WP_Error('awpt_knowledge_wrong_type', __(
                 'The requested item is not a Knowledge record.',
                 'agent-wordpress-terminal',
             ));
         }
 
-        $kind = self::CORE_POST_TYPE === $post->post_type ? 'core_knowledge' : 'legacy_guideline';
+        return $this->mapper->from_post($post, $backend['kind'], $backend['taxonomy']);
+    }
 
-        return $this->mapper->from_post($post, $kind, $this->mapper->taxonomy_for_post_type($post->post_type));
+    /**
+     * Knowledge storage backends supported across the 7.1 rollout.
+     *
+     * Plugins testing a renamed or companion-provided backend can add a definition
+     * without replacing AWPT's repository implementation.
+     *
+     * @return list<array{post_type: string, taxonomy: string, kind: string, mode: string, label: string, family: string}>
+     */
+    private function backends(): array {
+        $defaults = [
+            [
+                'post_type' => 'wp_knowledge',
+                'taxonomy' => 'wp_knowledge_type',
+                'kind' => 'core_knowledge',
+                'mode' => 'core',
+                'label' => __('Core Knowledge', 'agent-wordpress-terminal'),
+                'family' => 'core',
+            ],
+            [
+                'post_type' => 'wp_guideline',
+                'taxonomy' => 'wp_guideline_type',
+                'kind' => 'legacy_guideline',
+                'mode' => 'legacy_guidelines',
+                'label' => __('Legacy Guidelines', 'agent-wordpress-terminal'),
+                'family' => 'legacy',
+            ],
+        ];
+
+        /**
+         * Filters Knowledge post-type backends AWPT can ingest.
+         *
+         * @param array<int, array<string, string>> $defaults Backend definitions.
+         */
+        /** @var mixed $filtered */
+        $filtered = apply_filters('awpt_knowledge_backends', $defaults);
+
+        if (!is_array($filtered)) {
+            return $defaults;
+        }
+
+        $backends = [];
+        $array_backends = array_filter($filtered, 'is_array');
+
+        foreach ($array_backends as $backend) {
+            $post_type = sanitize_key((string) ($backend['post_type'] ?? ''));
+            $kind = sanitize_key((string) ($backend['kind'] ?? ''));
+
+            if ('' === $post_type || '' === $kind) {
+                continue;
+            }
+
+            $backends[] = [
+                'post_type' => $post_type,
+                'taxonomy' => sanitize_key((string) ($backend['taxonomy'] ?? '')),
+                'kind' => $kind,
+                'mode' => sanitize_key((string) ($backend['mode'] ?? $kind)),
+                'label' => sanitize_text_field((string) ($backend['label'] ?? $post_type)),
+                'family' => sanitize_key((string) ($backend['family'] ?? 'extension')),
+            ];
+        }
+
+        return [] !== $backends ? $backends : $defaults;
+    }
+
+    /**
+     * @param list<array{post_type: string, taxonomy: string, kind: string, mode: string, label: string, family: string}> $backends
+     * @return array{post_type: string, taxonomy: string, kind: string, mode: string, label: string, family: string}|null
+     */
+    private function active_backend(array $backends): ?array {
+        foreach ($backends as $backend) {
+            if (post_type_exists($backend['post_type'])) {
+                return $backend;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{post_type: string, taxonomy: string, kind: string, mode: string, label: string, family: string}|null
+     */
+    private function backend_for_post_type(string $post_type): ?array {
+        foreach ($this->backends() as $backend) {
+            if ($backend['post_type'] === $post_type && post_type_exists($post_type)) {
+                return $backend;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{post_type: string, taxonomy: string, kind: string, mode: string, label: string, family: string}> $backends
+     */
+    private function backend_family_available(array $backends, string $family): bool {
+        foreach ($backends as $backend) {
+            if ($backend['family'] === $family && post_type_exists($backend['post_type'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

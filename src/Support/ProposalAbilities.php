@@ -26,6 +26,9 @@ final class ProposalAbilities {
         'awpt/propose-block-attrs-update',
         'awpt/propose-block-insert',
         'awpt/propose-block-remove',
+        'awpt/propose-pattern-insert',
+        'awpt/propose-template-update',
+        'awpt/propose-global-styles-update',
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
@@ -39,7 +42,6 @@ final class ProposalAbilities {
      */
     public const SESSION_SCOPED = [
         ...self::NAMES,
-        'awpt/sideload-media',
         'awpt/diagnose-error',
     ];
 

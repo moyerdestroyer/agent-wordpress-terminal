@@ -33,10 +33,13 @@ final class ToolCatalogFormatter {
         'awpt/render-block' => 'Renders one block or the full post to HTML via render_block().',
         'awpt/list-templates' => 'Lists block theme templates and template parts.',
         'awpt/read-template' => 'Reads a template/template part with content and block summary.',
-        'core/get-site-info' => 'Returns WordPress site information (Core ability; shared with MCP).',
-        'core/get-user-info' => 'Returns the current authenticated user profile (Core ability; shared with MCP).',
-        'core/get-environment-info' => 'Returns WordPress runtime environment details (Core ability; shared with MCP).',
-        'core/read-settings' => 'Returns WordPress settings exposed to abilities (Core/AI ability; shared with MCP).',
+        'awpt/list-patterns' => 'Lists registered theme/core and reusable block patterns.',
+        'awpt/read-pattern' => 'Reads a pattern composition and its block tree before reuse.',
+        'awpt/read-global-styles' => 'Reads the active theme’s saved WordPress global-styles JSON and metadata.',
+        'core/get-site-info' => 'Returns WordPress site information (Core ability).',
+        'core/get-user-info' => 'Returns the current authenticated user profile (Core ability).',
+        'core/get-environment-info' => 'Returns WordPress runtime environment details (Core ability).',
+        'core/read-settings' => 'Returns WordPress settings exposed to abilities (Core/AI ability).',
         'awpt/analyze-page' => 'Returns an agent-friendly page brief with structure and risk signals.',
         'awpt/preview-post' => 'Returns preview URL and iframe metadata for a post.',
         'awpt/search-content' => 'Finds posts, pages, templates, template parts, and reusable blocks by title, slug, ID, or URL.',
@@ -47,7 +50,10 @@ final class ToolCatalogFormatter {
         'awpt/propose-block-attrs-update' => 'Stages a targeted Gutenberg block attribute update by block path for explicit admin approval.',
         'awpt/propose-block-insert' => 'Stages insertion of a Gutenberg block (before/after/append a path) for admin approval.',
         'awpt/propose-block-remove' => 'Stages removal of a Gutenberg block by path and fingerprint for admin approval.',
-        'awpt/propose-new-post' => 'Stages creation of a brand new post or page for explicit admin approval. Use for new posts, not existing ones. Optional featured_image_id sets the WordPress featured image on apply.',
+        'awpt/propose-pattern-insert' => 'Stages insertion of a registered or reusable pattern as an ordered block composition for admin approval.',
+        'awpt/propose-template-update' => 'Stages a full Gutenberg template or template-part update for admin approval.',
+        'awpt/propose-global-styles-update' => 'Stages creation or update of active-theme global-styles JSON for admin approval.',
+        'awpt/propose-new-post' => 'Stages or revises a draft post/page for approval. Pass body-only post_content. pattern_mode prepend inserts an unchanged verified pattern; adapted records a read pattern as the source of a complete customized block composition. AWPT automatically targets the newest compatible open proposal for corrective requests. A pasted image requested in the design must appear in an inline Image/Cover block; featured_image_id alone is insufficient. AWPT repairs unambiguous Gutenberg wrapper and image-class serialization issues before staging and returns repairs_applied; creative copy and layout remain yours.',
         'awpt/propose-site-settings-update' => 'Stages safe WordPress site settings changes for explicit admin approval.',
         'awpt/propose-theme-switch' => 'Stages activation of an installed WordPress theme for explicit admin approval.',
         'awpt/propose-plugin-deactivate' => 'Last-resort staged deactivation when diagnosis attributes a fatal PHP error to a third-party plugin.',
@@ -57,7 +63,6 @@ final class ToolCatalogFormatter {
         'awpt/probe-url' => 'Fetches a same-site URL and extracts rendered PHP or critical error snippets.',
         'awpt/diagnose-error' => 'Analyzes an error with log evidence, suspects, Site Health context, and remediation hints.',
         'awpt/apply-action' => 'Applies an explicitly approved AWPT staged action.',
-        'awpt/sideload-media' => 'Downloads a remote image or video URL and adds it to the Media Library, returning its attachment ID and hosted URL. Automatically resolves share/preview page links (e.g. Tenor, Giphy) to their underlying direct media file.',
     ];
 
     /**
@@ -70,6 +75,9 @@ final class ToolCatalogFormatter {
         'awpt/propose-block-attrs-update',
         'awpt/propose-block-insert',
         'awpt/propose-block-remove',
+        'awpt/propose-pattern-insert',
+        'awpt/propose-template-update',
+        'awpt/propose-global-styles-update',
         'awpt/propose-new-post',
         'awpt/propose-site-settings-update',
         'awpt/propose-theme-switch',
@@ -83,11 +91,14 @@ final class ToolCatalogFormatter {
     public function get_system_prompt_catalog(): string {
         $registry = new ToolRegistry();
         $lines = [
-            'You may call any enabled site tool discovered from WordPress Abilities (any plugin/theme) and connected MCP tools. Names use namespace/tool form (e.g. core/get-site-info, ai/get-post-details, awpt/search-content).',
+            'You may call any enabled site tool discovered from WordPress Abilities (core, this plugin, and other plugins/themes). Names use namespace/tool form (e.g. core/get-site-info, ai/get-post-details, awpt/search-content).',
             'Natural language is the primary user workflow. Slash shortcuts are typed by users and should only be mentioned when users ask for shortcuts or commands.',
             'Use awpt/search-knowledge for durable site knowledge, guidelines, memories, notes, indexed content, and allowed document sources when available.',
             'AWPT write abilities (awpt/propose-*) stage proposed actions for admin approval; never claim a destructive change was applied without approval.',
             'Block edits: use awpt/list-blocks or awpt/read-block-tree for dotted paths (0, 2.1). Prefer fingerprint when proposing attrs/remove. Stage inserts with awpt/propose-block-insert (before|after|append) and removals with awpt/propose-block-remove.',
+            'Pattern edits: use awpt/list-patterns, then awpt/read-pattern before staging awpt/propose-pattern-insert. Reuse the active theme pattern when it satisfies the request instead of recreating a generic layout.',
+            'Template edits: use awpt/list-templates and awpt/read-template first; then stage awpt/propose-template-update. Template actions are reviewed as a diff because frontend post previews do not safely represent global template changes.',
+            'Global styles: use awpt/read-global-styles before staging awpt/propose-global-styles-update. Keep the JSON valid and scope the proposal to the requested style tokens.',
             'Auto-callable tools currently enabled for this site:',
         ];
 
@@ -105,8 +116,7 @@ final class ToolCatalogFormatter {
         $lines[] = '- /focus {title|slug|url|id} — set session focus';
         $lines[] = '- /preview {title|slug|url|id} — open a preview';
         $lines[] = '- /knowledge search {query} — search indexed Knowledge';
-        $lines[] = '- /tools — list registered abilities and MCP tools';
-        $lines[] = '- /mcp status — show MCP connection status';
+        $lines[] = '- /tools — list registered abilities';
         $lines[] = '- /clear — clear the transcript';
 
         if (!function_exists('wp_get_abilities')) {

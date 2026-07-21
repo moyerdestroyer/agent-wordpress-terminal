@@ -1,11 +1,12 @@
 import { Button, Spinner } from '@wordpress/components';
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import {
+	createPreviewCapture,
 	createSession,
 	deleteSession,
 	fetchActionPreview,
-	getMcpStatus,
+	getChatProgress,
 	getSession,
 	listAwptTools,
 	listSessions,
@@ -14,11 +15,13 @@ import {
 	sendMessage,
 	updateAction,
 	updateSession,
+	uploadAttachment,
 } from '../api';
+import type { PreviewCapture } from '../lib/previewCapture';
 import { mergeProposalActions, proposalActionsFromToolCalls } from '../proposalActions';
 import type {
+	ChatProgress,
 	ChatResponse,
-	McpStatus,
 	Message,
 	PreviewDetails,
 	ProposedAction,
@@ -57,6 +60,37 @@ function focusMeta(session: SessionSummary): string {
 		.join(' · ');
 }
 
+const CHAT_REQUEST_TIMEOUT_MS = 135_000;
+
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+	return Promise.race([
+		promise,
+		new Promise<T>((_resolve, reject) => {
+			window.setTimeout(() => {
+				reject(
+					new Error(
+						__(
+							'The agent request timed out. Retry the message, or check the selected AI model.',
+							'agent-wordpress-terminal',
+						),
+					),
+				);
+			}, milliseconds);
+		}),
+	]);
+}
+
+function cacheBustPreview(preview: PreviewDetails, revision: string): PreviewDetails {
+	const separator = preview.preview_url.includes('?') ? '&' : '?';
+	const url = `${preview.preview_url}${separator}awpt_revision=${encodeURIComponent(revision)}`;
+
+	return {
+		...preview,
+		preview_url: url,
+		iframe: preview.iframe ? { ...preview.iframe, src: url } : preview.iframe,
+	};
+}
+
 export function Terminal(): JSX.Element {
 	const [sessions, setSessions] = useState<SessionSummary[]>([]);
 	const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -64,21 +98,28 @@ export function Terminal(): JSX.Element {
 	const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
 	const [actions, setActions] = useState<ProposedAction[]>([]);
 	const [tools, setTools] = useState<ToolsResponse | null>(null);
-	const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
 	const [preview, setPreview] = useState<PreviewDetails | null>(null);
 	const [previewAction, setPreviewAction] = useState<ProposedAction | null>(null);
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 	const [input, setInput] = useState('');
+	const [attachments, setAttachments] = useState<
+		Array<{ id: number; url: string; filename: string }>
+	>([]);
+	const [isUploading, setIsUploading] = useState(false);
 	const [commandHistory, setCommandHistory] = useState<string[]>([]);
 	const [historyIndex, setHistoryIndex] = useState<number | null>(null);
 	const [historyDraft, setHistoryDraft] = useState('');
 	const [isLoading, setIsLoading] = useState(true);
+	const [bootError, setBootError] = useState<string | null>(null);
 	const [isSending, setIsSending] = useState(false);
+	const [chatProgress, setChatProgress] = useState<ChatProgress | null>(null);
 	const [sidebarTab, setSidebarTab] = useState<'knowledge' | 'tools'>('knowledge');
 	const [toolsLoadedFully, setToolsLoadedFully] = useState(false);
 	const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 	const [editingSessionTitle, setEditingSessionTitle] = useState('');
 	const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<number | null>(null);
+	const previewDrawerRef = useRef<HTMLElement | null>(null);
+	const previewReturnFocusRef = useRef<HTMLElement | null>(null);
 	const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
 	const connection = window.awptSettings?.connection;
 	const abilitiesStatus = tools?.environment?.abilities;
@@ -86,15 +127,10 @@ export function Terminal(): JSX.Element {
 	useEffect(() => {
 		const boot = async (): Promise<void> => {
 			try {
-				const [sessionList, toolList, mcp] = await Promise.all([
-					listSessions(),
-					listAwptTools(),
-					getMcpStatus(),
-				]);
+				const [sessionList, toolList] = await Promise.all([listSessions(), listAwptTools()]);
 
 				setSessions(sessionList);
 				setTools(toolList);
-				setMcpStatus(mcp);
 
 				if (sessionList.length > 0) {
 					await loadSession(sessionList[0].id);
@@ -103,6 +139,15 @@ export function Terminal(): JSX.Element {
 					setSessions([created]);
 					setActiveSessionId(created.id);
 				}
+			} catch (error: unknown) {
+				setBootError(
+					error &&
+						typeof error === 'object' &&
+						'message' in error &&
+						typeof error.message === 'string'
+						? error.message
+						: __('Could not load the Agent Terminal. Try again.', 'agent-wordpress-terminal'),
+				);
 			} finally {
 				setIsLoading(false);
 			}
@@ -124,6 +169,26 @@ export function Terminal(): JSX.Element {
 
 		void loadFullTools();
 	}, [sidebarTab, toolsLoadedFully]);
+
+	useEffect(() => {
+		if (!isPreviewOpen) {
+			previewReturnFocusRef.current?.focus();
+			previewReturnFocusRef.current = null;
+			return;
+		}
+
+		previewReturnFocusRef.current =
+			document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		previewDrawerRef.current?.focus();
+		const closeOnEscape = (event: KeyboardEvent): void => {
+			if (event.key === 'Escape') {
+				setIsPreviewOpen(false);
+			}
+		};
+
+		window.addEventListener('keydown', closeOnEscape);
+		return () => window.removeEventListener('keydown', closeOnEscape);
+	}, [isPreviewOpen]);
 
 	useEffect(() => {
 		if (!activeSessionId) {
@@ -228,13 +293,34 @@ export function Terminal(): JSX.Element {
 	};
 
 	const handleSend = async (): Promise<void> => {
-		if (!activeSessionId || !input.trim() || isSending) {
+		if (
+			!activeSessionId ||
+			(!input.trim() && attachments.length === 0) ||
+			isSending ||
+			isUploading
+		) {
 			return;
 		}
 
-		const message = input.trim();
+		const submittedAttachments = attachments;
+		const attachmentContext = submittedAttachments
+			.map((item) => `Attached image: ${item.url} (Media Library attachment #${item.id})`)
+			.join('\n');
+		const inputMessage = input.trim();
+		const message = [inputMessage, attachmentContext].filter(Boolean).join('\n\n');
 		setInput('');
+		setAttachments([]);
 		setIsSending(true);
+		setChatProgress({
+			state: 'pending',
+			phase: 'starting',
+			label: __('Sending request', 'agent-wordpress-terminal'),
+			detail: '',
+			completed: 0,
+			total: 0,
+			sequence: 0,
+			updated_at: '',
+		});
 		setCommandHistory((current) =>
 			current[current.length - 1] === message ? current : [...current, message],
 		);
@@ -242,11 +328,36 @@ export function Terminal(): JSX.Element {
 		setHistoryDraft('');
 
 		const turnAt = new Date().toISOString();
+		const turnId =
+			typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+				? crypto.randomUUID()
+				: `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 		setMessages((current) => [...current, { role: 'user', content: message, created_at: turnAt }]);
+		let progressRequestPending = false;
+		const pollProgress = async (): Promise<void> => {
+			if (progressRequestPending) return;
+			progressRequestPending = true;
+
+			try {
+				const next = await getChatProgress(activeSessionId, turnId);
+				setChatProgress((current) =>
+					!current || next.sequence >= current.sequence ? next : current,
+				);
+			} catch {
+				// Progress is supplementary; the chat request remains authoritative.
+			} finally {
+				progressRequestPending = false;
+			}
+		};
+		void pollProgress();
+		const progressTimer = window.setInterval(() => void pollProgress(), 700);
 
 		try {
-			const response: ChatResponse = await sendMessage(activeSessionId, message);
+			const response: ChatResponse = await withTimeout(
+				sendMessage(activeSessionId, inputMessage, submittedAttachments, turnId),
+				CHAT_REQUEST_TIMEOUT_MS,
+			);
 
 			if (response.command === 'clear') {
 				setMessages([]);
@@ -263,33 +374,60 @@ export function Terminal(): JSX.Element {
 				{ role: 'assistant', content: response.content, created_at: turnAt },
 			]);
 
-			if (response.tool_calls?.length) {
-				const turnToolCalls = response.tool_calls.map((call) => ({ ...call, created_at: turnAt }));
+			const turnToolCalls = (response.tool_calls ?? []).map((call) => ({
+				...call,
+				created_at: turnAt,
+			}));
+
+			if (turnToolCalls.length > 0) {
 				setToolCalls((current) => [...current, ...turnToolCalls]);
-
-				const proposalActions = proposalActionsFromToolCalls(turnToolCalls);
-
-				if (proposalActions.length > 0) {
-					setActions((current) => mergeProposalActions(current, proposalActions));
-				}
 			}
 
-			if (response.actions?.length) {
+			const responseActions = (response.actions ?? []).map((action) => ({
+				id: action.id,
+				session_id: action.session_id,
+				title: action.title,
+				description: action.description,
+				payload: action.payload,
+				status: action.status as ProposedAction['status'],
+				created_at: action.created_at,
+				updated_at: action.updated_at,
+				revision_kind: action.revision_kind,
+				revised_action_id: action.revised_action_id,
+				removed_action_ids: action.removed_action_ids,
+			}));
+			const incomingActions = mergeProposalActions(
+				proposalActionsFromToolCalls(turnToolCalls),
+				responseActions,
+			);
+			const removedActionIds = new Set(response.removed_action_ids ?? []);
+
+			if (incomingActions.length > 0 || removedActionIds.size > 0) {
 				setActions((current) =>
 					mergeProposalActions(
-						current,
-						response.actions.map((action) => ({
-							id: action.id,
-							session_id: action.session_id,
-							title: action.title,
-							description: action.description,
-							payload: action.payload,
-							status: action.status as ProposedAction['status'],
-							created_at: action.created_at,
-							updated_at: action.updated_at,
-						})),
+						current.filter((action) => !action.id || !removedActionIds.has(action.id)),
+						incomingActions,
 					),
 				);
+			}
+
+			const revisedAction = incomingActions.find(
+				(action) => action.id === response.revised_action_id,
+			);
+
+			if (response.revision_kind === 'revised' && revisedAction?.id && isPreviewOpen) {
+				setPreviewAction(revisedAction);
+
+				try {
+					const refreshed = await fetchActionPreview(revisedAction.id);
+					setPreview(cacheBustPreview(refreshed, revisedAction.updated_at ?? String(Date.now())));
+				} catch {
+					setPreview(null);
+				}
+			} else if (previewAction?.id && removedActionIds.has(previewAction.id)) {
+				setPreview(null);
+				setPreviewAction(null);
+				setIsPreviewOpen(false);
 			}
 
 			if (response.preview?.preview_url) {
@@ -335,8 +473,33 @@ export function Terminal(): JSX.Element {
 
 			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
 		} finally {
+			window.clearInterval(progressTimer);
+			setChatProgress(null);
 			setIsSending(false);
 		}
+	};
+
+	const handleAttachment = async (file: File): Promise<void> => {
+		if (!file.type.startsWith('image/')) return;
+		setIsUploading(true);
+		try {
+			const uploaded = await uploadAttachment(file);
+			setAttachments((current) => [...current, uploaded]);
+		} finally {
+			setIsUploading(false);
+		}
+	};
+
+	const handlePreviewCapture = (capture: PreviewCapture | null): void => {
+		if (!capture || !activeSessionId) {
+			return;
+		}
+
+		void createPreviewCapture(activeSessionId, {
+			...capture,
+			action_id: previewAction?.id,
+			post_id: Number(previewAction?.payload?.post_id ?? 0) || undefined,
+		}).catch(() => {});
 	};
 
 	const handleNewSession = async (): Promise<void> => {
@@ -531,6 +694,17 @@ export function Terminal(): JSX.Element {
 		);
 	}
 
+	if (bootError) {
+		return (
+			<div className="awpt-terminal awpt-terminal--error" role="alert">
+				<p>{bootError}</p>
+				<Button variant="primary" onClick={() => window.location.reload()}>
+					{__('Retry', 'agent-wordpress-terminal')}
+				</Button>
+			</div>
+		);
+	}
+
 	return (
 		<div className="awpt-terminal">
 			<header className="awpt-header">
@@ -556,13 +730,6 @@ export function Terminal(): JSX.Element {
 					</span>
 					<span
 						className={`awpt-header__status ${
-							mcpStatus?.connected ? 'awpt-header__status--connected' : ''
-						}`}
-					>
-						MCP: {mcpStatus?.label ?? __('Unknown', 'agent-wordpress-terminal')}
-					</span>
-					<span
-						className={`awpt-header__status ${
 							abilitiesStatus?.available
 								? 'awpt-header__status--connected'
 								: 'awpt-header__status--warning'
@@ -579,12 +746,14 @@ export function Terminal(): JSX.Element {
 					<div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
 						<Button
 							variant={sidebarTab === 'knowledge' ? 'primary' : 'secondary'}
+							aria-pressed={sidebarTab === 'knowledge'}
 							onClick={() => setSidebarTab('knowledge')}
 						>
 							{__('Knowledge', 'agent-wordpress-terminal')}
 						</Button>
 						<Button
 							variant={sidebarTab === 'tools' ? 'primary' : 'secondary'}
+							aria-pressed={sidebarTab === 'tools'}
 							onClick={() => setSidebarTab('tools')}
 						>
 							{__('Tools', 'agent-wordpress-terminal')}
@@ -594,7 +763,7 @@ export function Terminal(): JSX.Element {
 					{sidebarTab === 'knowledge' ? (
 						<KnowledgePanel />
 					) : (
-						<ToolsSidebar tools={tools} mcpStatus={mcpStatus} onToolsChange={setTools} />
+						<ToolsSidebar tools={tools} onToolsChange={setTools} />
 					)}
 
 					<div style={{ marginTop: 16 }}>
@@ -606,6 +775,7 @@ export function Terminal(): JSX.Element {
 										<div className="awpt-session-edit">
 											<input
 												type="text"
+												aria-label={__('Message the agent', 'agent-wordpress-terminal')}
 												value={editingSessionTitle}
 												onChange={(event) => setEditingSessionTitle(event.target.value)}
 												onKeyDown={(event) => {
@@ -681,6 +851,7 @@ export function Terminal(): JSX.Element {
 						toolCalls={toolCalls}
 						actions={actions}
 						isThinking={isSending}
+						progress={chatProgress}
 						onActionOperation={(action, operation) => void handleActionOperation(action, operation)}
 						onActionPreview={handleActionPreview}
 					/>
@@ -702,6 +873,23 @@ export function Terminal(): JSX.Element {
 									setHistoryIndex(null);
 								}
 							}}
+							onPaste={(event) => {
+								const file = Array.from(event.clipboardData.files).find((item) =>
+									item.type.startsWith('image/'),
+								);
+								if (file) {
+									event.preventDefault();
+									void handleAttachment(file);
+								}
+							}}
+							onDrop={(event) => {
+								event.preventDefault();
+								const file = Array.from(event.dataTransfer.files).find((item) =>
+									item.type.startsWith('image/'),
+								);
+								if (file) void handleAttachment(file);
+							}}
+							onDragOver={(event) => event.preventDefault()}
 							placeholder={__(
 								'Ask about a page, post, or site task...',
 								'agent-wordpress-terminal',
@@ -754,7 +942,24 @@ export function Terminal(): JSX.Element {
 							}}
 							disabled={isSending}
 						/>
-						<Button variant="primary" onClick={() => void handleSend()} disabled={isSending}>
+						{attachments.map((item) => (
+							<Button
+								key={item.id}
+								variant="secondary"
+								onClick={() =>
+									setAttachments((current) =>
+										current.filter((attachment) => attachment.id !== item.id),
+									)
+								}
+							>
+								{item.filename} ×
+							</Button>
+						))}
+						<Button
+							variant="primary"
+							onClick={() => void handleSend()}
+							disabled={isSending || isUploading}
+						>
 							{isSending
 								? __('Sending…', 'agent-wordpress-terminal')
 								: __('Send', 'agent-wordpress-terminal')}
@@ -765,7 +970,11 @@ export function Terminal(): JSX.Element {
 				{isPreviewOpen ? (
 					<aside
 						className="awpt-preview-drawer"
+						ref={previewDrawerRef}
+						role="dialog"
+						aria-modal="true"
 						aria-label={__('Preview', 'agent-wordpress-terminal')}
+						tabIndex={-1}
 					>
 						<div className="awpt-preview-drawer__bar">
 							<div>
@@ -780,7 +989,11 @@ export function Terminal(): JSX.Element {
 								{__('Close', 'agent-wordpress-terminal')}
 							</Button>
 						</div>
-						<PreviewPane preview={preview} action={previewAction} />
+						<PreviewPane
+							preview={preview}
+							action={previewAction}
+							onCapture={handlePreviewCapture}
+						/>
 					</aside>
 				) : null}
 			</div>

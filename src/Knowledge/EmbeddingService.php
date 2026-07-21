@@ -20,7 +20,8 @@ if (!defined('ABSPATH')) {
 final class EmbeddingService {
     public const OPTION_ENABLED = 'awpt_knowledge_embeddings_enabled';
     public const OPTION_MODEL = 'awpt_knowledge_embedding_model';
-    public const DEFAULT_MODEL = 'openai/text-embedding-3-small';
+    public const OPTION_LAST_ERROR = 'awpt_knowledge_embedding_last_error';
+    public const DEFAULT_MODEL = 'text-embedding-3-small';
 
     private EmbeddingApiClient $client;
 
@@ -39,11 +40,19 @@ final class EmbeddingService {
     public function model(): string {
         $model = trim((string) get_option(self::OPTION_MODEL, self::DEFAULT_MODEL));
 
-        return '' !== $model ? $model : self::DEFAULT_MODEL;
+        return $this->client->model_for_request('' !== $model ? $model : self::DEFAULT_MODEL);
     }
 
     public function provider_label(): string {
         return $this->client->provider_label();
+    }
+
+    public function last_error(): string {
+        return trim((string) get_option(self::OPTION_LAST_ERROR, ''));
+    }
+
+    public function clear_last_error(): void {
+        update_option(self::OPTION_LAST_ERROR, '', false);
     }
 
     /**

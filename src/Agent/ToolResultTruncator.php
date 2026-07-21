@@ -27,6 +27,12 @@ final class ToolResultTruncator {
      * @return array<string, mixed>
      */
     public function for_provider(string $tool, array $output): array {
+        if ('awpt/read-pattern' === $tool) {
+            // Raw content is what the model adapts. The normalized tree repeats
+            // the same composition and can more than double prompt size.
+            unset($output['blocks']);
+        }
+
         return $this->truncate($tool, $output, self::PROVIDER_MAX_CHARS);
     }
 
@@ -74,6 +80,11 @@ final class ToolResultTruncator {
 
         if ('awpt/list-content' === $tool) {
             $output['items'] = $this->clip_array_items($output['items'] ?? [], 25);
+        }
+
+        if ('awpt/list-patterns' === $tool) {
+            $output['patterns'] = $this->clip_array_items($output['patterns'] ?? [], 24);
+            $output['suggested_patterns'] = $this->clip_array_items($output['suggested_patterns'] ?? [], 12);
         }
 
         if (in_array($tool, ['awpt/search-knowledge', 'awpt/knowledge-auto-retrieval'], true)) {

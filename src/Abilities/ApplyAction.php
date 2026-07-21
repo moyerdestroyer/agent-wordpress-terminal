@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
+use AWPT\Abilities\ActionAppliers\GlobalStylesCreateActionApplier;
 use AWPT\Abilities\ActionAppliers\NewPostActionApplier;
 use AWPT\Abilities\ActionAppliers\PluginDeactivateActionApplier;
 use AWPT\Abilities\ActionAppliers\SiteSettingsActionApplier;
@@ -87,9 +88,14 @@ final class ApplyAction implements AbilityInterface {
         $payload = $this->actions->decode_payload($action);
 
         return match ((string) ($payload['operation'] ?? '')) {
-            'content_update', 'block_attrs_update', 'block_insert', 'block_remove' => (int) ($payload['post_id'] ?? 0)
-                > 0
+            'content_update', 'block_attrs_update', 'block_insert', 'block_remove', 'pattern_insert' => (int) (
+                $payload['post_id'] ?? 0
+            ) > 0
                 && current_user_can('edit_post', (int) ($payload['post_id'] ?? 0)),
+            'template_update', 'global_styles_update' => (int) ($payload['post_id'] ?? 0) > 0
+                && current_user_can('edit_theme_options')
+                && current_user_can('edit_post', (int) ($payload['post_id'] ?? 0)),
+            'global_styles_create' => current_user_can('edit_theme_options'),
             'new_post' => current_user_can('edit_posts'),
             'site_settings_update' => current_user_can('manage_options'),
             'theme_switch' => current_user_can('switch_themes'),
@@ -125,9 +131,15 @@ final class ApplyAction implements AbilityInterface {
         $payload = $this->actions->decode_payload($action);
 
         $result = match ((string) ($payload['operation'] ?? '')) {
-            'content_update', 'block_attrs_update', 'block_insert', 'block_remove' => $this->content_updates->apply(
-                $payload,
-            ),
+            'content_update',
+            'block_attrs_update',
+            'block_insert',
+            'block_remove',
+            'pattern_insert',
+            'template_update',
+            'global_styles_update',
+                => $this->content_updates->apply($payload),
+            'global_styles_create' => new GlobalStylesCreateActionApplier()->apply($payload),
             'new_post' => $this->new_posts->apply($payload),
             'site_settings_update' => $this->site_settings->apply($payload),
             'theme_switch' => $this->theme_switches->apply($payload),
@@ -145,9 +157,12 @@ final class ApplyAction implements AbilityInterface {
 
         $this->actions->mark_applied($action_id);
 
-        return array_merge([
+        /** @var array<string, mixed> $response */
+        $response = array_merge([
             'action_id' => $action_id,
             'status' => 'applied',
         ], $result);
+
+        return $response;
     }
 }

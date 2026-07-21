@@ -39,6 +39,22 @@ final class BlockTreeEditor {
     }
 
     /**
+     * Insert a complete, ordered block composition without flattening its nested structure.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{content: string, blocks: array<int, array<string, mixed>>, paths: list<string>}|\WP_Error
+     */
+    public function insert_blocks(
+        array $blocks,
+        string $path,
+        array $new_blocks,
+        string $position = BlockTree::POSITION_AFTER,
+    ): array|\WP_Error {
+        return new BlockTreeMutator()->insert_blocks($blocks, $path, $new_blocks, $position);
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $blocks
      * @return array{content: string, removed: array<string, mixed>}|\WP_Error
      */

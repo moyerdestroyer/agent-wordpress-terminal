@@ -42,7 +42,6 @@ final class SlashCommandRouter {
                 'command' => 'clear',
             ],
             '/tools' => $this->tools(),
-            '/mcp' => $this->mcp($parts),
             '/knowledge' => $this->knowledge($parts),
             '/focus' => $this->focus($parts),
             '/preview' => $this->preview($parts),
@@ -73,8 +72,7 @@ final class SlashCommandRouter {
                 __('/focus about - set focus by title, slug, URL, or ID', 'agent-wordpress-terminal'),
                 __('/preview about - open a preview by title, slug, URL, or ID', 'agent-wordpress-terminal'),
                 __('/knowledge search brand voice - search indexed Knowledge', 'agent-wordpress-terminal'),
-                __('/tools - list registered abilities and MCP tools', 'agent-wordpress-terminal'),
-                __('/mcp status - show MCP connection status', 'agent-wordpress-terminal'),
+                __('/tools - list registered WordPress Abilities', 'agent-wordpress-terminal'),
                 __('/clear - clear this session transcript', 'agent-wordpress-terminal'),
             ]),
             'tool_calls' => [],
@@ -102,13 +100,11 @@ final class SlashCommandRouter {
         $prefs = new ToolPreferences();
         $core_label = __('Core Abilities', 'agent-wordpress-terminal');
         $awpt_label = __('AWPT Abilities', 'agent-wordpress-terminal');
-        $other_label = __('Other plugin/theme abilities', 'agent-wordpress-terminal');
-        $mcp_label = __('MCP Tools', 'agent-wordpress-terminal');
+        $other_label = __('Other abilities & tools', 'agent-wordpress-terminal');
         $groups = [
             $core_label => [],
             $awpt_label => [],
             $other_label => [],
-            $mcp_label => [],
         ];
         $seen = [];
 
@@ -132,6 +128,7 @@ final class SlashCommandRouter {
             }
         }
 
+        // Rare non-ability leftovers (not a first-class MCP product surface).
         foreach (new Adapter()->list_tools() as $tool) {
             $name = (string) ($tool['name'] ?? '');
 
@@ -139,7 +136,7 @@ final class SlashCommandRouter {
                 continue;
             }
 
-            $groups[$mcp_label][] = $name . $this->tool_status_suffix($name, $prefs);
+            $groups[$other_label][] = $name . $this->tool_status_suffix($name, $prefs);
         }
 
         return $groups;
@@ -171,130 +168,6 @@ final class SlashCommandRouter {
         }
 
         return implode("\n", $lines);
-    }
-
-    /**
-     * @param array<int, string> $parts
-     * @return array<string, mixed>
-     */
-    private function mcp(array $parts): array {
-        $subcommand = strtolower($parts[1] ?? 'status');
-
-        return match ($subcommand) {
-            'status' => [
-                'content' => wp_json_encode(new Adapter()->get_status(), JSON_PRETTY_PRINT),
-                'tool_calls' => [],
-                'actions' => [],
-                'command' => 'mcp',
-            ],
-            'tools' => $this->mcp_tools(),
-            'call' => $this->mcp_call($parts),
-            default => [
-                'content' => __(
-                    'Usage: /mcp status, /mcp tools, or /mcp call tool/name {"key":"value"}',
-                    'agent-wordpress-terminal',
-                ),
-                'tool_calls' => [],
-                'actions' => [],
-                'command' => 'mcp',
-            ],
-        };
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function mcp_tools(): array {
-        $tools = new Adapter()->list_tools();
-
-        return [
-            'content' => [] === $tools
-                ? __('No MCP tools are currently discovered.', 'agent-wordpress-terminal')
-                : implode("\n", array_map(static fn(array $tool): string => sprintf(
-                    '%s - %s',
-                    (string) $tool['name'],
-                    (string) ($tool['description'] ?? ''),
-                ), $tools)),
-            'tool_calls' => [],
-            'actions' => [],
-            'command' => 'mcp',
-        ];
-    }
-
-    /**
-     * @param array<int, string> $parts
-     * @return array<string, mixed>
-     */
-    private function mcp_call(array $parts): array {
-        $tool_name = sanitize_text_field($parts[2] ?? '');
-
-        if ('' === $tool_name) {
-            return [
-                'content' => __('Usage: /mcp call tool/name {"key":"value"}', 'agent-wordpress-terminal'),
-                'tool_calls' => [],
-                'actions' => [],
-                'command' => 'mcp',
-            ];
-        }
-
-        $input = $this->mcp_decode_input($parts);
-
-        if (is_wp_error($input)) {
-            return $this->error_response('mcp', $input->get_error_message());
-        }
-
-        $result = new Adapter()->execute_tool($tool_name, $input);
-
-        if (is_wp_error($result)) {
-            $message = $result->get_error_message();
-
-            return [
-                'content' => $message,
-                'tool_calls' => [[
-                    'tool' => $tool_name,
-                    'input' => $input,
-                    'output' => ['error' => $message],
-                    'status' => 'failed',
-                ]],
-                'actions' => [],
-                'command' => 'mcp',
-            ];
-        }
-
-        return [
-            'content' => wp_json_encode($result, JSON_PRETTY_PRINT),
-            'tool_calls' => [[
-                'tool' => $tool_name,
-                'input' => $input,
-                'output' => $result,
-                'status' => 'success',
-            ]],
-            'actions' => [],
-            'command' => 'mcp',
-        ];
-    }
-
-    /**
-     * @param array<int, string> $parts
-     * @return array<array-key, mixed>|\WP_Error
-     */
-    private function mcp_decode_input(array $parts): array|\WP_Error {
-        $json_input = trim(implode(' ', array_slice($parts, 3)));
-
-        if ('' === $json_input) {
-            return [];
-        }
-
-        $decoded = json_decode($json_input, true);
-
-        if (!is_array($decoded)) {
-            return new \WP_Error('awpt_mcp_invalid_input', __(
-                'MCP tool input must be a JSON object.',
-                'agent-wordpress-terminal',
-            ));
-        }
-
-        return $decoded;
     }
 
     /**

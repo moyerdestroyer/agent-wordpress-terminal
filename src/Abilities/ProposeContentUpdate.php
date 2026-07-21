@@ -13,6 +13,7 @@ namespace AWPT\Abilities;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
+use AWPT\Support\NewPostStagingDraft;
 use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\StagedPostPreview;
 
@@ -135,6 +136,18 @@ final class ProposeContentUpdate implements AbilityInterface {
                 'Post not found.',
                 'agent-wordpress-terminal',
             ));
+        }
+
+        if (new NewPostStagingDraft()->is_staging_draft($post_id)) {
+            return new \WP_Error(
+                code: 'awpt_staging_draft_not_content',
+                message: __(
+                    'This post is a temporary new-post preview. Revise its staged proposal with '
+                    . 'awpt/propose-new-post and the proposal action_id instead.',
+                    'agent-wordpress-terminal',
+                ),
+                data: ['status' => 409],
+            );
         }
 
         if (!$this->sessions->exists($session_id)) {

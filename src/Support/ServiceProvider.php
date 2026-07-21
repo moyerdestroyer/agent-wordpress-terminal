@@ -15,6 +15,8 @@ use AWPT\Admin\Page;
 use AWPT\Agent\AgentRuntime;
 use AWPT\MCP\WordPressMcpBridge;
 use AWPT\REST\ActionsController;
+use AWPT\REST\AttachmentsController;
+use AWPT\REST\CapturesController;
 use AWPT\REST\ChatController;
 use AWPT\REST\IncidentsController;
 use AWPT\REST\KnowledgeController;
@@ -72,7 +74,9 @@ final class ServiceProvider {
     public function rest_controllers(): array {
         return [
             new SessionsController(),
+            new AttachmentsController(),
             new ChatController($this->agent_runtime),
+            new CapturesController(),
             new KnowledgeController(),
             new ActionsController(),
             new IncidentsController(),

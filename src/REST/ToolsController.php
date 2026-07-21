@@ -127,8 +127,12 @@ final class ToolsController extends RestController {
 
         if (is_string($name) && '' !== $name && true === $enabled) {
             $disabled = $prefs->enable_tool($name);
+            if (new \AWPT\Agent\ToolRegistry($prefs)->requires_explicit_trust($name)) {
+                $prefs->set_mutating_trust($name, true);
+            }
         } elseif (is_string($name) && '' !== $name && false === $enabled) {
             $disabled = $prefs->disable_tool($name);
+            $prefs->set_mutating_trust($name, false);
         } else {
             $disabled_param = $request->get_param('disabled');
             $disabled = $prefs->set_disabled(is_array($disabled_param) ? $disabled_param : []);

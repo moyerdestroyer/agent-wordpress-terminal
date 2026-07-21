@@ -42,5 +42,21 @@ function test_tool_result_truncator_keeps_proposal_outputs(): void {
     Assert::same(9, $provider['action_id'] ?? null, 'proposal payload should be preserved');
 }
 
+function test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider(): void {
+    $provider = new ToolResultTruncator()->for_provider('awpt/read-pattern', [
+        'name' => 'civicpress/header-hero',
+        'title' => 'Hero Header',
+        'content' => '<!-- wp:cover --><div>Hero</div><!-- /wp:cover -->',
+        'blocks' => [['name' => 'core/cover', 'text_excerpt' => str_repeat('duplicate ', 500)]],
+    ]);
+
+    Assert::true(array_key_exists('content', $provider), 'adaptable raw pattern content should remain available');
+    Assert::false(
+        array_key_exists('blocks', $provider),
+        'duplicated normalized tree should not consume provider context',
+    );
+}
+
 test_tool_result_truncator_clips_large_read_content_output();
 test_tool_result_truncator_keeps_proposal_outputs();
+test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider();

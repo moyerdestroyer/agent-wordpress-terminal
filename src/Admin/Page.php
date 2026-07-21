@@ -88,6 +88,12 @@ final class Page {
         foreach (self::API_KEY_PROVIDERS as [, , $key_option]) {
             $this->register_secret_setting($key_option);
         }
+
+        register_setting('awpt_settings', 'awpt_openrouter_model', [
+            'type' => 'string',
+            'sanitize_callback' => [$this, 'sanitize_openrouter_model'],
+            'default' => 'openai/gpt-5.4-mini',
+        ]);
     }
 
     /**
@@ -347,8 +353,47 @@ final class Page {
             </td>
         </tr>
         <?php $this->render_secret_field($meta['key_option'], $meta['key_label']); ?>
+        <?php if ('openrouter' === $provider_id): ?>
+            <?php $this->render_openrouter_model_field(); ?>
+        <?php endif; ?>
         <?php
     }
+
+    /**
+     * Render the explicit OpenRouter model setting.
+     */
+    private function render_openrouter_model_field(): void { ?>
+        <tr>
+            <th scope="row">
+                <label for="awpt_openrouter_model">
+                    <?php echo esc_html(__('OpenRouter chat model', 'agent-wordpress-terminal')); ?>
+                </label>
+            </th>
+            <td>
+                <input
+                    id="awpt_openrouter_model"
+                    class="regular-text"
+                    type="text"
+                    name="awpt_openrouter_model"
+                    value="<?php echo
+                        esc_attr($this->sanitize_openrouter_model(get_option(
+                            'awpt_openrouter_model',
+                            'openai/gpt-5.4-mini',
+                        )))
+                    ; ?>"
+                    placeholder="openai/gpt-5.4-mini"
+                />
+                <p class="description">
+                    <?php echo
+                        esc_html(__(
+                            'AWPT defaults to a balanced, tool-capable model. Enter another exact OpenRouter model ID only when you want to override it.',
+                            'agent-wordpress-terminal',
+                        ))
+                    ; ?>
+                </p>
+            </td>
+        </tr>
+        <?php }
 
     /**
      * Render a password field row with a "clear saved key" checkbox.
@@ -392,6 +437,21 @@ final class Page {
         }
 
         return $catalog->resolve_default_provider();
+    }
+
+    /**
+     * Sanitize an OpenRouter model ID without restricting valid provider namespaces.
+     *
+     * @param mixed $value Raw model ID.
+     */
+    public function sanitize_openrouter_model(mixed $value): string {
+        $model = trim(sanitize_text_field((string) $value));
+
+        if ('' === $model || in_array($model, ['openrouter/auto', 'openrouter/auto-beta'], true)) {
+            return 'openai/gpt-5.4-mini';
+        }
+
+        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'openai/gpt-5.4-mini';
     }
 
     /**

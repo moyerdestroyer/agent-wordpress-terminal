@@ -23,15 +23,32 @@ final class WordPressAIClientRunner {
      * @param list<string>                     $ability_names
      * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string, no_text_generation_model: bool}
      */
-    public function generate(array $messages, string $connector_id, array $ability_names = []): array {
+    public function generate(
+        array $messages,
+        string $connector_id,
+        array $ability_names = [],
+        int $max_completion_tokens = 8192,
+    ): array {
         $system_instruction = $this->extract_system_instruction($messages);
         $prompt = $this->build_prompt_text($messages);
         $builder = call_user_func('wp_ai_client_prompt', $prompt);
-        $builder = $this->configure_builder($builder, $system_instruction, $connector_id, $ability_names);
+        $builder = $this->configure_builder(
+            $builder,
+            $system_instruction,
+            $connector_id,
+            $ability_names,
+            $max_completion_tokens,
+        );
 
         if ([] !== $ability_names && !$this->builder_supports_text_generation($builder)) {
             $builder = call_user_func('wp_ai_client_prompt', $prompt);
-            $builder = $this->configure_builder($builder, $system_instruction, $connector_id, []);
+            $builder = $this->configure_builder(
+                $builder,
+                $system_instruction,
+                $connector_id,
+                [],
+                $max_completion_tokens,
+            );
             $ability_names = [];
         }
 
@@ -40,7 +57,13 @@ final class WordPressAIClientRunner {
         if ([] !== $ability_names && new WordPressAIClientResultParser()->is_text_generation_model_error($result)) {
             $this->log_provider_error($connector_id, $result, 'pre-flight check passed but generation still failed');
             $builder = call_user_func('wp_ai_client_prompt', $prompt);
-            $builder = $this->configure_builder($builder, $system_instruction, $connector_id, []);
+            $builder = $this->configure_builder(
+                $builder,
+                $system_instruction,
+                $connector_id,
+                [],
+                $max_completion_tokens,
+            );
             $result = $this->generate_result($builder);
         }
 
@@ -143,12 +166,13 @@ final class WordPressAIClientRunner {
         string $system_instruction,
         string $connector_id,
         array $ability_names,
+        int $max_completion_tokens,
     ): mixed {
         if (!is_object($builder)) {
             return $builder;
         }
 
-        $configured_result = $builder->using_max_tokens(1000);
+        $configured_result = $builder->using_max_tokens(max(1024, min(32_000, $max_completion_tokens)));
         $configured = is_object($configured_result) ? $configured_result : $builder;
 
         if ('' !== $connector_id && method_exists($configured, 'using_provider')) {

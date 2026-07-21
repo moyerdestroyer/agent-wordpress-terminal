@@ -116,5 +116,51 @@ function test_block_tree_insert_and_remove(): void {
     Assert::same('1', $flat[0]['path'] ?? null, 'image block path should remain 1');
 }
 
+function test_block_tree_insert_composition_in_order(): void {
+    awpt_test_reset_state();
+
+    $tree = BlockTree::from_content('<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+    . '<!-- wp:paragraph --><p>Outro</p><!-- /wp:paragraph -->');
+    $composition = [
+        [
+            'blockName' => 'core/heading',
+            'attrs' => ['level' => 2],
+            'innerHTML' => '<h2>Pattern title</h2>',
+            'innerBlocks' => [],
+            'innerContent' => ['<h2>Pattern title</h2>'],
+        ],
+        [
+            'blockName' => 'core/group',
+            'attrs' => ['layout' => ['type' => 'constrained']],
+            'innerHTML' => '',
+            'innerBlocks' => [[
+                'blockName' => 'core/paragraph',
+                'attrs' => [],
+                'innerHTML' => '<p>Pattern body</p>',
+                'innerBlocks' => [],
+                'innerContent' => ['<p>Pattern body</p>'],
+            ]],
+            'innerContent' => [null],
+        ],
+    ];
+    $inserted = $tree->insert_blocks('0', $composition, 'after');
+
+    Assert::false(is_wp_error($inserted), 'a multi-block pattern composition should stage successfully');
+
+    if (!is_wp_error($inserted)) {
+        Assert::same(['1', '2'], $inserted['paths'] ?? null, 'composition paths should preserve block order');
+        Assert::true(
+            str_contains($inserted['content'], '<h2>Pattern title</h2>')
+            && str_contains($inserted['content'], '<p>Pattern body</p>'),
+            'composition serialization should retain nested and sibling block content',
+        );
+        Assert::true(
+            BlockTree::from_content($inserted['content'])->count() >= 4,
+            'the serialized composition should retain both inserted blocks and the original neighbors',
+        );
+    }
+}
+
 test_block_tree_paths_and_updates();
 test_block_tree_insert_and_remove();
+test_block_tree_insert_composition_in_order();

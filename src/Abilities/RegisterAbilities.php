@@ -61,12 +61,18 @@ final class RegisterAbilities {
         new ListContent()->register();
         new ListTemplates()->register();
         new ReadTemplate()->register();
+        new ListPatterns()->register();
+        new ReadPattern()->register();
+        new ReadGlobalStyles()->register();
         new SearchKnowledge()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
         new ProposeBlockAttrsUpdate()->register();
         new ProposeBlockInsert()->register();
         new ProposeBlockRemove()->register();
+        new ProposePatternInsert()->register();
+        new ProposeTemplateUpdate()->register();
+        new ProposeGlobalStylesUpdate()->register();
         new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();

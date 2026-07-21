@@ -122,8 +122,9 @@ final class DiagnosisRuntime {
             return $result;
         }
 
-        $result = new IntentToolCallEnricher()->enrich($messages, $result, $tool_registry);
-        $loop_result = new ProviderRuntime()->run_tool_loop($session_id, $provider, $messages, $result, $tool_registry);
+        $loop_result = new ProviderRuntime()->run_tool_loop($session_id, $provider, $messages, $result, [
+            'tool_registry' => $tool_registry,
+        ]);
 
         $now = current_time('mysql');
         $content = (string) $loop_result['content'];

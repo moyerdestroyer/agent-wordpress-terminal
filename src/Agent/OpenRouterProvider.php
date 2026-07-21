@@ -21,7 +21,7 @@ final class OpenRouterProvider extends ChatCompletionsProvider {
     /**
      * Default OpenRouter model when no explicit model is configured.
      */
-    private const DEFAULT_MODEL = 'openrouter/auto';
+    private const DEFAULT_MODEL = 'openai/gpt-5.4-mini';
 
     /**
      * Get provider name.
@@ -58,7 +58,13 @@ final class OpenRouterProvider extends ChatCompletionsProvider {
      * Provider model identifier.
      */
     protected function get_model(): string {
-        return self::DEFAULT_MODEL;
+        $model = trim((string) get_option('awpt_openrouter_model', self::DEFAULT_MODEL));
+
+        if ('' === $model || in_array($model, ['openrouter/auto', 'openrouter/auto-beta'], true)) {
+            return self::DEFAULT_MODEL;
+        }
+
+        return $model;
     }
 
     /**

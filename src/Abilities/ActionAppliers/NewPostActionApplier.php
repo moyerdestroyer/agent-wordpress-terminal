@@ -69,6 +69,8 @@ final class NewPostActionApplier {
                 'post_content' => PostContentSanitizer::for_staged_update($post_content),
                 'post_type' => $post_type,
                 'post_status' => 'draft',
+                'post_name' => sanitize_title((string) ($payload['post_name'] ?? '')),
+                'post_parent' => (int) ($payload['post_parent'] ?? 0),
             ], true);
 
             if (is_wp_error($post_id)) {
@@ -84,6 +86,8 @@ final class NewPostActionApplier {
                 'post_type' => $post_type,
                 'post_status' => 'draft',
                 'post_author' => get_current_user_id(),
+                'post_name' => sanitize_title((string) ($payload['post_name'] ?? '')),
+                'post_parent' => (int) ($payload['post_parent'] ?? 0),
             ], true);
 
             if (is_wp_error($post_id)) {
@@ -111,6 +115,13 @@ final class NewPostActionApplier {
 
         if ($featured_image_id > 0) {
             $result['featured_image_id'] = $featured_image_id;
+        }
+
+        $page_template = sanitize_text_field((string) ($payload['page_template'] ?? ''));
+
+        if ('' !== $page_template) {
+            update_post_meta($post_id, '_wp_page_template', $page_template);
+            $result['page_template'] = $page_template;
         }
 
         return $result;

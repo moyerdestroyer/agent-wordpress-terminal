@@ -108,7 +108,7 @@ final class ContentSearchService {
 
         $post = get_page_by_path($slug, OBJECT, $post_types);
 
-        return $post instanceof \WP_Post ? $post : null;
+        return $post instanceof \WP_Post && $this->is_allowed_post($post, $post_types) ? $post : null;
     }
 
     private function slug_from_query(string $query): string {
@@ -130,7 +130,7 @@ final class ContentSearchService {
      * @param list<string> $post_types
      */
     private function is_allowed_post(\WP_Post $post, array $post_types): bool {
-        return in_array($post->post_type, $post_types, true);
+        return in_array($post->post_type, $post_types, true) && !new NewPostStagingDraft()->is_staging_draft($post->ID);
     }
 
     /**
@@ -152,6 +152,10 @@ final class ContentSearchService {
             'no_found_rows' => true,
             'update_post_meta_cache' => false,
             'update_post_term_cache' => false,
+            'meta_query' => [[
+                'key' => NewPostStagingDraft::META_KEY,
+                'compare' => 'NOT EXISTS',
+            ]],
         ];
 
         if ($this->supports_title_only_search()) {
@@ -173,7 +177,11 @@ final class ContentSearchService {
      * @param array<int, array<string, mixed>> $results
      */
     private function add_result(array &$results, \WP_Post $post, string $matched_by, int $limit): void {
-        if (count($results) >= $limit || !current_user_can('read_post', $post->ID)) {
+        if (
+            count($results) >= $limit
+            || !$this->is_allowed_post($post, $this->types->from_requested(''))
+            || !current_user_can('read_post', $post->ID)
+        ) {
             return;
         }
 

@@ -40,9 +40,74 @@ final class ToolResultContentFormatter {
         return match ($tool) {
             'awpt/read-content' => $this->format_read_content($output),
             'awpt/read-block-tree' => $this->format_read_block_tree($output),
+            'awpt/read-pattern' => $this->format_read_pattern($output),
+            'awpt/list-patterns' => $this->format_patterns($output),
             'awpt/read-site-health' => $this->format_site_health($output),
             default => '',
         };
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_read_pattern(array $output): string {
+        return sprintf(
+            /* translators: 1: pattern name, 2: title, 3: block count. */
+            __('Read pattern %1$s — %2$s (%3$d top-level blocks).', 'agent-wordpress-terminal'),
+            (string) ($output['name'] ?? ''),
+            (string) ($output['title'] ?? ''),
+            (int) ($output['block_count'] ?? 0),
+        );
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_patterns(array $output): string {
+        $patterns = $this->list_items($output['patterns'] ?? []);
+        $search = trim((string) ($output['search'] ?? ''));
+        $count = (int) ($output['count'] ?? count($patterns));
+        $lines = [
+            '' !== $search
+                ? sprintf(
+                    /* translators: 1: match count, 2: pattern metadata search. */
+                    __('Found %1$d patterns matching metadata search “%2$s”.', 'agent-wordpress-terminal'),
+                    $count,
+                    $search,
+                )
+                : sprintf(
+                    /* translators: %d: registered pattern count. */
+                    __('Found %d registered patterns.', 'agent-wordpress-terminal'),
+                    $count,
+                ),
+        ];
+
+        if ('' !== (string) ($output['search_note'] ?? '')) {
+            $lines[] = (string) $output['search_note'];
+        }
+
+        foreach (array_slice($patterns, 0, 12) as $pattern) {
+            $lines[] = sprintf('- %s — %s', (string) ($pattern['name'] ?? ''), (string) ($pattern['title'] ?? ''));
+        }
+
+        $suggestions = $this->list_items($output['suggested_patterns'] ?? []);
+
+        if ([] !== $suggestions) {
+            $lines[] = sprintf(
+                /* translators: %d: total number of patterns available without the metadata filter. */
+                __('There are %d total patterns available. Possible layout patterns:', 'agent-wordpress-terminal'),
+                (int) ($output['available_count'] ?? count($suggestions)),
+            );
+
+            foreach (array_slice($suggestions, 0, 8) as $pattern) {
+                $lines[] = sprintf('- %s — %s', (string) ($pattern['name'] ?? ''), (string) ($pattern['title'] ?? ''));
+            }
+        }
+
+        if (count($patterns) > 12 || (int) ($output['count'] ?? 0) > 12) {
+            $lines[] = __(
+                'Additional patterns were kept in tool context but omitted from this transcript.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        return implode("\n", $lines);
     }
 
     private function format_read_content(array $output): string {

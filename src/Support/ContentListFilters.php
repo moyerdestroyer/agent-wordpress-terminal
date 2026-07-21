@@ -21,7 +21,7 @@ final class ContentListFilters {
     /**
      * @var list<string>
      */
-    private const STATUSES = ['publish', 'draft', 'pending', 'private', 'future'];
+    private const STATUSES = ['publish', 'draft', 'pending', 'private', 'future', 'inherit'];
 
     /**
      * @var list<string>

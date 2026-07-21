@@ -22,9 +22,16 @@ final class FilesystemSourceReader {
 
     private FilesystemSourceFactory $factory;
 
-    public function __construct(?FilesystemRootProvider $roots = null, ?FilesystemSourceFactory $factory = null) {
+    private FilesystemAccessPolicy $policy;
+
+    public function __construct(
+        ?FilesystemRootProvider $roots = null,
+        ?FilesystemSourceFactory $factory = null,
+        ?FilesystemAccessPolicy $policy = null,
+    ) {
         $this->roots = $roots ?? new FilesystemRootProvider();
         $this->factory = $factory ?? new FilesystemSourceFactory();
+        $this->policy = $policy ?? new FilesystemAccessPolicy();
     }
 
     /**
@@ -50,9 +57,9 @@ final class FilesystemSourceReader {
     public function list_sources(): array {
         $sources = [];
 
-        foreach ($this->roots->allowed_roots() as $root) {
-            foreach ($this->files_in_root($root) as $path) {
-                $source = $this->factory->from_file($path, $root);
+        foreach ($this->roots->root_definitions() as $definition) {
+            foreach ($this->files_in_root($definition['path']) as $path) {
+                $source = $this->factory->from_file($path, $definition['path'], $definition['type']);
 
                 if (null !== $source) {
                     $sources[] = $source;
@@ -68,10 +75,15 @@ final class FilesystemSourceReader {
      */
     private function files_in_root(string $root): array {
         $files = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST,
-        );
+        $directory = new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS);
+        $filter = new \RecursiveCallbackFilterIterator($directory, fn(
+            \RecursiveDirectoryIterator|\SplFileInfo|string $file,
+            string $_key,
+            \RecursiveDirectoryIterator $_iterator,
+        ): bool => is_string($file)
+            ? false
+            : !$file->isDir() || $this->policy->can_traverse_directory($file->getPathname(), $root));
+        $iterator = new \RecursiveIteratorIterator($filter, \RecursiveIteratorIterator::LEAVES_ONLY);
 
         foreach ($iterator as $file) {
             if (!$file instanceof \SplFileInfo || !$file->isFile() || $file->isLink()) {

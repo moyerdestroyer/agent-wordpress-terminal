@@ -1,9 +1,9 @@
 import apiFetch from '@wordpress/api-fetch';
 import type {
+	ChatProgress,
 	ChatResponse,
 	KnowledgeSettings,
 	KnowledgeStatus,
-	McpStatus,
 	PreviewDetails,
 	ProposedAction,
 	SessionSummary,
@@ -98,12 +98,39 @@ export async function getSession(
 	});
 }
 
-export async function sendMessage(sessionId: number, message: string): Promise<ChatResponse> {
+export interface ComposerAttachment {
+	id: number;
+	url: string;
+	filename: string;
+	mime_type?: string;
+}
+
+export async function sendMessage(
+	sessionId: number,
+	message: string,
+	attachments: ComposerAttachment[] = [],
+	turnId = '',
+): Promise<ChatResponse> {
 	return apiFetch<ChatResponse>({
 		path: path(`/sessions/${sessionId}/chat`),
 		method: 'POST',
-		data: { message },
+		data: { message, attachments, turn_id: turnId },
 	});
+}
+
+export async function getChatProgress(sessionId: number, turnId: string): Promise<ChatProgress> {
+	const query = new URLSearchParams({ turn_id: turnId });
+	return apiFetch<ChatProgress>({
+		path: path(`/sessions/${sessionId}/chat-progress?${query.toString()}`),
+	});
+}
+
+export async function uploadAttachment(
+	file: File,
+): Promise<{ id: number; url: string; mime_type: string; filename: string }> {
+	const body = new FormData();
+	body.append('file', file);
+	return apiFetch({ path: path('/attachments'), method: 'POST', body } as never);
 }
 
 export async function updateAction(
@@ -124,12 +151,33 @@ export async function fetchActionPreview(actionId: number): Promise<PreviewDetai
 	});
 }
 
+export async function createPreviewCapture(
+	sessionId: number,
+	payload: {
+		action_id?: number;
+		post_id?: number;
+		url: string;
+		viewport: { width: number; height: number };
+		dom_snapshot: string;
+		image_data?: string;
+	},
+): Promise<{ id: number; has_image: boolean }> {
+	return apiFetch({
+		path: path(`/sessions/${sessionId}/captures`),
+		method: 'POST',
+		data: payload,
+	});
+}
+
 export async function getKnowledgeStatus(): Promise<KnowledgeStatus> {
 	return apiFetch<KnowledgeStatus>({ path: path('/knowledge/status') });
 }
 
-export async function rebuildKnowledge(): Promise<{ status: KnowledgeStatus }> {
-	return apiFetch<{ status: KnowledgeStatus }>({
+export async function rebuildKnowledge(): Promise<{
+	status: KnowledgeStatus;
+	in_progress?: boolean;
+}> {
+	return apiFetch<{ status: KnowledgeStatus; in_progress?: boolean }>({
 		path: path('/knowledge/rebuild'),
 		method: 'POST',
 	});
@@ -168,8 +216,15 @@ export async function updateToolEnabled(
 	});
 }
 
-export async function getMcpStatus(): Promise<McpStatus> {
-	return apiFetch<McpStatus>({ path: path('/mcp/status') });
+/** Replace the full deny-list of tools hidden from the agent. */
+export async function updateToolsDisabled(
+	disabled: string[],
+): Promise<import('./types').ToolPreferencesResponse> {
+	return apiFetch<import('./types').ToolPreferencesResponse>({
+		path: path('/tools/preferences'),
+		method: 'POST',
+		data: { disabled },
+	});
 }
 
 export interface IncidentReportPayload {

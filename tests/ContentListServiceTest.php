@@ -184,5 +184,38 @@ function test_content_list_service_skips_totals_when_filtered(): void {
     Assert::false((bool) ($result['filters']['include_totals'] ?? true), 'author filter should disable include_totals');
 }
 
+function test_content_list_service_hides_staging_drafts(): void {
+    awpt_test_reset_state();
+    awpt_test_list_post(71, 'Visible draft', 'visible-draft', 'post', 'draft');
+    awpt_test_list_post(72, 'Temporary preview', 'temporary-preview', 'post', 'draft');
+    $GLOBALS['awpt_test_post_meta_updates'][72]['_awpt_staging_draft'] = 1;
+
+    $result = new ContentListService()->list(['status' => 'draft', 'limit' => 10]);
+    $ids = array_map(static fn(array $item): int => (int) $item['id'], $result['items']);
+
+    Assert::same([71], $ids, 'temporary new-post preview drafts should not appear in content listings');
+}
+
+function test_content_list_service_maps_published_attachment_browse_to_inherit(): void {
+    awpt_test_reset_state();
+    awpt_test_list_post(88, 'Library image', 'library-image', 'attachment', 'inherit');
+
+    $result = new ContentListService()->list([
+        'post_type' => 'attachment',
+        'status' => 'publish',
+        'limit' => 10,
+    ]);
+
+    Assert::same(1, $result['count'] ?? null, 'attachment browsing should find inherited Media Library items');
+    Assert::same('inherit', $result['status'] ?? null, 'the effective attachment status should be explicit');
+    Assert::same(
+        'inherit',
+        $result['filters']['status'] ?? null,
+        'returned filters should explain the attachment status normalization',
+    );
+}
+
 test_content_list_service_includes_totals_by_type_for_all();
 test_content_list_service_skips_totals_when_filtered();
+test_content_list_service_hides_staging_drafts();
+test_content_list_service_maps_published_attachment_browse_to_inherit();

@@ -41,7 +41,7 @@ final class ListContent implements AbilityInterface {
                     'status' => [
                         'type' => 'string',
                         'description' => __(
-                            'Optional status filter: publish, draft, pending, private, or future.',
+                            'Optional status filter: publish, draft, pending, private, future, or inherit. For attachment-only Media Library browsing, omitted or publish automatically resolves to inherit.',
                             'agent-wordpress-terminal',
                         ),
                     ],

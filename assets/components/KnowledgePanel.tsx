@@ -17,6 +17,18 @@ function formatBytes(value: number): string {
 	return `${Math.max(1, Math.round(value / 1024))} KB`;
 }
 
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+	return Promise.race([
+		promise,
+		new Promise<T>((_resolve, reject) => {
+			window.setTimeout(
+				() => reject(new Error('Knowledge status request timed out.')),
+				milliseconds,
+			);
+		}),
+	]);
+}
+
 function sourceCount(status: KnowledgeStatus | null, kind: string): number {
 	return status?.source_kinds?.[kind] ?? 0;
 }
@@ -91,11 +103,13 @@ export function KnowledgePanel(): JSX.Element {
 	const [rootsText, setRootsText] = useState('');
 	const [maxFileSize, setMaxFileSize] = useState('2097152');
 	const [embeddingsEnabled, setEmbeddingsEnabled] = useState(true);
-	const [embeddingModel, setEmbeddingModel] = useState('openai/text-embedding-3-small');
+	const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small');
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [isRebuilding, setIsRebuilding] = useState(false);
-	const [autoRebuildAttempted, setAutoRebuildAttempted] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
+	const isIndexing = isRebuilding || status?.progress.state === 'indexing';
+	const progress = status?.progress;
 
 	const refresh = async (): Promise<KnowledgeStatus> => {
 		const [nextStatus, nextSettings] = await Promise.all([
@@ -107,7 +121,7 @@ export function KnowledgePanel(): JSX.Element {
 		setRootsText(nextSettings.roots.join('\n'));
 		setMaxFileSize(String(nextSettings.max_file_size));
 		setEmbeddingsEnabled(Boolean(nextSettings.embeddings_enabled));
-		setEmbeddingModel(nextSettings.embedding_model || 'openai/text-embedding-3-small');
+		setEmbeddingModel(nextSettings.embedding_model || 'text-embedding-3-small');
 
 		return nextStatus;
 	};
@@ -115,12 +129,17 @@ export function KnowledgePanel(): JSX.Element {
 	useEffect(() => {
 		const boot = async (): Promise<void> => {
 			try {
-				const nextStatus = await refresh();
+				await withTimeout(refresh(), 10_000);
 
-				if (nextStatus.needs_rebuild && !autoRebuildAttempted) {
-					setAutoRebuildAttempted(true);
-					await handleRebuild();
-				}
+				// Rebuilds are explicit: opening the terminal must not start a long,
+				// synchronous database job against a large theme or uploads folder.
+			} catch {
+				setLoadError(
+					__(
+						'Knowledge status is taking longer than expected. Reload to try again.',
+						'agent-wordpress-terminal',
+					),
+				);
 			} finally {
 				setIsLoading(false);
 			}
@@ -128,6 +147,22 @@ export function KnowledgePanel(): JSX.Element {
 
 		void boot();
 	}, []);
+
+	useEffect(() => {
+		if (!isIndexing) {
+			return;
+		}
+
+		const poll = (): void => {
+			void getKnowledgeStatus()
+				.then(setStatus)
+				.catch(() => {});
+		};
+		poll();
+		const interval = window.setInterval(poll, 1000);
+
+		return () => window.clearInterval(interval);
+	}, [isIndexing]);
 
 	const handleRebuild = async (): Promise<void> => {
 		setIsRebuilding(true);
@@ -151,13 +186,13 @@ export function KnowledgePanel(): JSX.Element {
 					.filter(Boolean),
 				max_file_size: Number.parseInt(maxFileSize, 10) || 2097152,
 				embeddings_enabled: embeddingsEnabled,
-				embedding_model: embeddingModel.trim() || 'openai/text-embedding-3-small',
+				embedding_model: embeddingModel.trim() || 'text-embedding-3-small',
 			});
 			setSettings(saved);
 			setRootsText(saved.roots.join('\n'));
 			setMaxFileSize(String(saved.max_file_size));
 			setEmbeddingsEnabled(Boolean(saved.embeddings_enabled));
-			setEmbeddingModel(saved.embedding_model || 'openai/text-embedding-3-small');
+			setEmbeddingModel(saved.embedding_model || 'text-embedding-3-small');
 			await handleRebuild();
 		} finally {
 			setIsSaving(false);
@@ -168,9 +203,56 @@ export function KnowledgePanel(): JSX.Element {
 		return <p className="awpt-empty">{__('Loading Knowledge…', 'agent-wordpress-terminal')}</p>;
 	}
 
+	if (loadError) {
+		return (
+			<div className="awpt-knowledge">
+				<h3 className="awpt-section-title">{__('Knowledge', 'agent-wordpress-terminal')}</h3>
+				<p className="awpt-knowledge-error" role="alert">
+					{loadError}
+				</p>
+				<Button variant="secondary" onClick={() => window.location.reload()}>
+					{__('Reload terminal', 'agent-wordpress-terminal')}
+				</Button>
+			</div>
+		);
+	}
+
 	return (
 		<div className="awpt-knowledge">
 			<h3 className="awpt-section-title">{__('Knowledge', 'agent-wordpress-terminal')}</h3>
+			{isIndexing ? (
+				<div className="awpt-knowledge-progress" role="status" aria-live="polite">
+					<div>
+						<strong>{__('Refreshing Knowledge', 'agent-wordpress-terminal')}</strong>
+						<span>
+							{progress && progress.total_sources > 0
+								? sprintf(
+										/* translators: 1: processed source count, 2: total source count */
+										__('%1$d of %2$d sources', 'agent-wordpress-terminal'),
+										progress.processed_sources,
+										progress.total_sources,
+									)
+								: __('Preparing sources…', 'agent-wordpress-terminal')}
+						</span>
+					</div>
+					<progress
+						value={progress?.total_sources ? progress.processed_sources : undefined}
+						max={progress?.total_sources || undefined}
+					>
+						{progress?.total_sources
+							? `${progress.processed_sources}/${progress.total_sources}`
+							: __('Working', 'agent-wordpress-terminal')}
+					</progress>
+					<p>
+						{sprintf(
+							/* translators: 1: indexed source count, 2: indexed chunk count */
+							__('%1$d indexed · %2$d chunks prepared', 'agent-wordpress-terminal'),
+							progress?.indexed_sources ?? 0,
+							progress?.indexed_chunks ?? 0,
+						)}
+					</p>
+				</div>
+			) : null}
 			<ul className="awpt-knowledge-sources">
 				{knowledgeSourceRows(status).map((source) => (
 					<li key={source.key} className={source.available ? 'is-available' : 'is-unavailable'}>
@@ -227,9 +309,12 @@ export function KnowledgePanel(): JSX.Element {
 			</dl>
 
 			{status?.last_error ? <p className="awpt-knowledge-error">{status.last_error}</p> : null}
+			{status?.embedding.last_error ? (
+				<p className="awpt-knowledge-error">{status.embedding.last_error}</p>
+			) : null}
 
-			<Button variant="secondary" onClick={() => void handleRebuild()} disabled={isRebuilding}>
-				{isRebuilding
+			<Button variant="secondary" onClick={() => void handleRebuild()} disabled={isIndexing}>
+				{isIndexing
 					? __('Rebuilding…', 'agent-wordpress-terminal')
 					: __('Rebuild index', 'agent-wordpress-terminal')}
 			</Button>
@@ -240,7 +325,7 @@ export function KnowledgePanel(): JSX.Element {
 					{sprintf(
 						/* translators: %s: file size label */
 						__(
-							'Open under wp-content: active theme, parent theme, uploads, and any extra folders you list. Text, markdown, CSS/JS, JSON, and PDF text are indexed. Default max file size: %s.',
+							'Indexes theme design context (theme.json, styles, templates, CSS, and docs) plus documents from uploads and extra folders. Dependency and generated directories are excluded. Default max file size: %s.',
 							'agent-wordpress-terminal',
 						),
 						formatBytes(settings?.max_file_size ?? 2097152),
@@ -258,7 +343,7 @@ export function KnowledgePanel(): JSX.Element {
 				<TextareaControl
 					label={__('Extra document folders', 'agent-wordpress-terminal')}
 					help={__(
-						'One absolute path per line under wp-content (themes, plugins, custom docs — all open).',
+						'One absolute path per line under wp-content. Document formats are indexed; code, dependencies, and generated files are excluded.',
 						'agent-wordpress-terminal',
 					)}
 					value={rootsText}
@@ -294,10 +379,17 @@ export function KnowledgePanel(): JSX.Element {
 				/>
 				<TextControl
 					label={__('Embedding model', 'agent-wordpress-terminal')}
-					help={__(
-						'OpenRouter-style model id (e.g. openai/text-embedding-3-small). Rebuild the index after changing.',
-						'agent-wordpress-terminal',
-					)}
+					help={
+						settings?.embedding_provider === 'openrouter'
+							? __(
+									'OpenRouter model id (for example, openai/text-embedding-3-small). Rebuild after changing.',
+									'agent-wordpress-terminal',
+								)
+							: __(
+									'Provider model id (for OpenAI, text-embedding-3-small). Rebuild after changing.',
+									'agent-wordpress-terminal',
+								)
+					}
 					value={embeddingModel}
 					onChange={setEmbeddingModel}
 					disabled={!embeddingsEnabled}

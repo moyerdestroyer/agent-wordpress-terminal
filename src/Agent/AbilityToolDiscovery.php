@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
  */
 final class AbilityToolDiscovery {
     /**
-     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>}>
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>, annotations: array<string, bool|null>}>
      */
     public function tools(): array {
         if (!function_exists('wp_get_abilities')) {
@@ -40,11 +40,24 @@ final class AbilityToolDiscovery {
             $raw_schema = method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : null;
             $schema = is_array($raw_schema) ? $this->string_keyed($raw_schema) : AbilitySchemas::empty_object_input();
             $description = method_exists($ability, 'get_description') ? (string) $ability->get_description() : $name;
+            $meta = method_exists($ability, 'get_meta') ? $ability->get_meta() : [];
+            $raw_annotations = is_array($meta) && is_array($meta['annotations'] ?? null) ? $meta['annotations'] : [];
 
             $tools[] = [
                 'name' => $name,
                 'description' => $description,
                 'parameters' => AbilitySchemas::normalize_for_provider($schema),
+                'annotations' => [
+                    'readonly' => array_key_exists('readonly', $raw_annotations)
+                        ? (bool) $raw_annotations['readonly']
+                        : null,
+                    'destructive' => array_key_exists('destructive', $raw_annotations)
+                        ? (bool) $raw_annotations['destructive']
+                        : null,
+                    'requires_approval' => array_key_exists('requires_approval', $raw_annotations)
+                        ? (bool) $raw_annotations['requires_approval']
+                        : null,
+                ],
             ];
         }
 

@@ -2,13 +2,14 @@ import { Button } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { actionDiff, actionMetadata, canPreviewAction } from '../actionDisplay';
-import type { Message, ProposedAction, ToolCall } from '../types';
+import type { ChatProgress, Message, ProposedAction, ToolCall } from '../types';
 
 interface TranscriptProps {
 	messages: Message[];
 	toolCalls: ToolCall[];
 	actions: ProposedAction[];
 	isThinking?: boolean;
+	progress?: ChatProgress | null;
 	onActionOperation: (action: ProposedAction, operation: 'approve' | 'reject' | 'apply') => void;
 	onActionPreview: (action: ProposedAction) => void;
 }
@@ -18,7 +19,12 @@ type TranscriptItem =
 	| { kind: 'tool'; call: ToolCall }
 	| { kind: 'action-record'; action: ProposedAction };
 
-function ThinkingIndicator(): JSX.Element {
+function ThinkingIndicator({ progress }: { progress?: ChatProgress | null }): JSX.Element {
+	const label = progress?.label || __('Thinking', 'agent-wordpress-terminal');
+	const hasTotal = (progress?.total ?? 0) > 0;
+	const completed = Math.min(progress?.completed ?? 0, progress?.total ?? 0);
+	const percentage = hasTotal ? Math.max(4, (completed / (progress?.total ?? 1)) * 100) : 0;
+
 	return (
 		<div
 			className="awpt-message awpt-message--assistant awpt-message--thinking"
@@ -26,15 +32,25 @@ function ThinkingIndicator(): JSX.Element {
 			aria-live="polite"
 			aria-busy="true"
 		>
-			<strong>{__('Agent', 'agent-wordpress-terminal')}:</strong>{' '}
-			<span className="awpt-thinking">
-				<span className="awpt-thinking__label">{__('Thinking', 'agent-wordpress-terminal')}</span>
-				<span className="awpt-thinking__dots" aria-hidden="true">
-					<span>.</span>
-					<span>.</span>
-					<span>.</span>
-				</span>
-			</span>
+			<strong>{__('Agent', 'agent-wordpress-terminal')}:</strong>
+			<div className="awpt-thinking">
+				<div className="awpt-thinking__copy">
+					<span className="awpt-thinking__label">{label}</span>
+					{progress?.detail ? (
+						<span className="awpt-thinking__detail">{progress.detail}</span>
+					) : null}
+				</div>
+				<div
+					className={`awpt-thinking__track${hasTotal ? ' is-determinate' : ''}`}
+					role="progressbar"
+					aria-label={label}
+					aria-valuemin={hasTotal ? 0 : undefined}
+					aria-valuemax={hasTotal ? progress?.total : undefined}
+					aria-valuenow={hasTotal ? completed : undefined}
+				>
+					<span style={hasTotal ? { width: `${percentage}%` } : undefined} />
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -243,15 +259,26 @@ function ActionCard({
 	const canPreview = canPreviewAction(action.payload);
 	const metadata = actionMetadata(action.payload);
 	const diff = actionDiff(action.payload);
+	const manifest = action.payload?.proposal_manifest;
+	const decisionTrace = action.payload?.decision_trace ?? [];
+	const repairsApplied = action.payload?.repairs_applied ?? [];
 
 	return (
 		<div className="awpt-action-card">
 			<h4>
-				{__('Proposed Action', 'agent-wordpress-terminal')}{' '}
+				{action.revision_kind === 'revised'
+					? __('Current revision', 'agent-wordpress-terminal')
+					: __('Proposed Action', 'agent-wordpress-terminal')}{' '}
 				<span className={`awpt-action-card__status awpt-action-card__status--${action.status}`}>
 					{action.status}
 				</span>
 			</h4>
+			{action.id ? (
+				<p className="awpt-action-card__context">
+					{`${__('Action', 'agent-wordpress-terminal')} #${action.id}`}
+					{action.updated_at ? ` · ${action.updated_at}` : ''}
+				</p>
+			) : null}
 			<p>
 				<strong>{action.title}</strong>
 				<br />
@@ -266,6 +293,48 @@ function ActionCard({
 						</div>
 					))}
 				</dl>
+			) : null}
+			{manifest?.approach ? (
+				<div className="awpt-action-card__rationale">
+					<strong>{__('Agent approach', 'agent-wordpress-terminal')}</strong>
+					<p>{manifest.approach}</p>
+					{(manifest.requirements?.length ?? 0) > 0 ? (
+						<ul>
+							{manifest.requirements?.map((requirement) => (
+								<li key={JSON.stringify(requirement)}>
+									{Object.values(requirement).filter(Boolean).join(' — ')}
+								</li>
+							))}
+						</ul>
+					) : null}
+				</div>
+			) : null}
+			{decisionTrace.length > 0 || (manifest?.assumptions?.length ?? 0) > 0 ? (
+				<details className="awpt-action-card__rationale-details">
+					<summary>{__('Details', 'agent-wordpress-terminal')}</summary>
+					{decisionTrace.length > 0 ? (
+						<ol>
+							{decisionTrace.map((item) => (
+								<li key={item}>{item}</li>
+							))}
+						</ol>
+					) : null}
+					{(manifest?.assumptions?.length ?? 0) > 0 ? (
+						<p>{`${__('Assumptions', 'agent-wordpress-terminal')}: ${manifest?.assumptions?.join('; ')}`}</p>
+					) : null}
+				</details>
+			) : null}
+			{repairsApplied.length > 0 ? (
+				<details className="awpt-action-card__rationale-details">
+					<summary>{__('Markup repairs applied', 'agent-wordpress-terminal')}</summary>
+					<ul>
+						{repairsApplied.map((repair) => (
+							<li key={`${repair.kind}-${repair.block_path}-${repair.description}`}>
+								{`${repair.block_name} ${repair.block_path}: ${repair.description}`}
+							</li>
+						))}
+					</ul>
+				</details>
 			) : null}
 			<div className="awpt-action-card__buttons">
 				<Button variant="secondary" onClick={() => onPreview(action)} disabled={!canPreview}>
@@ -329,6 +398,7 @@ export function Transcript({
 	toolCalls,
 	actions,
 	isThinking = false,
+	progress = null,
 	onActionOperation,
 	onActionPreview,
 }: TranscriptProps): JSX.Element {
@@ -399,7 +469,7 @@ export function Transcript({
 				})
 			)}
 
-			{isThinking ? <ThinkingIndicator /> : null}
+			{isThinking ? <ThinkingIndicator progress={progress} /> : null}
 
 			{pendingActions.map((action) => (
 				<ActionCard

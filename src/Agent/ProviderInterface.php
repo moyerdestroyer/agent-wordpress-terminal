@@ -23,9 +23,10 @@ interface ProviderInterface {
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      * @param array<int, array<string, mixed>> $tools Available tools.
+     * @param array<string, mixed>             $options Provider request options.
      * @return array<string, mixed>|\WP_Error
      */
-    public function complete(array $messages, array $tools = []): array|\WP_Error;
+    public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error;
 
     /**
      * Provider identifier.

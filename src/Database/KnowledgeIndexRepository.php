@@ -99,18 +99,20 @@ final class KnowledgeIndexRepository {
      *
      * @return list<array<string, mixed>>
      */
-    public function list_chunks_with_embeddings(int $limit = 2000): array {
+    public function list_chunks_with_embeddings(int $limit = 100, int $before_id = 0): array {
         $wpdb = WpDb::get();
-        $limit = max(1, min($limit, 5000));
+        $limit = max(1, min($limit, 250));
+        $cursor_clause = $before_id > 0 ? 'AND c.id < %d' : '';
         $sql = "SELECT c.id, c.chunk_text, c.chunk_index, c.embedding_json,
 				i.source_kind, i.source_id, i.source_post_id, i.label, i.uri, i.metadata_json
 			FROM {$wpdb->prefix}awpt_knowledge_chunks c
 			INNER JOIN {$wpdb->prefix}awpt_knowledge_index i ON i.id = c.index_id
 			WHERE c.embedding_json IS NOT NULL AND c.embedding_json != ''
+			{$cursor_clause}
 			ORDER BY c.id DESC
 			LIMIT %d";
-
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $limit), output: \ARRAY_A);
+        $params = $before_id > 0 ? [$before_id, $limit] : [$limit];
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $params), output: \ARRAY_A);
 
         return is_array($rows) ? $rows : [];
     }
@@ -126,6 +128,17 @@ final class KnowledgeIndexRepository {
 
     public function content_hash_for_source_id(string $source_id): ?string {
         return new KnowledgeIndexMaintenance()->content_hash_for_source_id($source_id);
+    }
+
+    public function source_needs_embeddings(string $source_id): bool {
+        $wpdb = WpDb::get();
+        $sql = "SELECT COUNT(*)
+            FROM {$wpdb->prefix}awpt_knowledge_index i
+            LEFT JOIN {$wpdb->prefix}awpt_knowledge_chunks c ON c.index_id = i.id
+            WHERE i.source_id = %s
+                AND (c.id IS NULL OR c.embedding_json IS NULL OR c.embedding_json = '')";
+
+        return (int) $wpdb->get_var($wpdb->prepare($sql, $source_id)) > 0;
     }
 
     public function delete_source_by_source_id(string $source_id): void {

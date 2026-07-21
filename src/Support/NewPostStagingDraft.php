@@ -57,6 +57,8 @@ final class NewPostStagingDraft {
             'post_type' => $post_type,
             'post_status' => 'draft',
             'post_author' => get_current_user_id(),
+            'post_name' => sanitize_title((string) ($payload['post_name'] ?? '')),
+            'post_parent' => (int) ($payload['post_parent'] ?? 0),
         ], true);
 
         if (is_wp_error($post_id)) {
@@ -64,6 +66,7 @@ final class NewPostStagingDraft {
         }
 
         update_post_meta($post_id, self::META_KEY, 1);
+        $this->apply_page_template($post_id, $payload);
         $this->apply_featured_image($post_id, $payload);
 
         return (int) $post_id;
@@ -108,6 +111,14 @@ final class NewPostStagingDraft {
             }
         }
 
+        if (array_key_exists('post_name', $payload)) {
+            $update['post_name'] = sanitize_title((string) $payload['post_name']);
+        }
+
+        if (array_key_exists('post_parent', $payload)) {
+            $update['post_parent'] = (int) $payload['post_parent'];
+        }
+
         if (count($update) > 1) {
             $updated = wp_update_post($update, wp_error: true);
 
@@ -117,6 +128,7 @@ final class NewPostStagingDraft {
         }
 
         $this->apply_featured_image($post_id, $payload);
+        $this->apply_page_template($post_id, $payload);
 
         return true;
     }
@@ -168,6 +180,15 @@ final class NewPostStagingDraft {
 
         if ($featured_image_id > 0) {
             $this->ensure_featured_image($post_id, $featured_image_id);
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function apply_page_template(int $post_id, array $payload): void {
+        $template = sanitize_text_field((string) ($payload['page_template'] ?? ''));
+
+        if ('' !== $template) {
+            update_post_meta($post_id, '_wp_page_template', $template);
         }
     }
 }

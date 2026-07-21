@@ -32,6 +32,13 @@ final class ToolResultFormatter {
      */
     public function format_for_transcript(array $tool_calls, string $prefix = ''): string {
         $sections = [];
+        $successful_tools = [];
+
+        foreach ($tool_calls as $tool_call) {
+            if ('success' === (string) ($tool_call['status'] ?? '')) {
+                $successful_tools[(string) ($tool_call['tool'] ?? '')] = true;
+            }
+        }
 
         foreach ($tool_calls as $tool_call) {
             $status = (string) ($tool_call['status'] ?? '');
@@ -47,6 +54,13 @@ final class ToolResultFormatter {
             }
 
             if (in_array($status, ['failed', 'rejected'], true)) {
+                // A validation failure the model corrected in the same turn is
+                // useful internally but reads like a broken final result. The
+                // complete tool history remains available in the Tools UI.
+                if (array_key_exists((string) ($tool_call['tool'] ?? ''), $successful_tools)) {
+                    continue;
+                }
+
                 $sections[] = $this->format_failure($tool_call);
             }
         }
@@ -149,7 +163,7 @@ final class ToolResultFormatter {
         $status = (string) ($output['status'] ?? 'proposed');
         $id = (int) ($output['id'] ?? 0);
 
-        return sprintf(
+        $summary = sprintf(
             /* translators: 1: tool name, 2: action ID, 3: action title, 4: status */
             __('%1$s staged action #%2$d: %3$s (%4$s).', 'agent-wordpress-terminal'),
             $tool,
@@ -157,6 +171,29 @@ final class ToolResultFormatter {
             '' !== $title ? $title : __('Untitled action', 'agent-wordpress-terminal'),
             $status,
         );
+        $payload = is_array($output['payload'] ?? null) ? $output['payload'] : [];
+        $repairs = is_array($payload['repairs_applied'] ?? null) ? $payload['repairs_applied'] : [];
+
+        if ([] === $repairs) {
+            return $summary;
+        }
+
+        $lines = [$summary, __('AWPT repaired Gutenberg markup before staging:', 'agent-wordpress-terminal')];
+
+        foreach ($repairs as $repair) {
+            if (!is_array($repair)) {
+                continue;
+            }
+
+            $lines[] = sprintf(
+                '- %1$s %2$s: %3$s',
+                (string) ($repair['block_name'] ?? __('Block', 'agent-wordpress-terminal')),
+                (string) ($repair['block_path'] ?? ''),
+                (string) ($repair['description'] ?? ''),
+            );
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

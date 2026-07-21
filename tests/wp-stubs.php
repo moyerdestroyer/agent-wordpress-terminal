@@ -20,6 +20,10 @@ if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
 }
 
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}
+
 /**
  * Resets all in-memory WordPress test state. Call at the start of every test case.
  */
@@ -42,9 +46,50 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_trashed_posts'] = [];
     $GLOBALS['awpt_test_users'] = [];
     $GLOBALS['awpt_test_filters'] = [];
+    $GLOBALS['awpt_test_post_types'] = [
+        'post',
+        'page',
+        'attachment',
+        'wp_block',
+        'wp_template',
+        'wp_template_part',
+    ];
+    $GLOBALS['awpt_test_http_response'] = null;
+    $GLOBALS['awpt_test_http_requests'] = [];
+    $GLOBALS['awpt_test_stylesheet'] = 'civicpress';
+    $GLOBALS['awpt_test_transients'] = [];
 }
 
 awpt_test_reset_state();
+
+if (!function_exists('get_transient')) {
+    function get_transient(string $key): mixed {
+        return $GLOBALS['awpt_test_transients'][$key] ?? false;
+    }
+}
+
+if (!function_exists('set_transient')) {
+    function set_transient(string $key, mixed $value, int $expiration = 0): bool {
+        unset($expiration);
+        $GLOBALS['awpt_test_transients'][$key] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('current_time')) {
+    function current_time(string $type, bool $gmt = false): string|int {
+        unset($gmt);
+
+        return 'timestamp' === $type ? 1_750_000_000 : '2026-07-20 12:00:00';
+    }
+}
+
+if (!function_exists('get_stylesheet')) {
+    function get_stylesheet(): string {
+        return (string) $GLOBALS['awpt_test_stylesheet'];
+    }
+}
 
 if (!function_exists('get_option')) {
     function get_option(string $name, mixed $default = false): mixed {
@@ -53,7 +98,8 @@ if (!function_exists('get_option')) {
 }
 
 if (!function_exists('update_option')) {
-    function update_option(string $name, mixed $value): bool {
+    function update_option(string $name, mixed $value, ?bool $autoload = null): bool {
+        unset($autoload);
         $GLOBALS['awpt_test_options'][$name] = $value;
 
         return true;
@@ -82,6 +128,12 @@ if (!function_exists('sanitize_key')) {
     }
 }
 
+if (!function_exists('absint')) {
+    function absint(mixed $value): int {
+        return abs((int) $value);
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $value): string {
         return trim($value);
@@ -103,6 +155,12 @@ if (!function_exists('sanitize_html_class')) {
 if (!function_exists('admin_url')) {
     function admin_url(string $path = ''): string {
         return 'https://example.test/wp-admin/' . $path;
+    }
+}
+
+if (!function_exists('home_url')) {
+    function home_url(string $path = ''): string {
+        return 'https://example.test/' . ltrim($path, '/');
     }
 }
 
@@ -299,11 +357,39 @@ if (!function_exists('url_to_postid')) {
 
 if (!function_exists('post_type_exists')) {
     function post_type_exists(string $post_type): bool {
-        return in_array(
-            $post_type,
-            ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'],
-            true,
-        );
+        return in_array($post_type, $GLOBALS['awpt_test_post_types'], true);
+    }
+}
+
+if (!function_exists('wp_remote_post')) {
+    /**
+     * @param array<string, mixed> $args
+     */
+    function wp_remote_post(string $url, array $args = []): array|WP_Error {
+        $GLOBALS['awpt_test_http_requests'][] = ['url' => $url, 'args' => $args];
+        $response = $GLOBALS['awpt_test_http_response'];
+
+        return is_array($response) || $response instanceof WP_Error
+            ? $response
+            : new WP_Error('http_request_failed', 'No fake HTTP response configured.');
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    /**
+     * @param array<string, mixed>|WP_Error $response
+     */
+    function wp_remote_retrieve_response_code(array|WP_Error $response): int {
+        return is_array($response) ? (int) ($response['response']['code'] ?? 0) : 0;
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_body')) {
+    /**
+     * @param array<string, mixed>|WP_Error $response
+     */
+    function wp_remote_retrieve_body(array|WP_Error $response): string {
+        return is_array($response) ? (string) ($response['body'] ?? '') : '';
     }
 }
 
@@ -374,6 +460,24 @@ if (!function_exists('parse_blocks')) {
     }
 }
 
+if (!function_exists('wp_get_attachment_url')) {
+    function wp_get_attachment_url(int $attachment_id): string|false {
+        return $attachment_id > 0 ? 'https://example.test/uploads/image-' . $attachment_id . '.jpg' : false;
+    }
+}
+
+if (!function_exists('untrailingslashit')) {
+    function untrailingslashit(string $value): string {
+        return rtrim($value, '/\\');
+    }
+}
+
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw(string $url): string {
+        return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
 if (!function_exists('serialize_blocks')) {
     /**
      * @param array<int|string, array<string, mixed>> $blocks
@@ -392,7 +496,28 @@ if (!function_exists('serialize_blocks')) {
             $comment_name = str_starts_with($name, 'core/') ? substr($name, 5) : $name;
             $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
             $attrs_json = [] === $attrs ? '' : ' ' . (string) json_encode($attrs, JSON_UNESCAPED_SLASHES);
-            $inner = (string) ($block['innerHTML'] ?? '');
+            $inner_blocks = is_array($block['innerBlocks'] ?? null) ? $block['innerBlocks'] : [];
+            $inner_content = is_array($block['innerContent'] ?? null) ? $block['innerContent'] : [];
+
+            if ([] === $inner_content) {
+                $inner = (string) ($block['innerHTML'] ?? '') . serialize_blocks($inner_blocks);
+            } else {
+                $inner = '';
+                $child_index = 0;
+
+                foreach ($inner_content as $part) {
+                    if (null !== $part) {
+                        $inner .= (string) $part;
+                        continue;
+                    }
+
+                    if (array_key_exists($child_index, $inner_blocks)) {
+                        $inner .= serialize_blocks([$inner_blocks[$child_index]]);
+                    }
+
+                    ++$child_index;
+                }
+            }
 
             $content .= sprintf('<!-- wp:%s%s -->%s<!-- /wp:%s -->', $comment_name, $attrs_json, $inner, $comment_name);
         }

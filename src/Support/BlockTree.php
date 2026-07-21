@@ -100,6 +100,18 @@ final class BlockTree {
     }
 
     /**
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{content: string, blocks: array<int, array<string, mixed>>, paths: list<string>}|\WP_Error
+     */
+    public function insert_blocks(
+        string $path,
+        array $new_blocks,
+        string $position = self::POSITION_AFTER,
+    ): array|\WP_Error {
+        return new BlockTreeEditor()->insert_blocks($this->blocks, $path, $new_blocks, $position);
+    }
+
+    /**
      * Remove a block by path and return serialized content.
      *
      * @return array{content: string, removed: array<string, mixed>}|\WP_Error

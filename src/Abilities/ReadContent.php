@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Support\NewPostStagingDraft;
 use AWPT\Support\ReadablePostMeta;
 
 if (!defined('ABSPATH')) {
@@ -39,7 +40,11 @@ final class ReadContent implements AbilityInterface {
                 'properties' => [
                     'id' => [
                         'type' => 'integer',
-                        'description' => __('Post ID.', 'agent-wordpress-terminal'),
+                        'minimum' => 1,
+                        'description' => __(
+                            'Positive post ID returned by list-content or search-content. Never use 0 as a browse request.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                 ],
                 'required' => ['id'],
@@ -75,7 +80,7 @@ final class ReadContent implements AbilityInterface {
     public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
-        return $post_id > 0 && current_user_can('read_post', $post_id);
+        return $post_id > 0 ? current_user_can('read_post', $post_id) : current_user_can('edit_posts');
     }
 
     /**
@@ -86,10 +91,25 @@ final class ReadContent implements AbilityInterface {
      */
     public function execute(array $input): array|\WP_Error {
         $post_id = (int) ($input['id'] ?? 0);
+
+        if ($post_id <= 0) {
+            return new \WP_Error('awpt_invalid_post_id', __(
+                'A positive post ID is required. Use awpt/list-content to browse.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
         $post = get_post($post_id);
 
         if (!$post) {
             return new \WP_Error('awpt_post_not_found', __('Post not found.', 'agent-wordpress-terminal'));
+        }
+
+        if (new NewPostStagingDraft()->is_staging_draft($post_id)) {
+            return new \WP_Error('awpt_staging_draft_not_content', __(
+                'This ID belongs to a temporary staged-action preview, not ordinary site content.',
+                'agent-wordpress-terminal',
+            ));
         }
 
         return [

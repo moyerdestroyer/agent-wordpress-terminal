@@ -49,7 +49,11 @@ final class KnowledgeSourceIndexer {
         $content_hash = hash('sha256', $content);
         $existing_hash = $this->index->content_hash_for_source_id($source_id);
 
-        if (null !== $existing_hash && hash_equals($existing_hash, $content_hash)) {
+        $content_unchanged = null !== $existing_hash && hash_equals($existing_hash, $content_hash);
+        $needs_embedding_backfill =
+            $content_unchanged && $this->embeddings->is_enabled() && $this->index->source_needs_embeddings($source_id);
+
+        if ($content_unchanged && !$needs_embedding_backfill) {
             return [
                 'status' => 'skipped',
                 'source_id' => $source_id,

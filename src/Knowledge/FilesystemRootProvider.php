@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Resolves Knowledge document roots — open under wp-content by default.
+ * Resolves Knowledge document roots under wp-content.
  */
 final class FilesystemRootProvider {
     private FilesystemAccessPolicy $policy;
@@ -28,17 +28,27 @@ final class FilesystemRootProvider {
      * @return list<string>
      */
     public function allowed_roots(): array {
+        return array_column($this->root_definitions(), 'path');
+    }
+
+    /**
+     * @return list<array{path: string, type: string}>
+     */
+    public function root_definitions(): array {
         $normalized = [];
 
-        foreach ($this->configured_roots() as $root) {
-            $real = realpath($root);
+        foreach ($this->configured_roots() as $definition) {
+            $real = realpath($definition['path']);
 
             if (is_string($real) && is_dir($real) && $this->policy->is_allowed_root($real)) {
-                $normalized[] = $real;
+                $normalized[$real] ??= [
+                    'path' => $real,
+                    'type' => $definition['type'],
+                ];
             }
         }
 
-        return array_values(array_unique($normalized));
+        return array_values($normalized);
     }
 
     /**
@@ -60,25 +70,34 @@ final class FilesystemRootProvider {
     }
 
     /**
-     * @return list<string>
+     * @return list<array{path: string, type: string}>
      */
     private function configured_roots(): array {
         $roots = [];
         $upload_dir = wp_get_upload_dir();
 
         if (is_string($upload_dir['basedir'] ?? null)) {
-            $roots[] = $upload_dir['basedir'];
+            $roots[] = [
+                'path' => $upload_dir['basedir'],
+                'type' => FilesystemAccessPolicy::ROOT_UPLOADS,
+            ];
         }
 
         $stylesheet = get_stylesheet_directory();
         $template = get_template_directory();
 
         if ('' !== $stylesheet) {
-            $roots[] = $stylesheet;
+            $roots[] = [
+                'path' => $stylesheet,
+                'type' => FilesystemAccessPolicy::ROOT_THEME,
+            ];
         }
 
         if ('' !== $template && $template !== $stylesheet) {
-            $roots[] = $template;
+            $roots[] = [
+                'path' => $template,
+                'type' => FilesystemAccessPolicy::ROOT_THEME,
+            ];
         }
 
         $configured = (string) get_option('awpt_knowledge_roots', '');
@@ -88,7 +107,10 @@ final class FilesystemRootProvider {
             $path = trim($path);
 
             if ('' !== $path) {
-                $roots[] = $path;
+                $roots[] = [
+                    'path' => $path,
+                    'type' => FilesystemAccessPolicy::ROOT_CUSTOM,
+                ];
             }
         }
 

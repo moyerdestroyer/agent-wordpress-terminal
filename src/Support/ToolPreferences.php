@@ -22,6 +22,8 @@ if (!defined('ABSPATH')) {
 final class ToolPreferences {
     public const OPTION = 'awpt_disabled_tools';
 
+    public const TRUSTED_MUTATING_OPTION = 'awpt_trusted_mutating_tools';
+
     /**
      * Tools that must never be auto-executed by the model (human/REST only).
      *
@@ -103,6 +105,36 @@ final class ToolPreferences {
         update_option(self::OPTION, $clean, false);
 
         return $clean;
+    }
+
+    /** @return list<string> */
+    public function trusted_mutating_names(): array {
+        $raw = get_option(self::TRUSTED_MUTATING_OPTION, []);
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(static fn(mixed $name): string => is_string($name)
+            ? sanitize_text_field($name)
+            : '', $raw))));
+    }
+
+    public function is_trusted_mutating(string $tool_name): bool {
+        return in_array($tool_name, $this->trusted_mutating_names(), true);
+    }
+
+    public function set_mutating_trust(string $tool_name, bool $trusted): void {
+        $names = array_values(array_filter(
+            $this->trusted_mutating_names(),
+            static fn(string $name): bool => $name !== $tool_name,
+        ));
+
+        if ($trusted && '' !== $tool_name && !$this->is_never_auto($tool_name)) {
+            $names[] = sanitize_text_field($tool_name);
+        }
+
+        update_option(self::TRUSTED_MUTATING_OPTION, array_values(array_unique($names)), false);
     }
 
     /**

@@ -34,9 +34,7 @@ final class WordPressAIClientProvider implements ProviderInterface {
      * @param array<int, array<string, mixed>> $tools Available tools.
      * @return array<string, mixed>|\WP_Error
      */
-    public function complete(array $messages, array $tools = []): array|\WP_Error {
-        unset($tools);
-
+    public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error {
         if (!function_exists('wp_ai_client_prompt')) {
             return $this->response(
                 'WordPress AI Client is not available. Select OpenRouter or install a WordPress AI connector plugin.',
@@ -72,10 +70,23 @@ final class WordPressAIClientProvider implements ProviderInterface {
             break;
         }
 
+        $ability_names = [];
+        $registry = new ToolRegistry();
+
+        foreach ($tools as $tool) {
+            $function = is_array($tool['function'] ?? null) ? $tool['function'] : [];
+            $ability_name = $registry->tool_name_for_function((string) ($function['name'] ?? ''));
+
+            if (null !== $ability_name && $registry->is_ability($ability_name)) {
+                $ability_names[] = $ability_name;
+            }
+        }
+
         $result = new WordPressAIClientRunner()->generate(
             $messages,
             $this->connector_id,
-            new ToolRegistry()->get_auto_executable_ability_names(),
+            array_values(array_unique($ability_names)),
+            max(1024, min(32_000, (int) ($options['max_completion_tokens'] ?? 8192))),
         );
 
         if ($result['no_text_generation_model']) {

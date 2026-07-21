@@ -23,9 +23,10 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
      * @param array<int, array<string, mixed>> $tools Available tools.
+     * @param array<string, mixed>             $options Provider request options.
      * @return array<string, mixed>|\WP_Error
      */
-    public function complete(array $messages, array $tools = []): array|\WP_Error {
+    public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error {
         $api_key = $this->get_api_key();
 
         if ($this->requires_api_key() && '' === $api_key) {
@@ -50,18 +51,46 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'max_completion_tokens' => 1000,
+            // Long posts staged via propose-* tool calls easily exceed 1k tokens of
+            // arguments alone (~1000 words). A low cap yields truncated JSON tool calls
+            // or empty assistant text — both look like "the model returned no text".
+            'max_completion_tokens' => max(1024, min(32_000, (int) ($options['max_completion_tokens'] ?? 8192))),
         ];
 
         if ([] !== $tools) {
             $payload['tools'] = $tools;
-            $payload['tool_choice'] = 'auto';
+            $payload['tool_choice'] = $options['tool_choice'] ?? 'auto';
+        }
+
+        if ('OpenRouter' === $this->get_name()) {
+            // OpenRouter advertises the portable `max_tokens` parameter for its
+            // cross-provider routes; some Gemini endpoints reject the OpenAI-only
+            // `max_completion_tokens` alias when require_parameters is enabled.
+            $payload['max_tokens'] = $payload['max_completion_tokens'];
+            unset($payload['max_completion_tokens']);
+
+            if ((int) ($options['session_id'] ?? 0) > 0) {
+                $payload['session_id'] = 'awpt-' . (int) $options['session_id'];
+            }
+
+            if ([] !== $tools) {
+                // Ensure Auto selects a provider endpoint that supports every
+                // declared parameter, especially structured tool choice.
+                $payload['provider'] = ['require_parameters' => true];
+            }
+        }
+
+        $timeout = max(5, min(45, (int) ($options['timeout'] ?? 45)));
+        $encoded_payload = wp_json_encode($payload);
+
+        if (!is_string($encoded_payload)) {
+            $encoded_payload = '';
         }
 
         $response = wp_remote_post($endpoint, [
-            'timeout' => 45,
+            'timeout' => $timeout,
             'headers' => $this->get_headers($api_key),
-            'body' => wp_json_encode($payload),
+            'body' => $encoded_payload,
         ]);
 
         if (is_wp_error($response)) {
@@ -71,6 +100,36 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         $status = (int) wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+
+        if ($status < 200 || $status >= 300) {
+            $text_only_messages = $this->without_images($messages);
+
+            if (null !== $text_only_messages) {
+                $text_only_payload = $payload;
+                $text_only_payload['messages'] = $text_only_messages;
+                $encoded_payload = wp_json_encode($text_only_payload);
+
+                if (!is_string($encoded_payload)) {
+                    $encoded_payload = '';
+                }
+                $fallback_response = wp_remote_post($endpoint, [
+                    'timeout' => $timeout,
+                    'headers' => $this->get_headers($api_key),
+                    'body' => $encoded_payload,
+                ]);
+
+                if (
+                    !is_wp_error($fallback_response)
+                    && (int) wp_remote_retrieve_response_code($fallback_response) >= 200
+                    && (int) wp_remote_retrieve_response_code($fallback_response) < 300
+                ) {
+                    $response = $fallback_response;
+                    $status = (int) wp_remote_retrieve_response_code($response);
+                    $body = wp_remote_retrieve_body($response);
+                    $data = json_decode($body, true);
+                }
+            }
+        }
 
         if ($status < 200 || $status >= 300) {
             return new \WP_Error(
@@ -103,6 +162,33 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             'model' => (string) ($data['model'] ?? $model),
             'usage' => is_array($data['usage'] ?? null) ? $data['usage'] : [],
         ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $messages
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function without_images(array $messages): ?array {
+        $changed = false;
+
+        foreach ($messages as $index => $message) {
+            if (!is_array($message['content'] ?? null)) {
+                continue;
+            }
+
+            $text = [];
+
+            foreach ($message['content'] as $part) {
+                if (is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null)) {
+                    $text[] = $part['text'];
+                }
+            }
+
+            $messages[$index]['content'] = implode("\n", $text);
+            $changed = true;
+        }
+
+        return $changed ? $messages : null;
     }
 
     /**

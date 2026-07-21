@@ -75,7 +75,27 @@ function test_tool_registry_respects_never_auto(): void {
     Assert::false($registry->can_auto_execute('awpt/apply-action'), 'apply-action must never be model-auto-executable');
 }
 
+function test_tool_registry_uses_annotations_and_explicit_mutation_trust(): void {
+    awpt_test_reset_state();
+    add_filter('awpt_mcp_tools', static fn(): array => [
+        ['name' => 'demo/read', 'description' => 'Read', 'readonly' => true, 'destructive' => false],
+        ['name' => 'demo/write', 'description' => 'Write', 'readonly' => false, 'destructive' => true],
+    ]);
+    $prefs = new ToolPreferences();
+    $registry = new ToolRegistry($prefs);
+
+    Assert::true($registry->can_auto_execute('demo/read'), 'declared read-only tools should be automatic');
+    Assert::false($registry->can_auto_execute('demo/write'), 'direct mutations should require explicit trust');
+
+    $prefs->set_mutating_trust('demo/write', true);
+    Assert::true(
+        new ToolRegistry($prefs)->can_auto_execute('demo/write'),
+        'an admin should be able to explicitly trust a mutating tool',
+    );
+}
+
 test_tool_registry_proposal_abilities();
 test_tool_name_mapper_roundtrip();
 test_tool_preferences_deny_list();
 test_tool_registry_respects_never_auto();
+test_tool_registry_uses_annotations_and_explicit_mutation_trust();

@@ -64,6 +64,35 @@ final class BlockStructureUpdateActionApplier {
             return is_wp_error($result) ? $result : $result['content'];
         }
 
+        if (ActionOperations::PATTERN_INSERT === $operation) {
+            $raw_blocks = is_array($payload['blocks'] ?? null) ? $payload['blocks'] : [];
+            $blocks = [];
+
+            foreach ($raw_blocks as $raw) {
+                if (!is_array($raw)) {
+                    continue;
+                }
+
+                $typed = [];
+
+                foreach ($raw as $key => $value) {
+                    if (is_string($key)) {
+                        $typed[$key] = $value;
+                    }
+                }
+
+                $blocks[] = new BlockTreeEditor()->normalize_block($typed);
+            }
+
+            $result = $tree->insert_blocks(
+                $path,
+                $blocks,
+                (string) ($payload['position'] ?? BlockTree::POSITION_APPEND),
+            );
+
+            return is_wp_error($result) ? $result : $result['content'];
+        }
+
         return new \WP_Error(
             code: 'awpt_unsupported_block_operation',
             message: __('Unsupported block structure operation.', 'agent-wordpress-terminal'),

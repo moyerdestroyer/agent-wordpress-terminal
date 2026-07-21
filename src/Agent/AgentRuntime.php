@@ -35,7 +35,7 @@ final class AgentRuntime {
      *
      * @return array<string, mixed>|\WP_Error
      */
-    public function handle_message(int $session_id, string $message): array|\WP_Error {
+    public function handle_message(int $session_id, string $message, array $turn_context = []): array|\WP_Error {
         if (!$this->sessions->exists($session_id) || !current_user_can(capability: 'manage_options')) {
             return new \WP_Error(
                 code: 'awpt_session_not_found',
@@ -46,9 +46,10 @@ final class AgentRuntime {
 
         $now = current_time('mysql');
 
-        $this->messages->store_message($session_id, 'user', $message, $now);
+        $stored_message = $this->message_with_attachment_summary($message, $turn_context['attachments'] ?? []);
+        $this->messages->store_message($session_id, 'user', $stored_message, $now);
 
-        $response = $this->dispatch_message($session_id, $message);
+        $response = $this->dispatch_message($session_id, $message, $turn_context);
 
         if (is_wp_error($response)) {
             return $response;
@@ -72,7 +73,10 @@ final class AgentRuntime {
 
         $session_update = ['updated_at' => $now];
         $session_formats = ['%s'];
-        $suggested_title = new SessionTitleSuggester()->suggest($message, $this->sessions->get_summary($session_id));
+        $suggested_title = new SessionTitleSuggester()->suggest(
+            $stored_message,
+            $this->sessions->get_summary($session_id),
+        );
 
         if (null !== $suggested_title) {
             $session_update['title'] = $suggested_title;
@@ -102,20 +106,42 @@ final class AgentRuntime {
      *
      * @return array<string, mixed>|\WP_Error
      */
-    private function dispatch_message(int $session_id, string $message): array|\WP_Error {
+    private function dispatch_message(int $session_id, string $message, array $turn_context): array|\WP_Error {
         $trimmed = trim($message);
 
         if (str_starts_with($trimmed, '/')) {
             return new SlashCommandRouter()->dispatch($trimmed);
         }
 
-        return $this->provider_response($session_id);
+        return $this->provider_response($session_id, $turn_context);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function provider_response(int $session_id): array {
-        return new ProviderRuntime()->respond($session_id);
+    private function provider_response(int $session_id, array $turn_context): array {
+        return new ProviderRuntime()->respond($session_id, $turn_context);
+    }
+
+    private function message_with_attachment_summary(string $message, mixed $attachments): string {
+        if (!is_array($attachments)) {
+            return $message;
+        }
+
+        $lines = [];
+
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
+            $lines[] = sprintf(
+                'Attached image: %s (Media Library attachment #%d)',
+                (string) ($attachment['url'] ?? ''),
+                (int) ($attachment['id'] ?? 0),
+            );
+        }
+
+        return implode("\n\n", array_filter([trim($message), implode("\n", $lines)]));
     }
 }

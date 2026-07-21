@@ -63,6 +63,7 @@ final class KnowledgeController extends RestController {
             $result = new KnowledgeIndexer()->rebuild();
         } catch (\Throwable $throwable) {
             update_option('awpt_knowledge_last_error', $throwable->getMessage(), false);
+            KnowledgeIndexer::mark_rebuild_failed();
 
             return new \WP_REST_Response([
                 'error' => $throwable->getMessage(),

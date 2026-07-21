@@ -30,9 +30,17 @@ function actionStatusRank(status: ProposedAction['status']): number {
 }
 
 function mergeActionRecord(existing: ProposedAction, incoming: ProposedAction): ProposedAction {
-	return actionStatusRank(incoming.status) > actionStatusRank(existing.status)
-		? incoming
-		: existing;
+	const incomingUpdated = Date.parse(incoming.updated_at ?? incoming.created_at ?? '');
+	const existingUpdated = Date.parse(existing.updated_at ?? existing.created_at ?? '');
+
+	if (Number.isFinite(incomingUpdated) && Number.isFinite(existingUpdated)) {
+		return incomingUpdated >= existingUpdated ? { ...existing, ...incoming } : existing;
+	}
+
+	const incomingRank = actionStatusRank(incoming.status);
+	const existingRank = actionStatusRank(existing.status);
+
+	return incomingRank >= existingRank ? { ...existing, ...incoming } : existing;
 }
 
 function isProposedActionStatus(value: unknown): value is ProposedAction['status'] {
@@ -71,6 +79,12 @@ export function proposalActionFromToolCall(call: ToolCall): ProposedAction | nul
 		status: isProposedActionStatus(output.status) ? output.status : 'proposed',
 		created_at: typeof output.created_at === 'string' ? output.created_at : undefined,
 		updated_at: typeof output.updated_at === 'string' ? output.updated_at : undefined,
+		revision_kind: typeof output.revision_kind === 'string' ? output.revision_kind : undefined,
+		revised_action_id:
+			typeof output.revised_action_id === 'number' ? output.revised_action_id : undefined,
+		removed_action_ids: Array.isArray(output.removed_action_ids)
+			? output.removed_action_ids.filter((id): id is number => typeof id === 'number')
+			: undefined,
 	};
 }
 

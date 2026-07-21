@@ -33,6 +33,13 @@ final class KnowledgeSearchCache {
             return [];
         }
 
+        // Retrieval is supplemental context. Never let a rebuilding or recovering
+        // index hold the synchronous chat request open; the agent can answer without
+        // excerpts and the next turn will automatically resume retrieval.
+        if (!KnowledgeIndexer::retrieval_is_available()) {
+            return [];
+        }
+
         $key = hash('sha256', strtolower($normalized) . ':' . $limit);
 
         if (array_key_exists($key, self::$results)) {

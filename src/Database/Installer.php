@@ -18,10 +18,12 @@ if (!defined('ABSPATH')) {
  * Creates and maintains AWPT database tables.
  */
 final class Installer {
+    private const UPGRADE_LOCK_OPTION = 'awpt_schema_upgrade_lock';
+    private const UPGRADE_LOCK_TTL = 300;
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '3';
+    private const SCHEMA_VERSION = '8';
 
     /**
      * Plugin activation hook.
@@ -36,12 +38,23 @@ final class Installer {
      * Ensure newly added tables exist after plugin updates.
      */
     public static function maybe_upgrade(): void {
-        if (self::SCHEMA_VERSION === (string) get_option('awpt_schema_version', '')) {
+        $installed_version = (string) get_option('awpt_schema_version', '');
+
+        if (self::SCHEMA_VERSION === $installed_version) {
             return;
         }
 
-        self::create_tables();
-        update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
+        if (!self::acquire_upgrade_lock()) {
+            return;
+        }
+
+        try {
+            self::create_tables();
+
+            update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
+        } finally {
+            delete_option(self::UPGRADE_LOCK_OPTION);
+        }
     }
 
     /**
@@ -97,6 +110,26 @@ final class Installer {
 			KEY session_id (session_id)
 		) {$charset_collate};";
 
+        $provider_calls = "CREATE TABLE {$prefix}provider_calls (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			session_id bigint(20) unsigned NOT NULL,
+			provider varchar(100) NOT NULL DEFAULT '',
+			model varchar(191) NOT NULL DEFAULT '',
+			turn_id varchar(64) NULL,
+			tool_round int unsigned NOT NULL DEFAULT 0,
+			outcome varchar(30) NOT NULL DEFAULT 'success',
+			error_code varchar(100) NOT NULL DEFAULT '',
+			completion_budget int unsigned NOT NULL DEFAULT 0,
+			prompt_tokens int unsigned NOT NULL DEFAULT 0,
+			completion_tokens int unsigned NOT NULL DEFAULT 0,
+			total_tokens int unsigned NOT NULL DEFAULT 0,
+			duration_ms int unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY session_id (session_id),
+			KEY turn_id (turn_id)
+		) {$charset_collate};";
+
         $context_items = "CREATE TABLE {$prefix}context_items (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			session_id bigint(20) unsigned NOT NULL,
@@ -116,10 +149,13 @@ final class Installer {
 			description longtext NOT NULL,
 			payload_json longtext NOT NULL,
 			status varchar(20) NOT NULL DEFAULT 'proposed',
+			turn_id varchar(64) NULL,
+			proposal_key varchar(100) NULL,
 			created_at datetime NOT NULL,
 			updated_at datetime NOT NULL,
 			PRIMARY KEY  (id),
-			KEY session_id (session_id)
+			KEY session_id (session_id),
+			UNIQUE KEY turn_proposal (session_id, turn_id, proposal_key)
 			) {$charset_collate};";
 
         $knowledge_index = "CREATE TABLE {$prefix}knowledge_index (
@@ -171,13 +207,48 @@ final class Installer {
 			KEY status (status)
 		) {$charset_collate};";
 
+        $captures = "CREATE TABLE {$prefix}captures (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			session_id bigint(20) unsigned NOT NULL,
+			action_id bigint(20) unsigned NULL,
+			post_id bigint(20) unsigned NULL,
+			url text NOT NULL,
+			viewport_json text NULL,
+			dom_snapshot longtext NULL,
+			image_data longtext NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY session_id (session_id),
+			KEY action_id (action_id)
+		) {$charset_collate};";
+
         dbDelta($sessions);
         dbDelta($messages);
         dbDelta($tool_calls);
+        dbDelta($provider_calls);
         dbDelta($context_items);
         dbDelta($actions);
         dbDelta($knowledge_index);
         dbDelta($knowledge_chunks);
         dbDelta($incidents);
+        dbDelta($captures);
+    }
+
+    private static function acquire_upgrade_lock(): bool {
+        $now = time();
+
+        if (add_option(self::UPGRADE_LOCK_OPTION, $now, '', false)) {
+            return true;
+        }
+
+        $started_at = (int) get_option(self::UPGRADE_LOCK_OPTION, 0);
+
+        if ($started_at > 0 && ($started_at + self::UPGRADE_LOCK_TTL) >= $now) {
+            return false;
+        }
+
+        delete_option(self::UPGRADE_LOCK_OPTION);
+
+        return add_option(self::UPGRADE_LOCK_OPTION, $now, '', false);
     }
 }

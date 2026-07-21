@@ -82,6 +82,63 @@ final class BlockTreeMutator {
     }
 
     /**
+     * Insert an ordered composition. This deliberately reuses the single-block mutation
+     * path so dotted paths, nesting, and serialization stay identical to normal edits.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{content: string, blocks: array<int, array<string, mixed>>, paths: list<string>}|\WP_Error
+     */
+    public function insert_blocks(array $blocks, string $path, array $new_blocks, string $position): array|\WP_Error {
+        if ([] === $new_blocks) {
+            return $this->paths->error('awpt_empty_block_composition', __(
+                'A pattern must contain at least one block.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
+        $working = $blocks;
+        /** @var list<array<string, mixed>> $normalized */
+        $normalized = [];
+        /** @var list<string> $paths */
+        $paths = [];
+
+        if (BlockTree::POSITION_BEFORE === $position) {
+            $new_blocks = array_reverse($new_blocks);
+        }
+
+        $anchor = $path;
+
+        foreach ($new_blocks as $raw) {
+            $result = $this->insert_block($working, $anchor, $raw, $position);
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            /** @var array{content: string, block: array<string, mixed>, path: string} $result */
+            $working = parse_blocks($result['content']);
+            $normalized[] = $result['block'];
+            $paths[] = $result['path'];
+
+            if (BlockTree::POSITION_AFTER === $position) {
+                $anchor = $result['path'];
+            }
+        }
+
+        if (BlockTree::POSITION_BEFORE === $position) {
+            $normalized = array_reverse($normalized);
+            $paths = array_reverse($paths);
+        }
+
+        return [
+            'content' => $this->paths->serialize($working),
+            'blocks' => $normalized,
+            'paths' => $paths,
+        ];
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $blocks
      * @return array{content: string, removed: array<string, mixed>}|\WP_Error
      */

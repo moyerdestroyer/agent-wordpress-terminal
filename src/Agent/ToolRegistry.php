@@ -79,14 +79,20 @@ final class ToolRegistry {
     }
 
     /**
+     * @param list<string> $only_abilities Optional ability allow-list.
      * @return array<int, array<string, mixed>>
      */
-    public function get_chat_completion_tools(): array {
+    public function get_chat_completion_tools(array $only_abilities = []): array {
         $tools = [];
         $seen_functions = [];
         $catalog = array_merge($this->ability_tools(), $this->mcp_only_tools());
+        $only = array_fill_keys($only_abilities, true);
 
         foreach ($catalog as $tool) {
+            if ([] !== $only && !array_key_exists($tool['name'], $only)) {
+                continue;
+            }
+
             $function_name = $this->names->to_function_name($tool['name']);
 
             if ('' === $function_name || array_key_exists($function_name, $seen_functions)) {
@@ -130,6 +136,16 @@ final class ToolRegistry {
 
         $tool_name = $this->names->to_tool_name($function_name);
 
+        // Some providers omit the awpt__ namespace despite receiving the full
+        // declaration. Recover only unambiguous registered AWPT ability aliases.
+        if (!str_contains($function_name, '__')) {
+            $awpt_alias = 'awpt/' . str_replace('_', '-', $function_name);
+
+            if ($this->is_discovered($awpt_alias)) {
+                return $awpt_alias;
+            }
+        }
+
         if ('' === $tool_name || !$this->is_discovered($tool_name)) {
             return null;
         }
@@ -146,7 +162,36 @@ final class ToolRegistry {
             return false;
         }
 
-        return $this->is_discovered($tool_name);
+        if (!$this->is_discovered($tool_name)) {
+            return false;
+        }
+
+        $annotations = $this->annotations_for($tool_name);
+
+        if (true === ($annotations['readonly'] ?? null) || self::is_proposal_ability($tool_name)) {
+            return true;
+        }
+
+        return $this->preferences->is_trusted_mutating($tool_name);
+    }
+
+    public function requires_explicit_trust(string $tool_name): bool {
+        if (self::is_proposal_ability($tool_name)) {
+            return false;
+        }
+
+        return true !== ($this->annotations_for($tool_name)['readonly'] ?? null);
+    }
+
+    /** @return array<string, bool|null> */
+    public function annotations_for(string $tool_name): array {
+        foreach (array_merge($this->ability_tools(), $this->mcp_only_tools()) as $tool) {
+            if ($tool_name === $tool['name']) {
+                return is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
+            }
+        }
+
+        return [];
     }
 
     public function preferred_site_info_ability(): ?string {
@@ -181,14 +226,14 @@ final class ToolRegistry {
     }
 
     /**
-     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>}>
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>, annotations: array<string, bool|null>}>
      */
     private function ability_tools(): array {
         return $this->abilities->tools();
     }
 
     /**
-     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>}>
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>, annotations: array<string, bool|null>}>
      */
     private function mcp_only_tools(): array {
         $ability_names = [];

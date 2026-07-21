@@ -20,6 +20,10 @@ if (!defined('ABSPATH')) {
  * Resolves keys and calls embeddings APIs.
  */
 final class EmbeddingApiClient {
+    public const PROVIDER_OPENROUTER = 'openrouter';
+
+    public const PROVIDER_OPENAI = 'openai';
+
     public function resolve_api_key(): string {
         $openrouter = trim((string) get_option('awpt_openrouter_api_key', ''));
 
@@ -50,6 +54,27 @@ final class EmbeddingApiClient {
         return '' !== $resolved ? 'openai' : '';
     }
 
+    public function model_for_request(string $model): string {
+        $model = trim($model);
+
+        if ('' === $model) {
+            $model = EmbeddingService::DEFAULT_MODEL;
+        }
+
+        if (self::PROVIDER_OPENAI === $this->provider_label() && str_starts_with($model, 'openai/')) {
+            return substr($model, strlen('openai/'));
+        }
+
+        if (
+            self::PROVIDER_OPENROUTER === $this->provider_label()
+            && in_array($model, ['text-embedding-3-small', 'text-embedding-3-large'], true)
+        ) {
+            return 'openai/' . $model;
+        }
+
+        return $model;
+    }
+
     public function endpoint(): string {
         if ('' !== trim((string) get_option('awpt_openrouter_api_key', ''))) {
             return 'https://openrouter.ai/api/v1/embeddings';
@@ -68,8 +93,14 @@ final class EmbeddingApiClient {
         $endpoint = $this->endpoint();
 
         if ('' === $api_key || '' === $endpoint || $count <= 0) {
+            if ($count > 0) {
+                $this->record_error(__('No embeddings API key is configured.', 'agent-wordpress-terminal'));
+            }
+
             return $this->null_vectors($count);
         }
+
+        $model = $this->model_for_request($model);
 
         $body = wp_json_encode([
             'model' => $model,
@@ -77,6 +108,8 @@ final class EmbeddingApiClient {
         ]);
 
         if (!is_string($body) || '' === $body) {
+            $this->record_error(__('The embeddings request could not be encoded.', 'agent-wordpress-terminal'));
+
             return $this->null_vectors($count);
         }
 
@@ -92,6 +125,12 @@ final class EmbeddingApiClient {
         ]);
 
         if (is_wp_error($response)) {
+            $this->record_error(sprintf(
+                /* translators: %s: HTTP transport error */
+                __('Embeddings request failed: %s', 'agent-wordpress-terminal'),
+                $response->get_error_message(),
+            ));
+
             return $this->null_vectors($count);
         }
 
@@ -99,6 +138,19 @@ final class EmbeddingApiClient {
         $decoded = json_decode(wp_remote_retrieve_body($response), true);
 
         if ($status < 200 || $status >= 300 || !is_array($decoded) || !is_array($decoded['data'] ?? null)) {
+            $message = is_array($decoded) && is_array($decoded['error'] ?? null)
+                ? (string) ($decoded['error']['message'] ?? '')
+                : '';
+            $detail = '' !== trim($message)
+                ? trim($message)
+                : __('Unexpected provider response.', 'agent-wordpress-terminal');
+            $this->record_error(sprintf(
+                /* translators: 1: HTTP status code, 2: provider error */
+                __('Embeddings API returned HTTP %1$d: %2$s', 'agent-wordpress-terminal'),
+                $status,
+                $detail,
+            ));
+
             return $this->null_vectors($count);
         }
 
@@ -152,5 +204,10 @@ final class EmbeddingApiClient {
         }
 
         return array_fill(0, $count, null);
+    }
+
+    private function record_error(string $message): void {
+        $message = sanitize_text_field($message);
+        update_option(EmbeddingService::OPTION_LAST_ERROR, mb_substr($message, 0, 500, 'UTF-8'), false);
     }
 }

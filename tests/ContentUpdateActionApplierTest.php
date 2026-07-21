@@ -30,6 +30,10 @@ function test_content_update_action_applier(): void {
     // A user allowed to edit exactly this post can successfully apply the update.
     awpt_test_reset_state();
     $GLOBALS['awpt_test_current_user_can'] = $can_edit_post_42;
+    $post = new WP_Post();
+    $post->ID = 42;
+    $post->post_title = 'Original title';
+    $GLOBALS['awpt_test_posts'][42] = $post;
     $result = $applier->apply(['post_id' => 42, 'post_title' => 'Updated title']);
     Assert::false(is_wp_error($result), 'apply() should succeed when the user can edit the target post');
 
@@ -57,6 +61,9 @@ function test_content_update_action_applier(): void {
     awpt_test_reset_state();
     $GLOBALS['awpt_test_current_user_can'] = $can_edit_post_42;
     $GLOBALS['awpt_test_post_meta_updates'] = [];
+    $post = new WP_Post();
+    $post->ID = 42;
+    $GLOBALS['awpt_test_posts'][42] = $post;
     $result = $applier->apply([
         'post_id' => 42,
         'post_meta' => ['seo_title' => 'Updated SEO title'],
@@ -91,6 +98,30 @@ function test_content_update_action_applier(): void {
         str_contains($GLOBALS['awpt_test_posts'][42]->post_content, '<!-- wp:image {"width":"180","id":9} -->'),
         'block attr apply() should write the updated serialized block content',
     );
+
+    // Template/global-styles content updates also detect intervening content edits.
+    awpt_test_reset_state();
+    $GLOBALS['awpt_test_current_user_can'] = static fn(string $capability, mixed ...$args): bool => match (
+        $capability
+    ) {
+        'edit_post' => 42 === ($args[0] ?? null),
+        'edit_theme_options' => true,
+        default => false,
+    };
+    $post = new WP_Post();
+    $post->ID = 42;
+    $post->post_content = '<!-- wp:paragraph --><p>live</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][42] = $post;
+    $result = $applier->apply([
+        'operation' => 'template_update',
+        'post_id' => 42,
+        'post_content' => '<!-- wp:paragraph --><p>proposed</p><!-- /wp:paragraph -->',
+        'original_post_content' => '<!-- wp:paragraph --><p>stale</p><!-- /wp:paragraph -->',
+    ]);
+    Assert::true(is_wp_error($result), 'template apply() should fail when original content is stale');
+    if (is_wp_error($result)) {
+        Assert::same('awpt_action_conflict', $result->get_error_code(), 'stale template content uses conflict code');
+    }
 }
 
 test_content_update_action_applier();

@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Knowledge;
 
-use AWPT\Database\Installer;
 use AWPT\Database\KnowledgeIndexRepository;
 
 if (!defined('ABSPATH')) {
@@ -33,22 +32,21 @@ final class KnowledgeIndexerStatus {
      * @return array<string, mixed>
      */
     public function build(): array {
-        Installer::create_tables();
-
         $source_count = $this->index->count_sources();
-        $chunk_count = $this->index->count_chunks();
         $source_kinds = $this->index->count_sources_by_kind();
-        $embedded_count = $this->index->count_chunks_with_embeddings();
+        $counts = KnowledgeIndexer::cached_counts();
+        $chunk_count = $counts['chunk_count'];
+        $embedded_count = $counts['embedded_chunks'];
 
         return [
             'source_count' => $source_count,
             'source_kinds' => $source_kinds,
             'chunk_count' => $chunk_count,
             'stale' => '1' === (string) get_option('awpt_knowledge_stale', '0'),
-            'needs_rebuild' =>
-                0 === $source_count || 0 === $chunk_count || '1' === (string) get_option('awpt_knowledge_stale', '0'),
+            'needs_rebuild' => 0 === $source_count || '1' === (string) get_option('awpt_knowledge_stale', '0'),
             'last_indexed_at' => (string) get_option('awpt_knowledge_last_indexed_at', ''),
             'last_error' => (string) get_option('awpt_knowledge_last_error', ''),
+            'progress' => KnowledgeIndexer::progress(),
             'embedding' => $this->embedding_status($embedded_count, $chunk_count),
             'filesystem' => [
                 'allowed_roots' => new FilesystemSourceReader()->allowed_roots(),
@@ -72,8 +70,15 @@ final class KnowledgeIndexerStatus {
         $enabled = $this->embeddings->is_enabled();
         $provider = $this->embeddings->provider_label();
         $model = $this->embeddings->model();
+        $last_error = $this->embeddings->last_error();
 
-        if (!$available) {
+        if ('' !== $last_error) {
+            $label = sprintf(
+                /* translators: %s: embeddings provider error */
+                __('Keyword retrieval active; embeddings failed: %s', 'agent-wordpress-terminal'),
+                $last_error,
+            );
+        } elseif (!$available) {
             $label = __(
                 'Keyword retrieval active; add an OpenRouter or OpenAI API key to enable embeddings.',
                 'agent-wordpress-terminal',
@@ -107,6 +112,7 @@ final class KnowledgeIndexerStatus {
             'provider' => $provider,
             'model' => $model,
             'embedded_chunks' => $embedded_count,
+            'last_error' => $last_error,
             'label' => $label,
         ];
     }

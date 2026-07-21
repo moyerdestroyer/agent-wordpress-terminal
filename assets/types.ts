@@ -40,7 +40,11 @@ export type ActionOperation =
 	| 'block_attrs_update'
 	| 'block_insert'
 	| 'block_remove'
+	| 'pattern_insert'
 	| 'new_post'
+	| 'template_update'
+	| 'global_styles_update'
+	| 'global_styles_create'
 	| 'site_settings_update'
 	| 'theme_switch'
 	| 'plugin_deactivate';
@@ -49,6 +53,9 @@ export interface ActionPayload {
 	operation?: ActionOperation;
 	post_id?: number;
 	post_type?: string;
+	post_name?: string;
+	post_parent?: number;
+	page_template?: string;
 	post_status?: string;
 	original_post_status?: string;
 	original_post_title?: string;
@@ -66,6 +73,31 @@ export interface ActionPayload {
 	position?: string;
 	inserted_path?: string;
 	block?: Record<string, unknown>;
+	blocks?: Record<string, unknown>[];
+	inserted_paths?: string[];
+	pattern_name?: string;
+	pattern_mode?: 'prepend' | 'adapted';
+	pattern_title?: string;
+	pattern_source?: string;
+	required_attachment_ids?: number[];
+	required_minimum_library_images?: number;
+	required_minimum_visuals?: number;
+	required_links?: string[];
+	required_pattern_prefix?: string;
+	proposal_manifest?: {
+		approach?: string;
+		requirements?: Array<Record<string, string>>;
+		assumptions?: string[];
+	};
+	decision_trace?: string[];
+	repairs_applied?: Array<{
+		kind: string;
+		block_path: string;
+		block_name: string;
+		description: string;
+	}>;
+	template_type?: string;
+	template_area?: string;
 	attrs?: Record<string, unknown>;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
@@ -110,6 +142,9 @@ export interface ProposedAction {
 	status: 'proposed' | 'approved' | 'rejected' | 'applied';
 	created_at?: string;
 	updated_at?: string;
+	revision_kind?: 'created' | 'revised' | string;
+	revised_action_id?: number;
+	removed_action_ids?: number[];
 }
 
 export interface ToolInfo {
@@ -126,13 +161,17 @@ export interface ToolInfo {
 	source?: 'ability' | 'mcp' | string;
 	enabled?: boolean;
 	never_auto?: boolean;
+	requires_trust?: boolean;
+	trusted?: boolean;
+	policy_reason?: string;
 }
 
 export interface ToolsResponse {
 	core: ToolInfo[];
 	plugin: ToolInfo[];
 	other?: ToolInfo[];
-	mcp: ToolInfo[];
+	/** Rare non-ability leftovers; folded into Other in the Tools UI. */
+	mcp?: ToolInfo[];
 	disabled?: string[];
 	never_auto?: string[];
 	agent_enabled_count?: number;
@@ -153,12 +192,21 @@ export interface KnowledgeStatus {
 	needs_rebuild: boolean;
 	last_indexed_at: string;
 	last_error: string;
+	progress: {
+		state: 'indexing' | 'idle' | 'failed';
+		processed_sources: number;
+		total_sources: number;
+		indexed_sources: number;
+		indexed_chunks: number;
+		embedded_chunks: number;
+	};
 	embedding: {
 		available: boolean;
 		enabled?: boolean;
 		provider: string;
 		model: string;
 		embedded_chunks?: number;
+		last_error?: string;
 		label: string;
 	};
 	filesystem: {
@@ -170,6 +218,7 @@ export interface KnowledgeStatus {
 		label: string;
 		core_available: boolean;
 		legacy_guidelines_available: boolean;
+		post_type?: string;
 	};
 }
 
@@ -202,14 +251,6 @@ export interface EnvironmentStatus {
 	warnings: string[];
 }
 
-export interface McpStatus {
-	connected: boolean;
-	server_url: string;
-	tool_count: number;
-	last_sync: string;
-	label: string;
-}
-
 export interface ChatResponse {
 	content: string;
 	tool_calls?: ToolCall[];
@@ -221,4 +262,18 @@ export interface ChatResponse {
 	session_title?: string;
 	focus_post_id?: number | null;
 	focus?: FocusSummary | null;
+	removed_action_ids?: number[];
+	revised_action_id?: number | null;
+	revision_kind?: 'created' | 'revised' | string;
+}
+
+export interface ChatProgress {
+	state: 'pending' | 'active' | 'complete' | 'failed';
+	phase: string;
+	label: string;
+	detail: string;
+	completed: number;
+	total: number;
+	sequence: number;
+	updated_at: string;
 }

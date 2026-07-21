@@ -19,14 +19,108 @@ if (!defined('ABSPATH')) {
  */
 final class KnowledgeSearchRanker {
     /**
+     * Common chat/instruction words that match too much site content when used as
+     * Knowledge query tokens (e.g. "write a post about X" should not rank on "post").
+     *
+     * @var list<string>
+     */
+    private const STOPWORDS = [
+        'about',
+        'after',
+        'again',
+        'also',
+        'and',
+        'any',
+        'are',
+        'because',
+        'been',
+        'before',
+        'being',
+        'both',
+        'but',
+        'can',
+        'could',
+        'create',
+        'draft',
+        'each',
+        'from',
+        'have',
+        'here',
+        'how',
+        'into',
+        'just',
+        'like',
+        'make',
+        'more',
+        'most',
+        'need',
+        'only',
+        'other',
+        'our',
+        'out',
+        'over',
+        'page',
+        'pages',
+        'please',
+        'post',
+        'posts',
+        'should',
+        'some',
+        'such',
+        'than',
+        'that',
+        'the',
+        'their',
+        'them',
+        'then',
+        'there',
+        'these',
+        'they',
+        'this',
+        'those',
+        'through',
+        'too',
+        'under',
+        'very',
+        'want',
+        'was',
+        'were',
+        'what',
+        'when',
+        'where',
+        'which',
+        'while',
+        'who',
+        'will',
+        'with',
+        'word',
+        'words',
+        'would',
+        'write',
+        'writing',
+        'your',
+        'ish',
+    ];
+
+    /**
      * @return list<string>
      */
     public function tokens(string $query): array {
         $raw = preg_split('/[^\pL\pN_]+/u', strtolower($query));
         $tokens = [];
+        $stopwords = array_fill_keys(self::STOPWORDS, true);
 
         foreach (is_array($raw) ? $raw : [] as $token) {
             if (mb_strlen($token, 'UTF-8') < 3) {
+                continue;
+            }
+
+            if (isset($stopwords[$token])) {
+                continue;
+            }
+
+            // Pure numbers / "1000ish"-style length cues are not useful Knowledge keys.
+            if (preg_match('/^\d+([a-z]{0,4})?$/u', $token)) {
                 continue;
             }
 

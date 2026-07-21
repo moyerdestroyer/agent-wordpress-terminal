@@ -21,7 +21,7 @@ final class ContentListService {
     /**
      * @var list<string>
      */
-    private const STATUSES = ['publish', 'draft', 'pending', 'private', 'future'];
+    private const STATUSES = ['publish', 'draft', 'pending', 'private', 'future', 'inherit'];
 
     private ContentSearchTypes $types;
 
@@ -44,7 +44,22 @@ final class ContentListService {
         $include_totals = (bool) $filters['include_totals'];
         $offset = (int) $filters['offset'];
         $post_types = $this->resolve_post_types($post_type);
-        $statuses = $this->filters->resolve_statuses($status);
+        $attachment_only = ['attachment'] === $post_types;
+
+        if ($attachment_only && in_array($status, ['', 'publish'], true)) {
+            // Media Library attachments normally use `inherit`; models commonly
+            // send the ordinary-content default `publish`. Treat both as a media
+            // browse rather than falsely reporting an empty library.
+            $status = 'inherit';
+            $filters['status'] = 'inherit';
+            $statuses = ['inherit'];
+        } else {
+            $statuses = $this->filters->resolve_statuses($status);
+        }
+
+        if (!$attachment_only && in_array('attachment', $post_types, true) && '' === $status) {
+            $statuses[] = 'inherit';
+        }
         $items = [];
 
         if (!class_exists('WP_Query')) {
@@ -64,7 +79,11 @@ final class ContentListService {
                 continue;
             }
 
-            if (!current_user_can('read_post', $post->ID) || array_key_exists($post->ID, $items)) {
+            if (
+                new NewPostStagingDraft()->is_staging_draft($post->ID)
+                || !current_user_can('read_post', $post->ID)
+                || array_key_exists($post->ID, $items)
+            ) {
                 continue;
             }
 
@@ -106,6 +125,10 @@ final class ContentListService {
             'no_found_rows' => !$filters['include_total'],
             'update_post_meta_cache' => false,
             'update_post_term_cache' => false,
+            'meta_query' => [[
+                'key' => NewPostStagingDraft::META_KEY,
+                'compare' => 'NOT EXISTS',
+            ]],
         ];
 
         $author_id = (int) ($filters['author_id'] ?? 0);

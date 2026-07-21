@@ -119,9 +119,23 @@ final class ToolsPayloadBuilder {
      */
     private function decorate(array $item, string $name, ToolPreferences $prefs, string $source): array {
         $never_auto = $prefs->is_never_auto($name);
+        $registry = new ToolRegistry($prefs);
+        $requires_trust = $registry->requires_explicit_trust($name);
         $item['source'] = $source;
         $item['never_auto'] = $never_auto;
-        $item['enabled'] = !$never_auto && $prefs->is_enabled($name);
+        $item['requires_trust'] = $requires_trust;
+        $item['trusted'] = !$requires_trust || $prefs->is_trusted_mutating($name);
+        $item['enabled'] = $registry->can_auto_execute($name);
+        $item['policy_reason'] = $never_auto
+            ? __('Reserved for direct human approval.', 'agent-wordpress-terminal')
+            : (
+                $requires_trust && !$prefs->is_trusted_mutating($name)
+                    ? __(
+                        'Mutation or unknown effect; explicitly enable to trust it for agent execution.',
+                        'agent-wordpress-terminal',
+                    )
+                    : __('Available to the agent under its declared safety annotations.', 'agent-wordpress-terminal')
+            );
 
         return $item;
     }
