@@ -1,9 +1,10 @@
 import { Button } from '@wordpress/components';
 import { useEffect, useRef, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { actionMetadata, formatValue, titleCase } from '../actionDisplay';
+import { actionMetadata } from '../actionDisplay';
 import { capturePreview, type PreviewCapture } from '../lib/previewCapture';
 import type { PreviewDetails, ProposedAction } from '../types';
+import { ActionDiffView } from './ActionDiffView';
 
 interface PreviewPaneProps {
 	preview: PreviewDetails | null;
@@ -13,43 +14,7 @@ interface PreviewPaneProps {
 
 type PreviewTab = 'preview' | 'compare';
 
-function stripBlocks(content: string): string {
-	return content.replace(/<!--[\s\S]*?-->/g, '').trim();
-}
-
 function CompareView({ action }: { action: ProposedAction | null }): JSX.Element {
-	const buildCompareContent = (
-		content?: string,
-		status?: string,
-		meta?: Record<string, string | number | boolean>,
-	): string => {
-		const sections = [
-			status ? `${__('Status', 'agent-wordpress-terminal')}: ${titleCase(status)}` : '',
-			meta && Object.keys(meta).length > 0
-				? `${__('Meta', 'agent-wordpress-terminal')}:\n${formatValue(meta)}`
-				: '',
-			content ? stripBlocks(content) : '',
-		].filter(Boolean);
-
-		return sections.join('\n\n');
-	};
-
-	const originalContent = buildCompareContent(
-		action?.payload?.original_post_content ??
-			(action?.payload?.original_settings
-				? JSON.stringify(action.payload.original_settings, null, 2)
-				: action?.payload?.current_stylesheet),
-		action?.payload?.original_post_status,
-		action?.payload?.original_post_meta,
-	);
-	const newContent = buildCompareContent(
-		action?.payload?.post_content ??
-			(action?.payload?.settings_changes
-				? JSON.stringify(action.payload.settings_changes, null, 2)
-				: action?.payload?.stylesheet),
-		action?.payload?.post_status,
-		action?.payload?.post_meta,
-	);
 	const metadata = actionMetadata(action?.payload);
 
 	if (!action) {
@@ -79,16 +44,7 @@ function CompareView({ action }: { action: ProposedAction | null }): JSX.Element
 					))}
 				</dl>
 			) : null}
-			<div className="awpt-preview-compare">
-				<div>
-					<h4>{__('Before', 'agent-wordpress-terminal')}</h4>
-					<pre>{originalContent || __('(empty)', 'agent-wordpress-terminal')}</pre>
-				</div>
-				<div>
-					<h4>{__('After', 'agent-wordpress-terminal')}</h4>
-					<pre>{newContent || __('(empty)', 'agent-wordpress-terminal')}</pre>
-				</div>
-			</div>
+			<ActionDiffView payload={action.payload} />
 		</div>
 	);
 }

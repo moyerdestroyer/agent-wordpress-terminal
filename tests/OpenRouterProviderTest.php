@@ -54,9 +54,9 @@ function test_openrouter_provider_tool_routing(): void {
         'OpenRouter tool requests should require parameter-capable endpoints',
     );
     Assert::same(
-        'openai/gpt-5.4-mini',
+        'deepseek/deepseek-v4-flash',
         $payload['model'] ?? null,
-        'OpenRouter should use the balanced tool-capable default',
+        'OpenRouter should use the DeepSeek V4 Flash default',
     );
     Assert::false(array_key_exists('plugins', $payload), 'the pinned default should not invoke router plugins');
     Assert::same('awpt-38', $payload['session_id'] ?? null, 'OpenRouter requests should retain session affinity');
@@ -80,9 +80,9 @@ function test_openrouter_provider_migrates_legacy_auto_but_preserves_exact_model
     $legacy_args = is_array($legacy_request['args'] ?? null) ? $legacy_request['args'] : [];
     $legacy_payload = json_decode((string) ($legacy_args['body'] ?? ''), true);
     Assert::same(
-        'openai/gpt-5.4-mini',
+        'deepseek/deepseek-v4-flash',
         $legacy_payload['model'] ?? null,
-        'saved legacy Auto settings should migrate to the balanced model at request time',
+        'saved legacy Auto settings should migrate to DeepSeek V4 Flash at request time',
     );
 
     $GLOBALS['awpt_test_http_requests'] = [];
@@ -92,9 +92,9 @@ function test_openrouter_provider_migrates_legacy_auto_but_preserves_exact_model
     $beta_args = is_array($beta_request['args'] ?? null) ? $beta_request['args'] : [];
     $beta_payload = json_decode((string) ($beta_args['body'] ?? ''), true);
     Assert::same(
-        'openai/gpt-5.4-mini',
+        'deepseek/deepseek-v4-flash',
         $beta_payload['model'] ?? null,
-        'saved Auto Beta settings should migrate after an unsuitable routed model',
+        'saved Auto Beta settings should migrate to DeepSeek V4 Flash',
     );
 
     $GLOBALS['awpt_test_http_requests'] = [];

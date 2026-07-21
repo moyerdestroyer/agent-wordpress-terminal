@@ -93,6 +93,14 @@ final class ActionPayloadSanitizer {
      * @return array<string, mixed>
      */
     private function sanitize_theme(array $clean, array $payload): array {
+        if (array_key_exists('css', $payload)) {
+            $clean['css'] = is_string($payload['css']) ? $payload['css'] : '';
+        }
+
+        if (array_key_exists('original_css', $payload)) {
+            $clean['original_css'] = is_string($payload['original_css']) ? $payload['original_css'] : '';
+        }
+
         foreach (['stylesheet', 'current_stylesheet'] as $key) {
             if (!array_key_exists($key, $payload)) {
                 continue;

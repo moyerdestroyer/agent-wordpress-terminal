@@ -47,7 +47,8 @@ export type ActionOperation =
 	| 'global_styles_create'
 	| 'site_settings_update'
 	| 'theme_switch'
-	| 'plugin_deactivate';
+	| 'plugin_deactivate'
+	| 'custom_css_update';
 
 export interface ActionPayload {
 	operation?: ActionOperation;
@@ -109,6 +110,8 @@ export interface ActionPayload {
 	plugin_slug?: string;
 	plugin_name?: string;
 	was_active?: boolean;
+	css?: string;
+	original_css?: string;
 }
 
 export interface PreviewDetails {

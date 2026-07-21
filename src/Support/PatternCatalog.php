@@ -237,14 +237,62 @@ final class PatternCatalog {
             return true;
         }
 
-        $haystack = implode(' ', [
+        $haystack = mb_strtolower(implode(' ', [
             (string) ($pattern['name'] ?? ''),
             (string) ($pattern['title'] ?? ''),
             (string) ($pattern['description'] ?? ''),
             implode(' ', $this->string_list($pattern['categories'] ?? null)),
-        ]);
+        ]));
 
-        return str_contains(mb_strtolower($haystack), $search);
+        if (str_contains($haystack, $search)) {
+            return true;
+        }
+
+        // Token/synonym match so "docs" hits layout-page-documentation, "toc" hits
+        // two-column-toc, etc. Exact substring alone misses common shortenings.
+        foreach ($this->expand_search_terms($search) as $term) {
+            if (strlen($term) < 3) {
+                continue;
+            }
+
+            if (str_contains($haystack, $term)) {
+                return true;
+            }
+
+            // Prefix: "doc" matches "documentation" tokens in the slug/title.
+            if (preg_match('/(?:^|[^a-z0-9])' . preg_quote($term, '/') . '[a-z0-9]*/', $haystack)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function expand_search_terms(string $search): array {
+        $raw = array_values(array_filter(preg_split('/[^a-z0-9]+/i', mb_strtolower($search)) ?: []));
+        // Language-level expansions only (no theme-specific pattern slugs).
+        $aliases = [
+            'docs' => ['documentation', 'document', 'guide', 'reference'],
+            'doc' => ['documentation', 'document'],
+            'documentation' => ['docs', 'document'],
+            'toc' => ['table', 'contents', 'navigation'],
+            'sidebar' => ['sticky', 'navigation', 'aside'],
+            'cta' => ['call', 'action'],
+            'hero' => ['header', 'cover'],
+            'news' => ['posts', 'recent', 'blog'],
+        ];
+        $terms = $raw;
+
+        foreach ($raw as $term) {
+            if (isset($aliases[$term])) {
+                $terms = [...$terms, ...$aliases[$term]];
+            }
+        }
+
+        return array_values(array_unique($terms));
     }
 
     /** @return list<string> */

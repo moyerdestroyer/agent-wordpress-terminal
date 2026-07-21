@@ -113,6 +113,11 @@ export function Terminal(): JSX.Element {
 	const [bootError, setBootError] = useState<string | null>(null);
 	const [isSending, setIsSending] = useState(false);
 	const [chatProgress, setChatProgress] = useState<ChatProgress | null>(null);
+	const [turnSummary, setTurnSummary] = useState<{
+		durationMs: number;
+		toolCount: number;
+	} | null>(null);
+	const turnStartedAtRef = useRef<number | null>(null);
 	const [sidebarTab, setSidebarTab] = useState<'knowledge' | 'tools'>('knowledge');
 	const [toolsLoadedFully, setToolsLoadedFully] = useState(false);
 	const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
@@ -311,10 +316,12 @@ export function Terminal(): JSX.Element {
 		setInput('');
 		setAttachments([]);
 		setIsSending(true);
+		setTurnSummary(null);
+		turnStartedAtRef.current = Date.now();
 		setChatProgress({
 			state: 'pending',
 			phase: 'starting',
-			label: __('Sending request', 'agent-wordpress-terminal'),
+			label: __('Starting request', 'agent-wordpress-terminal'),
 			detail: '',
 			completed: 0,
 			total: 0,
@@ -352,6 +359,8 @@ export function Terminal(): JSX.Element {
 		};
 		void pollProgress();
 		const progressTimer = window.setInterval(() => void pollProgress(), 700);
+		let completedToolCount = 0;
+		let skipTurnSummary = false;
 
 		try {
 			const response: ChatResponse = await withTimeout(
@@ -366,6 +375,7 @@ export function Terminal(): JSX.Element {
 				setPreview(null);
 				setPreviewAction(null);
 				setIsPreviewOpen(false);
+				skipTurnSummary = true;
 				return;
 			}
 
@@ -378,6 +388,7 @@ export function Terminal(): JSX.Element {
 				...call,
 				created_at: turnAt,
 			}));
+			completedToolCount = turnToolCalls.length;
 
 			if (turnToolCalls.length > 0) {
 				setToolCalls((current) => [...current, ...turnToolCalls]);
@@ -474,6 +485,17 @@ export function Terminal(): JSX.Element {
 			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
 		} finally {
 			window.clearInterval(progressTimer);
+			const started = turnStartedAtRef.current;
+			const durationMs = started !== null ? Math.max(0, Date.now() - started) : 0;
+			turnStartedAtRef.current = null;
+			setTurnSummary(
+				skipTurnSummary
+					? null
+					: {
+							durationMs,
+							toolCount: completedToolCount,
+						},
+			);
 			setChatProgress(null);
 			setIsSending(false);
 		}
@@ -850,8 +872,9 @@ export function Terminal(): JSX.Element {
 						messages={messages}
 						toolCalls={toolCalls}
 						actions={actions}
-						isThinking={isSending}
+						isWorking={isSending}
 						progress={chatProgress}
+						turnSummary={turnSummary}
 						onActionOperation={(action, operation) => void handleActionOperation(action, operation)}
 						onActionPreview={handleActionPreview}
 					/>
@@ -960,9 +983,7 @@ export function Terminal(): JSX.Element {
 							onClick={() => void handleSend()}
 							disabled={isSending || isUploading}
 						>
-							{isSending
-								? __('Sending…', 'agent-wordpress-terminal')
-								: __('Send', 'agent-wordpress-terminal')}
+							{__('Send', 'agent-wordpress-terminal')}
 						</Button>
 					</div>
 				</main>

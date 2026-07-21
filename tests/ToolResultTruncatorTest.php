@@ -57,6 +57,27 @@ function test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider(
     );
 }
 
+function test_tool_result_truncator_clips_theme_file_content(): void {
+    $provider = new ToolResultTruncator()->for_provider('awpt/read-theme-file', [
+        'path' => 'assets/css/styles.css',
+        'bytes' => 200_000,
+        'content' => str_repeat('body{color:red}', 5_000),
+        'matches' => array_fill(0, 20, ['term' => 'layout', 'excerpt' => str_repeat('x', 500)]),
+        'absolute_path' => '/var/www/html/wp-content/themes/x/style.css',
+    ]);
+
+    Assert::true(
+        mb_strlen((string) ($provider['content'] ?? ''), 'UTF-8') <= 4_100,
+        'theme file content must be clipped for the provider',
+    );
+    Assert::false(array_key_exists('absolute_path', $provider), 'absolute paths should not be sent to the model');
+    Assert::true(
+        is_array($provider['matches'] ?? null) && count($provider['matches']) <= 6,
+        'match list should be capped',
+    );
+}
+
 test_tool_result_truncator_clips_large_read_content_output();
 test_tool_result_truncator_keeps_proposal_outputs();
 test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider();
+test_tool_result_truncator_clips_theme_file_content();

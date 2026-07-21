@@ -415,7 +415,7 @@ final class ProviderRuntime {
             'session_id' => $state['session_id'],
             'max_completion_tokens' => $completion_budget,
             'tool_choice' => 'auto',
-            'timeout' => min(90, $remaining),
+            'timeout' => min(120, max(5, $remaining)),
         ]);
         $this->record_provider_call($state['session_id'], [
             'provider' => $provider->get_name(),

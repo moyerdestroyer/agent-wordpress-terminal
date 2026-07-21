@@ -197,6 +197,54 @@ final class KnowledgeIndexRepository {
     }
 
     /**
+     * Sample source labels for agent discovery (newest first).
+     *
+     * @return list<array{source_kind: string, label: string, uri: string}>
+     */
+    public function sample_source_labels(int $limit = 24, string $kind = ''): array {
+        $wpdb = WpDb::get();
+        $limit = max(1, min(50, $limit));
+        $kind = sanitize_key($kind);
+
+        if ('' !== $kind) {
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    'SELECT source_kind, label, uri FROM %i WHERE source_kind = %s ORDER BY indexed_at DESC LIMIT %d',
+                    $wpdb->prefix . 'awpt_knowledge_index',
+                    $kind,
+                    $limit,
+                ),
+                output: \ARRAY_A,
+            );
+        } else {
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    'SELECT source_kind, label, uri FROM %i ORDER BY indexed_at DESC LIMIT %d',
+                    $wpdb->prefix . 'awpt_knowledge_index',
+                    $limit,
+                ),
+                output: \ARRAY_A,
+            );
+        }
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($rows as $row) {
+            $items[] = [
+                'source_kind' => (string) ($row['source_kind'] ?? ''),
+                'label' => (string) ($row['label'] ?? ''),
+                'uri' => (string) ($row['uri'] ?? ''),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
      * @param list<string> $tokens
      * @return list<array<string, mixed>>
      */

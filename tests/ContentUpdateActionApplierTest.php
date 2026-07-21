@@ -122,6 +122,34 @@ function test_content_update_action_applier(): void {
     if (is_wp_error($result)) {
         Assert::same('awpt_action_conflict', $result->get_error_code(), 'stale template content uses conflict code');
     }
+
+    // Meta already matches the proposed value after another apply — not a conflict.
+    awpt_test_reset_state();
+    $GLOBALS['awpt_test_current_user_can'] = static fn(string $capability, mixed ...$args): bool => match (
+        $capability
+    ) {
+        'edit_post' => 42 === ($args[0] ?? null),
+        default => false,
+    };
+    $post = new WP_Post();
+    $post->ID = 42;
+    $post->post_title = 'Maternity News';
+    $post->post_content = '<!-- wp:paragraph --><p>body</p><!-- /wp:paragraph -->';
+    $post->post_status = 'publish';
+    $GLOBALS['awpt_test_posts'][42] = $post;
+    $GLOBALS['awpt_test_post_meta_updates'][42]['_awpt_layout_goal'] = 'inline text flow';
+    $result = $applier->apply([
+        'operation' => 'content_update',
+        'post_id' => 42,
+        'post_content' => '<!-- wp:paragraph --><p>body revised</p><!-- /wp:paragraph -->',
+        'original_post_content' => '<!-- wp:paragraph --><p>body</p><!-- /wp:paragraph -->',
+        'post_meta' => ['_awpt_layout_goal' => 'inline text flow'],
+        'original_post_meta' => ['_awpt_layout_goal' => ''],
+    ]);
+    Assert::false(
+        is_wp_error($result),
+        'apply should succeed when live meta already equals the desired value even if original_meta differs',
+    );
 }
 
 test_content_update_action_applier();

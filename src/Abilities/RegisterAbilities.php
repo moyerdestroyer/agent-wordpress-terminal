@@ -51,6 +51,7 @@ final class RegisterAbilities {
         new ReadContent()->register();
         new ReadThemes()->register();
         new ReadThemeJson()->register();
+        new ReadThemeFile()->register();
         new ReadBlockTree()->register();
         new GetBlock()->register();
         new ListBlocks()->register();
@@ -65,6 +66,7 @@ final class RegisterAbilities {
         new ReadPattern()->register();
         new ReadGlobalStyles()->register();
         new SearchKnowledge()->register();
+        new ListKnowledgeSources()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
         new ProposeBlockAttrsUpdate()->register();
@@ -77,12 +79,14 @@ final class RegisterAbilities {
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();
         new ProposePluginDeactivate()->register();
+        new ProposeCustomCssUpdate()->register();
         new ApplyAction()->register();
         new SideloadMedia()->register();
         new ReadErrorLog()->register();
         new ReadPlugins()->register();
         new ReadSiteHealth()->register();
         new ProbeUrl()->register();
+        new InspectFrontend()->register();
         new DiagnoseError()->register();
     }
 }

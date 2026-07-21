@@ -162,6 +162,80 @@ final class ActionRepository {
         return null;
     }
 
+    /**
+     * Resolve which open new-post proposal a corrective propose-new-post call should revise.
+     *
+     * Preference order among open new-post actions in the session (newest first):
+     * 1. Exact title match for the same post type
+     * 2. The only open new-post of that post type
+     * 3. The only open new-post of any type when the agent omitted post_type
+     *
+     * Returns 0 when nothing is safely revisable (caller should create a new proposal).
+     */
+    public function resolve_revisable_new_post_id(
+        int $session_id,
+        string $post_type = '',
+        string $post_title = '',
+    ): int {
+        $candidates = [];
+
+        foreach ($this->list_open_for_session($session_id, 25) as $action) {
+            $payload = $this->decode_payload($action);
+
+            if (ActionOperations::NEW_POST !== (string) ($payload['operation'] ?? '')) {
+                continue;
+            }
+
+            $candidates[] = [
+                'id' => (int) ($action['id'] ?? 0),
+                'post_type' => sanitize_key((string) ($payload['post_type'] ?? 'post')),
+                'title_key' => sanitize_title((string) ($payload['post_title'] ?? '')),
+            ];
+        }
+
+        return self::pick_revisable_new_post_id($candidates, $post_type, $post_title);
+    }
+
+    /**
+     * @param list<array{id: int, post_type: string, title_key: string}> $candidates Newest-first candidates.
+     */
+    public static function pick_revisable_new_post_id(
+        array $candidates,
+        string $post_type = '',
+        string $post_title = '',
+    ): int {
+        if ([] === $candidates) {
+            return 0;
+        }
+
+        $post_type = sanitize_key($post_type);
+        $title_key = sanitize_title($post_title);
+        $typed = '' === $post_type
+            ? $candidates
+            : array_values(array_filter($candidates, static fn(array $row): bool => $row['post_type'] === $post_type));
+
+        if ([] === $typed) {
+            $typed = $candidates;
+        }
+
+        if ('' !== $title_key) {
+            $title_matches = array_values(array_filter(
+                $typed,
+                static fn(array $row): bool => $row['title_key'] === $title_key,
+            ));
+
+            if ([] !== $title_matches) {
+                return max(0, (int) ($title_matches[0]['id'] ?? 0));
+            }
+        }
+
+        if (1 === count($typed)) {
+            return max(0, (int) ($typed[0]['id'] ?? 0));
+        }
+
+        return 0;
+    }
+
     /** Find the action produced by one logical proposal slot in a turn. */
     public function find_by_turn_key(int $session_id, string $turn_id, string $proposal_key): ?array {
         if ($session_id <= 0 || '' === $turn_id || '' === $proposal_key) {

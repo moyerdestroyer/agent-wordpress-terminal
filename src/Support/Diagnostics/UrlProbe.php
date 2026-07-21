@@ -18,11 +18,11 @@ if (!defined('ABSPATH')) {
  * Fetches a same-site URL and extracts error signals from the response body.
  */
 final class UrlProbe {
-    private SameSiteUrlPolicy $policy;
+    private SameSiteHttpClient $http;
     private ErrorPathAttributor $attributor;
 
-    public function __construct(?SameSiteUrlPolicy $policy = null, ?ErrorPathAttributor $attributor = null) {
-        $this->policy = $policy ?? new SameSiteUrlPolicy();
+    public function __construct(?SameSiteHttpClient $http = null, ?ErrorPathAttributor $attributor = null) {
+        $this->http = $http ?? new SameSiteHttpClient();
         $this->attributor = $attributor ?? new ErrorPathAttributor();
     }
 
@@ -30,19 +30,8 @@ final class UrlProbe {
      * @return array<string, mixed>|\WP_Error
      */
     public function probe(string $url): array|\WP_Error {
-        if (!$this->policy->is_allowed($url)) {
-            return new \WP_Error(
-                'awpt_url_not_allowed',
-                __('URL must belong to this WordPress site.', 'agent-wordpress-terminal'),
-                ['status' => 400],
-            );
-        }
-
-        $response = wp_remote_get($url, [
-            'timeout' => 15,
-            'redirection' => 3,
-            'reject_unsafe_urls' => true,
-        ]);
+        $fetch = $this->http->get($url, [], 15);
+        $response = $fetch['response'];
 
         if (is_wp_error($response)) {
             return new \WP_Error('awpt_probe_failed', $response->get_error_message(), ['status' => 502]);
@@ -59,6 +48,7 @@ final class UrlProbe {
             'url' => $url,
             'status_code' => $status_code,
             'content_type' => $content_type,
+            'used_loopback' => $fetch['used_loopback'],
             'error_snippets' => $snippets,
             'suspected_plugin' => 'plugin' === ($primary_suspect['kind'] ?? '') ? $primary_suspect['slug'] : null,
             'suspected_theme' => 'theme' === ($primary_suspect['kind'] ?? '') ? $primary_suspect['slug'] : null,

@@ -21,7 +21,11 @@ function test_proposal_context_adds_identity_and_attachment_evidence_without_ove
     Assert::same('alternate', $input['proposal_key'] ?? null, 'agent proposal identity should be preserved');
     Assert::same('turn-123', $input['turn_id'] ?? null, 'request identity should be injected');
     Assert::same([77], $input['available_attachment_ids'] ?? null, 'attachments should be structured evidence');
-    Assert::false(array_key_exists('required_attachment_ids', $input), 'evidence must not become a hard requirement');
+    Assert::same(
+        [77],
+        $input['required_attachment_ids'] ?? null,
+        'composer attachments should be required as inline media evidence',
+    );
 }
 
 test_proposal_context_adds_identity_and_attachment_evidence_without_overriding_agent_input();

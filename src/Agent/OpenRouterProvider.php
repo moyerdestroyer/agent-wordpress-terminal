@@ -20,8 +20,12 @@ if (!defined('ABSPATH')) {
 final class OpenRouterProvider extends ChatCompletionsProvider {
     /**
      * Default OpenRouter model when no explicit model is configured.
+     *
+     * DeepSeek V4 Flash is the balanced agent default: tool-capable, long context,
+     * and cheap enough for multi-step ability loops. Override with Pro or another
+     * OpenRouter ID when a site needs more headroom.
      */
-    private const DEFAULT_MODEL = 'openai/gpt-5.4-mini';
+    private const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
 
     /**
      * Get provider name.

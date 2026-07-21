@@ -172,6 +172,20 @@ final class ToolResultFormatter {
             $status,
         );
         $payload = is_array($output['payload'] ?? null) ? $output['payload'] : [];
+        $pattern_name = (string) ($payload['pattern_name'] ?? '');
+        $pattern_mode = (string) ($payload['pattern_mode'] ?? '');
+
+        if ('' !== $pattern_name) {
+            $summary .=
+                ' '
+                . sprintf(
+                    /* translators: 1: pattern name, 2: pattern mode (adapted|prepend). */
+                    __('Pattern %1$s (%2$s).', 'agent-wordpress-terminal'),
+                    $pattern_name,
+                    '' !== $pattern_mode ? $pattern_mode : 'adapted',
+                );
+        }
+
         $repairs = is_array($payload['repairs_applied'] ?? null) ? $payload['repairs_applied'] : [];
 
         if ([] === $repairs) {
@@ -200,11 +214,37 @@ final class ToolResultFormatter {
      * @param array<array-key, mixed> $output
      */
     private function format_generic_tool(string $tool, array $output): string {
+        // Never dump multi-kilobyte JSON (e.g. minified CSS) into the transcript.
+        $keys = array_keys($output);
+        $preview = [];
+
+        foreach (array_slice($keys, 0, 8) as $key) {
+            $value = $output[$key];
+
+            if (is_string($value)) {
+                $preview[$key] = mb_strlen($value, 'UTF-8') > 160 ? mb_substr($value, 0, 160, 'UTF-8') . '…' : $value;
+                continue;
+            }
+
+            if (is_scalar($value) || null === $value) {
+                $preview[$key] = $value;
+            } elseif (is_array($value)) {
+                $preview[$key] = sprintf('[%d items]', count($value));
+            }
+        }
+
+        $encoded = wp_json_encode($preview);
+        $encoded = is_string($encoded) ? $encoded : '{}';
+
+        if (strlen($encoded) > 800) {
+            $encoded = substr($encoded, 0, 800) . '…';
+        }
+
         return sprintf(
-            /* translators: 1: tool name, 2: JSON output */
+            /* translators: 1: tool name, 2: compact JSON summary */
             __('Tool %1$s returned: %2$s', 'agent-wordpress-terminal'),
             $tool,
-            wp_json_encode($output),
+            $encoded,
         );
     }
 }

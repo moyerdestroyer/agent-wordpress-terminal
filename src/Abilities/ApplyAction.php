@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
+use AWPT\Abilities\ActionAppliers\CustomCssActionApplier;
 use AWPT\Abilities\ActionAppliers\GlobalStylesCreateActionApplier;
 use AWPT\Abilities\ActionAppliers\NewPostActionApplier;
 use AWPT\Abilities\ActionAppliers\PluginDeactivateActionApplier;
@@ -100,6 +101,7 @@ final class ApplyAction implements AbilityInterface {
             'site_settings_update' => current_user_can('manage_options'),
             'theme_switch' => current_user_can('switch_themes'),
             'plugin_deactivate' => current_user_can('activate_plugins'),
+            'custom_css_update' => current_user_can('edit_css') || current_user_can('edit_theme_options'),
             default => false,
         };
     }
@@ -144,6 +146,7 @@ final class ApplyAction implements AbilityInterface {
             'site_settings_update' => $this->site_settings->apply($payload),
             'theme_switch' => $this->theme_switches->apply($payload),
             'plugin_deactivate' => new PluginDeactivateActionApplier()->apply($payload),
+            'custom_css_update' => new CustomCssActionApplier()->apply($payload),
             default => new \WP_Error(
                 code: 'awpt_unsupported_action',
                 message: __('Unsupported action operation.', 'agent-wordpress-terminal'),

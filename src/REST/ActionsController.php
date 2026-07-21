@@ -148,11 +148,21 @@ final class ActionsController extends RestController {
             return new \WP_REST_Response($this->actions->format_action($action_id), status: 200);
         }
 
+        $previous_status = sanitize_key((string) ($action['status'] ?? 'proposed'));
         $this->actions->update_status($action_id, 'approved');
 
         $result = new ApplyAction()->execute(['action_id' => $action_id]);
 
         if (is_wp_error($result)) {
+            // Do not leave the card stuck in "approved" after a failed apply —
+            // restore the prior reviewable status so the admin can restage or retry.
+            $restore = in_array($previous_status, ['proposed', 'approved'], true) ? $previous_status : 'proposed';
+            if ('approved' === $restore) {
+                $restore = 'proposed';
+            }
+
+            $this->actions->update_status($action_id, $restore);
+
             return $result;
         }
 

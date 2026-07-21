@@ -99,10 +99,14 @@ function test_theme_policy_keeps_design_context_only(): void {
         'patterns/call-to-action.json' => true,
         'README.md' => true,
         'assets/brand.css' => true,
+        'docs/Patterns/Documentation Page.md' => true,
+        'docs/AGENTS/Modifying Styles.md' => true,
+        'documentation/guide.txt' => true,
         'package-lock.json' => false,
         'package.json' => false,
         'assets/editor.js' => false,
         'node_modules/package/readme.md' => false,
+        'secret/notes.md' => false,
     ];
     $policy = new FilesystemAccessPolicy();
 

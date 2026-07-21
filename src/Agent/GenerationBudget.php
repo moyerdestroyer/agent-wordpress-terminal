@@ -27,8 +27,22 @@ final class GenerationBudget {
     }
 
     public function is_content_request(string $message): bool {
-        return (bool) preg_match(
+        if ((bool) preg_match(
             '/\b(create|generate|make|build|design|draft|write)\b.*\b(page|landing|post|article|homepage)\b/i',
+            $message,
+        )) {
+            return true;
+        }
+
+        // Revisions of staged drafts are still full composition turns (complete
+        // post_content + propose-new-post), even when the user only names a section.
+        return (bool) preg_match(
+            '/\b('
+            . 'add|include|append|insert|update|revise|change|improve|expand|extend|rewrite|replace|need|want'
+            . ')\b.+\b('
+            . 'section|hero|pattern|block|paragraph|image|content|draft|proposal|page|post|layout|footer|header'
+            . '|recent posts'
+            . ')\b/i',
             $message,
         );
     }

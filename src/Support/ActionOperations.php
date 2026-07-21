@@ -30,6 +30,7 @@ final class ActionOperations {
     public const SITE_SETTINGS_UPDATE = 'site_settings_update';
     public const THEME_SWITCH = 'theme_switch';
     public const PLUGIN_DEACTIVATE = 'plugin_deactivate';
+    public const CUSTOM_CSS_UPDATE = 'custom_css_update';
 
     /**
      * @var list<string>
@@ -47,6 +48,7 @@ final class ActionOperations {
         self::SITE_SETTINGS_UPDATE,
         self::THEME_SWITCH,
         self::PLUGIN_DEACTIVATE,
+        self::CUSTOM_CSS_UPDATE,
     ];
 
     /**

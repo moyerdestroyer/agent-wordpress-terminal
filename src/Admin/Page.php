@@ -92,7 +92,7 @@ final class Page {
         register_setting('awpt_settings', 'awpt_openrouter_model', [
             'type' => 'string',
             'sanitize_callback' => [$this, 'sanitize_openrouter_model'],
-            'default' => 'openai/gpt-5.4-mini',
+            'default' => 'deepseek/deepseek-v4-flash',
         ]);
     }
 
@@ -378,15 +378,15 @@ final class Page {
                     value="<?php echo
                         esc_attr($this->sanitize_openrouter_model(get_option(
                             'awpt_openrouter_model',
-                            'openai/gpt-5.4-mini',
+                            'deepseek/deepseek-v4-flash',
                         )))
                     ; ?>"
-                    placeholder="openai/gpt-5.4-mini"
+                    placeholder="deepseek/deepseek-v4-flash"
                 />
                 <p class="description">
                     <?php echo
                         esc_html(__(
-                            'AWPT defaults to a balanced, tool-capable model. Enter another exact OpenRouter model ID only when you want to override it.',
+                            'Defaults to DeepSeek V4 Flash (deepseek/deepseek-v4-flash) — strong for agent tool loops at low cost. Override with deepseek/deepseek-v4-pro or any other exact OpenRouter model ID.',
                             'agent-wordpress-terminal',
                         ))
                     ; ?>
@@ -448,10 +448,10 @@ final class Page {
         $model = trim(sanitize_text_field((string) $value));
 
         if ('' === $model || in_array($model, ['openrouter/auto', 'openrouter/auto-beta'], true)) {
-            return 'openai/gpt-5.4-mini';
+            return 'deepseek/deepseek-v4-flash';
         }
 
-        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'openai/gpt-5.4-mini';
+        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'deepseek/deepseek-v4-flash';
     }
 
     /**

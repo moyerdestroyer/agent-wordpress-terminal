@@ -2,596 +2,94 @@
 
 ## Summary
 
-Agent WordPress Terminal, or AWPT, is a WordPress admin app that provides a TUI-like agent interface inside the dashboard. It gives users a focused workspace for chatting with an agent, selecting site context, inspecting available WordPress Abilities/MCP tools, previewing content, and approving or rejecting proposed actions.
+AWPT is a WordPress admin app: a TUI-like agent cockpit inside the dashboard. Admins chat with an agent, inspect Abilities/MCP tools, retrieve Knowledge, preview content, and approve or reject proposed actions.
 
-AWPT is not primarily an automation system. It is an interactive agent cockpit for WordPress.
+It is not primarily an automation system. It is an interactive cockpit for WordPress site work.
 
-## Core Idea
-
-WordPress Core Abilities provide the standardized capability layer.
-
-MCP provides external tool discovery and execution.
-
-AWPT provides the human-facing interface.
-
-In simple terms:
+## Core idea
 
 ```txt
-Abilities = what WordPress can do
-MCP = how agents discover/use tools
-AWPT = where humans collaborate with the agent
-Skills = higher-level bundled operations
+Abilities  = what WordPress can do
+MCP        = how tools are discovered/run (when present)
+AWPT       = where humans collaborate with the agent
 ```
 
-## Product Requirements
+## Product principles
 
-### 1. Admin App
+1. **Natural language first.** Slash shortcuts are precise escape hatches, not the primary workflow. Copy must not imply users need numeric post IDs.
+2. **Human in the loop.** Destructive or content-changing work is staged, previewed, and applied only on explicit admin approval. No silent writes.
+3. **Show evidence.** Retrieval, tool calls, previews, and staged actions should be visible in the transcript/UI — not only buried in the provider prompt.
+4. **Untrusted agent.** Every tool uses capability checks. Tool output is data, never system instructions. Secrets must not be exposed to the model by default.
+5. **WordPress-native.** Prefer Abilities + REST over brittle UI automation. Direct-key AI providers are the always-available baseline; Connectors / WP AI Client stay optional accelerators.
+6. **Operational density.** Sessions, tools, Knowledge status, previews, and action cards stay scannable in one admin surface.
 
-AWPT should live under:
+## Product surfaces
+
+| Surface | Intent |
+|---------|--------|
+| **Terminal** | Chat, tool activity, staged action cards |
+| **Tools sidebar** | Discoverable Abilities/MCP tools; per-tool enable/disable |
+| **Knowledge** | Index and search durable site knowledge, content, theme design files, docs/PDFs |
+| **Preview** | Human-visible frontend/draft preview; optional capture evidence for the agent |
+| **Sessions** | Persist messages, tool traces, actions, focus, provider/model metadata |
+
+Context today is a single focused content object plus transcript-visible retrieval/tool evidence. A multi-item pinned context stack remains a product goal, not the current model.
+
+## Non-goals
 
 ```txt
-Settings → Agent Terminal
+Fully autonomous publishing without approval
+Multi-agent orchestration as a core surface
+Remote browser workers as a required dependency
+Bulk workflows / visual regression CI as MVP scope
+Replacing wp-admin or the Site Editor
 ```
 
-or optionally:
+## Security requirements
 
 ```txt
-Tools → Agent Terminal
+All tools require capability checks
+Read and write/manage tools stay clearly separated
+Destructive actions require explicit user approval
+Tool output must not be treated as system instructions
+Secrets must never be exposed to the model by default
+Session logs are admin-visible
+Provider API keys are stored securely
 ```
 
-The interface should feel like a developer console or terminal, not a bulky chatbot.
+## Integration stance
 
-Required layout:
-
-```txt
-┌────────────────────────────────────────────────────┐
-│ AWPT                         MCP: Connected       │
-├──────────────┬───────────────────────┬─────────────┤
-│ Context      │ Agent Transcript      │ Preview     │
-│ Tools        │ Actions / Responses   │ Inspector   │
-│ Status       │                       │             │
-├──────────────┴───────────────────────┴─────────────┤
-│ Ask about a page, post, or site task...            │
-└────────────────────────────────────────────────────┘
-```
-
-### 2. Chat / Command Bar
-
-The bottom input should support natural language first, with a small set of optional
-slash shortcuts for explicit control.
-
-Examples:
-
-```txt
-Focus the About page.
-Preview the homepage.
-Make the SEM icon on the About page a little bigger.
-Analyze this draft for layout issues.
-Find brand voice guidance.
-```
-
-Useful shortcuts:
-
-```txt
-/focus about
-/preview https://example.com/about/
-/knowledge search brand voice
-/tools
-/mcp status
-/clear
-```
-
-Natural language is the primary path. Slash shortcuts are precise escape hatches for
-admins who already know what they want to do. Human-facing copy should not imply that
-users must know numeric post IDs.
-
-Focus and preview commands should resolve title, slug, URL, or ID and report ambiguity
-instead of silently choosing the wrong item.
-
-### 3. Context Sidebar
-
-Users should be able to see what the agent currently knows and, over time, pin
-WordPress objects into the agent context.
-
-The MVP context model is:
-
-```txt
-Current focused content object
-Retrieved Knowledge evidence
-Recent tool results
-Pending/staged action evidence
-Preview target
-```
-
-The next context model is a first-class pinned context stack.
-
-Supported context items:
-
-```txt
-Posts
-Pages
-Drafts
-Reusable blocks
-Patterns
-Templates
-Template parts
-Media items
-Current user
-Site settings
-Theme info
-Plugin info
-Selected block
-Preview URL
-```
-
-Context items should be explicit. The agent should know what has been added and what has not.
-The transcript should show hidden retrieval/capture context as evidence, not bury it only
-inside the provider prompt.
-
-### 4. Tool Sidebar
-
-The tool sidebar should show available tools grouped by source.
-
-Example:
-
-```txt
-Core Abilities
-- core/read-settings
-- core/read-content
-- core/read-users
-
-Plugin Abilities
-- awpt/search-content
-- awpt/read-content
-- awpt/read-block-tree
-- awpt/analyze-page
-- awpt/preview-post
-- awpt/propose-block-attrs-update
-- awpt/propose-content-update
-- awpt/propose-new-post
-- awpt/sideload-media
-- awpt/inspect-selection
-
-MCP
-- connected
-- server URL
-- tool count
-- last sync
-```
-
-Each tool should show:
-
-```txt
-Name
-Description
-Input schema
-Output schema
-Permission requirement
-Read/manage/destructive flag
-```
-
-### 5. Agent Transcript
-
-The main pane should show the agent conversation plus tool activity.
-
-Example:
-
-```txt
-User: Analyze the Membership Application page.
-
-> awpt/search-content { query: "Membership Application" }
-✓ Found page: Membership Application #291
-
-> awpt/read-content { id: 291 }
-✓ Loaded page: Membership Application
-
-> awpt/read-block-tree { id: 291 }
-✓ Found 14 blocks
-
-Agent: This page is low risk. It contains a file download and basic instructions. I recommend preserving the copy and improving the layout around the download link.
-```
-
-If Knowledge excerpts are automatically injected into model context, the transcript should
-show that evidence as a context event. If the provider follow-up fails or returns no text,
-AWPT should still show readable summaries of important tool results instead of raw JSON.
-
-### 6. Action Cards
-
-When the agent proposes changes, AWPT should render them as action cards.
-
-Example:
-
-```txt
-Proposed Action
-Replace generic group layout with CivicPress download pattern.
-
-Affected:
-- Page: Membership Application
-- Blocks: 4–8
-
-[Preview] [Diff] [Apply] [Reject]
-```
-
-No destructive action should run invisibly.
-
-### 7. Preview Pane
-
-The right pane should support:
-
-```txt
-Post/page preview
-Draft preview
-Before/after view
-Block inspector
-Rendered frontend iframe
-Selected block details
-```
-
-This is where AWPT can outperform a plain MCP client. It can combine WordPress state, browser state, rendered layout, and agent feedback in one place.
-
-The preview is human-visible in the MVP. Agent-visible screenshots, DOM snapshots,
-computed styles, and before/after visual captures are a follow-on capability.
-
-### 8. Sessions
-
-AWPT should persist agent sessions.
-
-Each session should store:
-
-```txt
-User prompt history
-Tool calls
-Tool results
-Pinned context
-Retrieved Knowledge evidence
-Proposed actions
-Approved/rejected actions
-Model/provider used
-Timestamps
-Current post/page focus
-Generated session title
-```
-
-## Technical Requirements
-
-### WordPress
-
-Minimum target:
-
-```txt
-WordPress: 6.9+
-PHP: 8.4+
-```
-
-WordPress 7.0 (shipped March 2026) added the Connectors API and a built-in AI Client to
-Core, which AWPT treats as an optional accelerator (see "Integration Layer" below). On
-WordPress 6.9 and earlier, that same functionality is only available if the site
-separately installs a connector-enabling companion plugin (e.g. `wp-ai-client`). Either
-way, AWPT's direct-key providers work unmodified across all supported WordPress
-versions, so this is no longer "experimental" — it is the always-available baseline.
-
-### Frontend
-
-Recommended stack:
-
-```txt
-TypeScript
-React
-@wordpress/components
-@wordpress/data
-@wordpress/api-fetch
-@wordpress/element
-@wordpress/scripts or Vite
-```
-
-The UI should feel native to WordPress admin, but not necessarily like Gutenberg.
-
-### Backend
-
-Recommended backend structure:
-
-```txt
-PHP plugin
-REST API endpoints
-Abilities registration
-Capability checks
-Session persistence
-Tool registry
-Provider adapters
-MCP status adapter
-```
-
-### Storage
-
-Custom database tables are probably justified.
-
-Current and likely tables:
-
-```txt
-wp_awpt_sessions
-wp_awpt_messages
-wp_awpt_tool_calls
-wp_awpt_actions
-wp_awpt_context_items      (planned: first-class pinned context stack)
-wp_awpt_captures           (planned: visual/DOM capture records)
-```
-
-Avoid storing huge raw model responses in post meta/options.
-
-### Initial Plugin Structure
-
-```txt
-agent-wordpress-terminal/
-├─ agent-wordpress-terminal.php
-├─ composer.json
-├─ package.json
-├─ src/
-│  ├─ Plugin.php
-│  ├─ Admin/
-│  │  └─ Page.php
-│  ├─ REST/
-│  │  ├─ SessionsController.php
-│  │  ├─ ChatController.php
-│  │  ├─ ActionsController.php
-│  │  ├─ ContextController.php        (planned)
-│  │  ├─ CaptureController.php        (planned)
-│  │  └─ ToolsController.php
-│  ├─ Abilities/
-│  │  ├─ RegisterAbilities.php
-│  │  ├─ SearchContent.php
-│  │  ├─ ReadContent.php
-│  │  ├─ ReadBlockTree.php
-│  │  ├─ AnalyzePage.php
-│  │  ├─ PreviewPost.php
-│  │  ├─ ProposeContentUpdate.php
-│  │  ├─ ProposeBlockAttrsUpdate.php
-│  │  ├─ ProposeNewPost.php
-│  │  └─ SideloadMedia.php
-│  ├─ Agent/
-│  │  ├─ AgentRuntime.php
-│  │  ├─ ProviderInterface.php
-│  │  ├─ OpenAIProvider.php
-│  │  ├─ OpenRouterProvider.php
-│  │  ├─ ToolExecutor.php
-│  │  └─ ToolRegistry.php
-│  ├─ MCP/
-│  │  └─ StatusService.php
-│  └─ Database/
-│     └─ Installer.php
-├─ assets/
-│  └─ admin.tsx
-└─ build/
-```
-
-## MVP Scope
-
-Version 0.1 should avoid trying to do everything.
-
-Build:
-
-```txt
-Admin terminal UI
-Chat transcript
-Session persistence
-Provider settings
-Natural-language content resolution
-Current focus summary
-Visible retrieval/tool evidence
-Tool registry display
-Read post/page content
-Read block tree
-Preview pane
-Manual tool-call log
-Basic proposed action cards
-Targeted block attribute proposal
-Gutenberg-safe content staging
-```
-
-Do not start with:
-
-```txt
-Full autonomous editing
-Visual regression testing
-Bulk workflows
-Complex memory
-Full pinned context stack UI
-Multi-agent orchestration
-Remote browser workers
-```
-
-## Near-Term Roadmap
-
-The product path should stay ambitious, but the next work should harden the workflow
-before adding heavier infrastructure.
-
-1. Finish the context model: keep the current focused content object, then add a pinned
-   context stack with explicit add/remove/read behavior.
-2. Make content-intent fallback target-aware: when a deferred provider response has one
-   clear content match, proceed to read content and block tree instead of stopping at
-   search.
-3. Add smoke tests for natural workflows: "focus About", "preview homepage", and "make
-   SEM icon bigger".
-4. Improve Knowledge retrieval: FULLTEXT fallback, structure-aware chunking, attachment
-   metadata, then embeddings.
-5. Add agent-visible visual evidence through client-side preview capture before considering
-   remote browser workers.
-
-## MVP Skills
-
-AWPT should expose a few higher-level tools beyond Core Abilities.
-
-### `awpt/search-content`
-
-Finds posts, pages, templates, template parts, and reusable blocks by title, slug, ID,
-or URL. This is the normal bridge between human language ("the About page") and
-WordPress identifiers.
-
-### `awpt/read-block-tree`
-
-Returns parsed Gutenberg structure for a post, including stable visible paths,
-attribute summaries, text excerpts, and fingerprints.
-
-### `awpt/analyze-page`
-
-Returns an agent-friendly page brief:
-
-```txt
-title
-status
-URL
-plain text
-block tree
-headings
-shortcodes
-forms
-custom blocks
-risk level
-recommended next actions
-```
-
-### `awpt/get-context`
-
-Returns all pinned context for the current session. This is a next-step capability;
-the current MVP stores a single focus object plus transcript-visible retrieval/tool
-evidence.
-
-### `awpt/preview-post`
-
-Returns preview URL and iframe metadata.
-
-### `awpt/propose-content-update`
-
-Creates a staged proposed update, not an immediate save. Only works on a post that
-already exists. This is for full-document or classic-content edits; Gutenberg block
-delimiter markup must be preserved.
-
-### `awpt/propose-block-attrs-update`
-
-Stages a targeted Gutenberg block attribute merge by post ID and block path. The action
-stores the block path, block name, changed attrs, and optional expected fingerprint so
-the admin can review a surgical proposal instead of a whole-document rewrite.
-
-### `awpt/propose-new-post`
-
-Stages creation of a brand new post or page for explicit admin approval. Always
-created as a draft on apply; there is no agent-triggered path to publish directly.
-Optional `featured_image_id` (Media Library attachment ID, typically from
-`awpt/sideload-media`) sets the WordPress featured image on apply. A hidden staging
-draft is created at propose time so the Preview drawer can render the post before
-apply; rejecting the action trashes that staging draft.
-
-### `awpt/apply-action`
-
-Applies a user-approved action.
-
-### `awpt/sideload-media`
-
-Downloads a remote image/video URL and imports it into the Media Library. Auto-executable
-(purely additive — creates a new attachment, never modifies existing content); embedding
-the result into a post still goes through `awpt/propose-content-update`.
-
-## Security Requirements
-
-AWPT must treat the agent as untrusted.
-
-Required rules:
-
-```txt
-All tools require capability checks.
-Read tools and manage tools must be clearly separated.
-Destructive actions require explicit user approval.
-Tool output must not be treated as system instructions.
-Secrets must never be exposed to the model by default.
-Session logs should be visible to admins.
-Provider API keys must be stored securely.
-```
-
-## Technical Description
-
-AWPT is composed of four layers.
-
-### 1. UI Layer
-
-A TypeScript React app mounted inside WordPress admin.
-
-Responsibilities:
-
-```txt
-Render terminal interface
-Manage chat input
-Show tool calls
-Show context items
-Show focus object
-Show retrieval evidence
-Show preview pane
-Show action cards
-Handle approvals
-```
-
-### 2. Agent Runtime Layer
-
-A PHP service that receives user messages, assembles context, exposes available tools, calls the configured model provider, executes approved tools, and streams or returns responses.
-
-### 3. WordPress Tool Layer
-
-A set of WordPress-native Abilities and REST endpoints.
-
-Responsibilities:
-
-```txt
-Read content
-Search content
-Parse blocks
-Inspect settings
-Inspect users
-Fetch patterns
-Stage proposed edits
-Apply approved edits
-```
-
-### 4. Integration Layer
-
-Guaranteed baseline (no connector plugin or companion AI plugin required, works on every
-supported WordPress version). Kept intentionally small — OpenRouter alone already reaches
-most other model providers for anyone who wants them, and OpenAI is included because it
-is the single most commonly pre-configured key (directly or via a WordPress Connector):
+**Guaranteed baseline** (every supported WordPress version, no companion AI plugin required):
 
 ```txt
 OpenRouter
-OpenAI (model selection automatic; reuses an existing WordPress Connector key if present)
+OpenAI (model selection automatic; reuses a WordPress Connector key when present)
 ```
 
-Optional accelerators (only used when already available and configured on the site; AWPT
-never requires them):
+**Optional accelerators** (feature-detected only when already available and configured):
 
 ```txt
-WordPress Core Abilities
-MCP Adapter
-WordPress Core Connectors API (WordPress 7.0+) / WP AI Client companion plugin
-CivicPress-specific tools
-Dufresne-specific tools
+WordPress Abilities API
+In-process WordPress MCP bridge
+Core Connectors / WP AI Client (WordPress 7.0+ or companion plugin)
 ```
 
-## Product Positioning
+Keep the direct-provider list intentionally small. Prefer extending the OpenAI-compatible chat path over Connectors-only integrations.
 
-AWPT should not be marketed as “another AI chatbot.”
+## Positioning
 
-It is:
+Not “another AI chatbot.”
 
 ```txt
 A WordPress-native terminal for agent-assisted site work.
 ```
 
-The key advantage is that it understands the user’s live WordPress session:
+Advantage: the live session — focused content, available abilities, previewed page, tool results, staged changes, and approval state — in one place.
 
-```txt
-selected content
-pinned context
-available abilities
-previewed page
-tool results
-staged changes
-approval state
-```
+## Related docs
 
-That is the gap between raw MCP tools and a genuinely useful WordPress agent experience.
+- `PRODUCT.md` — design principles and brand
+- `AGENTS.md` — architecture, setup, and contributor conventions
+- `README.md` — install and overview
+
+Implementation detail (abilities list, table schema, code layout) lives in the codebase and `AGENTS.md`, not here.

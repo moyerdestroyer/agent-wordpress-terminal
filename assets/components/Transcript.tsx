@@ -1,15 +1,23 @@
 import { Button } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
-import { actionDiff, actionMetadata, canPreviewAction } from '../actionDisplay';
+import { actionMetadata, canPreviewAction } from '../actionDisplay';
+import { formatElapsed, formatTimingStrip, type PhaseTimings } from '../lib/turnTiming';
 import type { ChatProgress, Message, ProposedAction, ToolCall } from '../types';
+import { ActionDiffView } from './ActionDiffView';
+
+export interface TurnSummary {
+	durationMs: number;
+	toolCount: number;
+}
 
 interface TranscriptProps {
 	messages: Message[];
 	toolCalls: ToolCall[];
 	actions: ProposedAction[];
-	isThinking?: boolean;
+	isWorking?: boolean;
 	progress?: ChatProgress | null;
+	turnSummary?: TurnSummary | null;
 	onActionOperation: (action: ProposedAction, operation: 'approve' | 'reject' | 'apply') => void;
 	onActionPreview: (action: ProposedAction) => void;
 }
@@ -19,38 +27,154 @@ type TranscriptItem =
 	| { kind: 'tool'; call: ToolCall }
 	| { kind: 'action-record'; action: ProposedAction };
 
-function ThinkingIndicator({ progress }: { progress?: ChatProgress | null }): JSX.Element {
-	const label = progress?.label || __('Thinking', 'agent-wordpress-terminal');
+function useTurnTiming(
+	active: boolean,
+	phase: string,
+): {
+	totalMs: number;
+	timingStrip: string;
+} {
+	const [now, setNow] = useState(() => Date.now());
+	const turnStartedAt = useRef<number | null>(null);
+	const phaseStartedAt = useRef<number | null>(null);
+	const activePhase = useRef('');
+	const closedPhaseMs = useRef<PhaseTimings>({});
+
+	useEffect(() => {
+		if (!active) {
+			turnStartedAt.current = null;
+			phaseStartedAt.current = null;
+			activePhase.current = '';
+			closedPhaseMs.current = {};
+			return;
+		}
+
+		const started = Date.now();
+		turnStartedAt.current = started;
+		phaseStartedAt.current = started;
+		activePhase.current = phase || 'starting';
+		closedPhaseMs.current = {};
+		setNow(started);
+
+		const timer = window.setInterval(() => setNow(Date.now()), 100);
+
+		return () => window.clearInterval(timer);
+	}, [active]);
+
+	useEffect(() => {
+		if (!active || !phase) {
+			return;
+		}
+
+		const previous = activePhase.current;
+
+		if (previous === phase) {
+			return;
+		}
+
+		if (previous !== '' && phaseStartedAt.current !== null) {
+			const elapsed = Math.max(0, Date.now() - phaseStartedAt.current);
+			closedPhaseMs.current = {
+				...closedPhaseMs.current,
+				[previous]: (closedPhaseMs.current[previous] ?? 0) + elapsed,
+			};
+		}
+
+		activePhase.current = phase;
+		phaseStartedAt.current = Date.now();
+	}, [active, phase]);
+
+	if (!active || turnStartedAt.current === null || phaseStartedAt.current === null) {
+		return { totalMs: 0, timingStrip: '' };
+	}
+
+	const totalMs = Math.max(0, now - turnStartedAt.current);
+	const activePhaseElapsedMs = Math.max(0, now - phaseStartedAt.current);
+	const currentPhase = activePhase.current || phase || 'starting';
+
+	return {
+		totalMs,
+		timingStrip: formatTimingStrip(
+			closedPhaseMs.current,
+			currentPhase,
+			activePhaseElapsedMs,
+			totalMs,
+		),
+	};
+}
+
+/** Live in-stream agent turn — full-width stream row, not a toast chip. */
+function AgentTurnStatus({ progress }: { progress?: ChatProgress | null }): JSX.Element {
+	const phase = progress?.phase || 'starting';
+	const label =
+		progress?.label ||
+		(phase === 'tools'
+			? __('Running tools', 'agent-wordpress-terminal')
+			: __('Working', 'agent-wordpress-terminal'));
+	const detail = progress?.detail ?? '';
 	const hasTotal = (progress?.total ?? 0) > 0;
 	const completed = Math.min(progress?.completed ?? 0, progress?.total ?? 0);
 	const percentage = hasTotal ? Math.max(4, (completed / (progress?.total ?? 1)) * 100) : 0;
+	const { timingStrip } = useTurnTiming(true, phase);
 
 	return (
 		<div
-			className="awpt-message awpt-message--assistant awpt-message--thinking"
+			className="awpt-message awpt-message--assistant awpt-message--working"
 			role="status"
 			aria-live="polite"
 			aria-busy="true"
 		>
-			<strong>{__('Agent', 'agent-wordpress-terminal')}:</strong>
-			<div className="awpt-thinking">
-				<div className="awpt-thinking__copy">
-					<span className="awpt-thinking__label">{label}</span>
-					{progress?.detail ? (
-						<span className="awpt-thinking__detail">{progress.detail}</span>
-					) : null}
+			<div className="awpt-turn-status">
+				<div className="awpt-turn-status__primary">
+					<strong>{__('Agent', 'agent-wordpress-terminal')}:</strong>
+					<span className="awpt-turn-status__label">{label}</span>
+					{detail ? <span className="awpt-turn-status__detail">{detail}</span> : null}
 				</div>
-				<div
-					className={`awpt-thinking__track${hasTotal ? ' is-determinate' : ''}`}
-					role="progressbar"
-					aria-label={label}
-					aria-valuemin={hasTotal ? 0 : undefined}
-					aria-valuemax={hasTotal ? progress?.total : undefined}
-					aria-valuenow={hasTotal ? completed : undefined}
-				>
-					<span style={hasTotal ? { width: `${percentage}%` } : undefined} />
-				</div>
+				{timingStrip ? <div className="awpt-turn-status__timing">{timingStrip}</div> : null}
+				{hasTotal ? (
+					<div
+						className="awpt-turn-status__track is-determinate"
+						role="progressbar"
+						aria-label={label}
+						aria-valuemin={0}
+						aria-valuemax={progress?.total}
+						aria-valuenow={completed}
+					>
+						<span style={{ width: `${percentage}%` }} />
+					</div>
+				) : (
+					<div
+						className="awpt-turn-status__track"
+						role="progressbar"
+						aria-label={label}
+						aria-valuetext={label}
+					>
+						<span />
+					</div>
+				)}
 			</div>
+		</div>
+	);
+}
+
+function TurnSummaryLine({ summary }: { summary: TurnSummary }): JSX.Element {
+	const tools =
+		summary.toolCount > 0
+			? sprintf(
+					/* translators: %d: number of tool calls in the completed turn. */
+					__(' · %d tools', 'agent-wordpress-terminal'),
+					summary.toolCount,
+				)
+			: '';
+
+	return (
+		<div className="awpt-turn-summary" role="note">
+			{sprintf(
+				/* translators: %s: formatted elapsed duration (e.g. 3.4s). */
+				__('Completed in %s', 'agent-wordpress-terminal'),
+				formatElapsed(summary.durationMs),
+			)}
+			{tools}
 		</div>
 	);
 }
@@ -258,7 +382,6 @@ function ActionCard({
 	const canReject = action.status === 'proposed' || action.status === 'approved';
 	const canPreview = canPreviewAction(action.payload);
 	const metadata = actionMetadata(action.payload);
-	const diff = actionDiff(action.payload);
 	const manifest = action.payload?.proposal_manifest;
 	const decisionTrace = action.payload?.decision_trace ?? [];
 	const repairsApplied = action.payload?.repairs_applied ?? [];
@@ -356,17 +479,7 @@ function ActionCard({
 					{__('Reject', 'agent-wordpress-terminal')}
 				</Button>
 			</div>
-			{showDiff ? (
-				<pre className="awpt-action-card__diff">
-					{[
-						`${__('Before', 'agent-wordpress-terminal')}:`,
-						diff.before,
-						'',
-						`${__('After', 'agent-wordpress-terminal')}:`,
-						diff.after,
-					].join('\n')}
-				</pre>
-			) : null}
+			{showDiff ? <ActionDiffView payload={action.payload} compact /> : null}
 		</div>
 	);
 }
@@ -397,8 +510,9 @@ export function Transcript({
 	messages,
 	toolCalls,
 	actions,
-	isThinking = false,
+	isWorking = false,
 	progress = null,
+	turnSummary = null,
 	onActionOperation,
 	onActionPreview,
 }: TranscriptProps): JSX.Element {
@@ -411,11 +525,11 @@ export function Transcript({
 
 	useEffect(() => {
 		scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-	}, [transcriptItems.length, isThinking, pendingActions.length]);
+	}, [transcriptItems.length, isWorking, pendingActions.length, turnSummary?.durationMs]);
 
 	return (
 		<div className="awpt-messages">
-			{messages.length === 0 && !isThinking ? (
+			{messages.length === 0 && !isWorking ? (
 				<p className="awpt-empty">
 					{__(
 						'Ask the agent what you want changed, or try “Focus the About page”, “Preview the homepage”, or “Find brand voice guidance”.',
@@ -469,7 +583,8 @@ export function Transcript({
 				})
 			)}
 
-			{isThinking ? <ThinkingIndicator progress={progress} /> : null}
+			{isWorking ? <AgentTurnStatus progress={progress} /> : null}
+			{!isWorking && turnSummary ? <TurnSummaryLine summary={turnSummary} /> : null}
 
 			{pendingActions.map((action) => (
 				<ActionCard

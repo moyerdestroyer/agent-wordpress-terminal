@@ -80,7 +80,9 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             }
         }
 
-        $timeout = max(5, min(45, (int) ($options['timeout'] ?? 45)));
+        // Content composition and multi-tool revision turns need longer than a
+        // short Q&A call. Cap at the content turn wall used by ProviderRuntime.
+        $timeout = max(5, min(120, (int) ($options['timeout'] ?? 45)));
         $encoded_payload = wp_json_encode($payload);
 
         if (!is_string($encoded_payload)) {

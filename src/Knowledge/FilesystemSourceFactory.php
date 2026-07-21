@@ -47,13 +47,21 @@ final class FilesystemSourceFactory {
         }
 
         $size = filesize($real);
+        $relative = $this->relative_path($real, $root);
+        $label = '' !== $relative ? $relative : basename($real);
+
+        if (FilesystemAccessPolicy::ROOT_THEME === $root_type) {
+            $label = 'theme:' . $label;
+        } elseif (FilesystemAccessPolicy::ROOT_UPLOADS === $root_type) {
+            $label = 'uploads:' . $label;
+        }
 
         return [
             'kind' => 'filesystem',
             'source_id' => 'file:' . hash('sha256', $real),
             'post_id' => null,
             'path' => $real,
-            'label' => basename($real),
+            'label' => $label,
             'uri' => $real,
             'content' => $content,
             'modified_at' => gmdate('Y-m-d H:i:s', (int) filemtime($real)),
@@ -62,8 +70,26 @@ final class FilesystemSourceFactory {
                 'size' => is_int($size) ? $size : 0,
                 'root' => $root,
                 'root_type' => $root_type,
+                'relative_path' => $relative,
             ],
         ];
+    }
+
+    private function relative_path(string $path, string $root): string {
+        $path = str_replace('\\', '/', $path);
+        $root = rtrim(str_replace('\\', '/', $root), '/');
+
+        if ($path === $root) {
+            return basename($path);
+        }
+
+        $prefix = $root . '/';
+
+        if (str_starts_with($path, $prefix)) {
+            return ltrim(substr($path, strlen($prefix)), '/');
+        }
+
+        return basename($path);
     }
 
     private function read_text_file(string $path, string $extension): string {

@@ -150,6 +150,14 @@ final class FilesystemAccessPolicy {
             return true;
         }
 
+        // Theme author docs (CivicPress docs/, AGENTS guides, pattern write-ups).
+        if (
+            in_array($extension, ['txt', 'md', 'markdown'], true)
+            && preg_match('~^(docs|documentation|doc)/~', $relative)
+        ) {
+            return true;
+        }
+
         if (preg_match('~^(styles|templates|parts|patterns)/~', $relative)) {
             return true;
         }

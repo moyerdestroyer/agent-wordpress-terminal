@@ -147,8 +147,12 @@ final class ProviderToolCallExecutor {
         if ('awpt/propose-new-post' === $tool_name) {
             $input = new ProposalRequestContext()->enrich($session_id, $input, $turn_context);
 
-            if ('adapted' === (string) ($input['pattern_mode'] ?? '')) {
-                $pattern_name = (string) ($input['pattern_name'] ?? '');
+            $pattern_name = (string) ($input['pattern_name'] ?? '');
+            $pattern_mode = (string) ($input['pattern_mode'] ?? '');
+            // Omitted mode defaults to adapted when a pattern is named (server policy).
+            $requires_pattern_read = '' !== $pattern_name && ('adapted' === $pattern_mode || '' === $pattern_mode);
+
+            if ($requires_pattern_read) {
                 $read_patterns = $this->read_patterns[$session_id] ?? [];
                 $input['pattern_read_verified'] = array_key_exists($pattern_name, $read_patterns);
             }

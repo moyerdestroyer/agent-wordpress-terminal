@@ -43,8 +43,128 @@ final class ToolResultContentFormatter {
             'awpt/read-pattern' => $this->format_read_pattern($output),
             'awpt/list-patterns' => $this->format_patterns($output),
             'awpt/read-site-health' => $this->format_site_health($output),
+            'awpt/read-theme-file' => $this->format_read_theme_file($output),
+            'awpt/inspect-frontend' => $this->format_inspect_frontend($output),
+            'awpt/list-knowledge-sources' => $this->format_list_knowledge_sources($output),
             default => '',
         };
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_read_theme_file(array $output): string {
+        $path = (string) ($output['path'] ?? '');
+        $mode = (string) ($output['mode'] ?? 'full');
+        $bytes = (int) ($output['bytes'] ?? 0);
+        $match_count = (int) ($output['match_count'] ?? 0);
+        $note = trim((string) ($output['note'] ?? ''));
+        $line = sprintf(
+            /* translators: 1: relative theme path, 2: read mode, 3: file size in bytes */
+            __('Read theme file %1$s (%2$s, %3$d bytes).', 'agent-wordpress-terminal'),
+            $path,
+            $mode,
+            $bytes,
+        );
+
+        if ($match_count > 0) {
+            $line .=
+                ' '
+                . sprintf(
+                    /* translators: %d: number of query matches */
+                    __('%d matching slice(s).', 'agent-wordpress-terminal'),
+                    $match_count,
+                );
+        }
+
+        if ('' !== $note) {
+            $line .= ' ' . $note;
+        }
+
+        // Never dump minified CSS into the human transcript; keep a tiny preview only for small files.
+        $content = (string) ($output['content'] ?? '');
+
+        if ('' !== $content && strlen($content) <= 900 && $match_count > 0) {
+            $line .= "\n" . mb_substr($content, 0, 900, 'UTF-8');
+        }
+
+        return $line;
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_inspect_frontend(array $output): string {
+        $title = (string) ($output['title'] ?? '');
+        $status = (int) ($output['status_code'] ?? 0);
+        $url = (string) ($output['url'] ?? '');
+        $signals = is_array($output['layout_signals'] ?? null) ? $output['layout_signals'] : [];
+        $interesting = is_array($signals['interesting_classes'] ?? null) ? $signals['interesting_classes'] : [];
+        $interesting = array_values(array_filter($interesting, 'is_string'));
+        $lines = [
+            sprintf(
+                /* translators: 1: HTTP status, 2: page title, 3: URL */
+                __('Inspected frontend HTTP %1$d — %2$s (%3$s).', 'agent-wordpress-terminal'),
+                $status,
+                '' !== $title ? $title : __('(untitled)', 'agent-wordpress-terminal'),
+                $url,
+            ),
+        ];
+
+        if ([] !== $interesting) {
+            $lines[] = sprintf(
+                /* translators: %s: comma-separated CSS class names */
+                __('Layout-related classes: %s', 'agent-wordpress-terminal'),
+                implode(', ', array_slice($interesting, 0, 12)),
+            );
+        }
+
+        if (!empty($signals['has_position_sticky'])) {
+            $lines[] = __('Sticky positioning detected on the page.', 'agent-wordpress-terminal');
+        }
+
+        if (!empty($output['used_loopback'])) {
+            $lines[] = __(
+                'Fetched via server loopback (public host not reachable from PHP).',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_list_knowledge_sources(array $output): string {
+        $count = (int) ($output['source_count'] ?? 0);
+        $chunks = (int) ($output['chunk_count'] ?? 0);
+        $stale = !empty($output['stale']);
+        $samples = is_array($output['samples'] ?? null) ? $output['samples'] : [];
+        $labels = [];
+
+        foreach (array_slice($samples, 0, 8) as $sample) {
+            if (is_array($sample) && '' !== (string) ($sample['label'] ?? '')) {
+                $labels[] = (string) $sample['label'];
+            }
+        }
+
+        $line = sprintf(
+            /* translators: 1: source count, 2: chunk count */
+            __('Knowledge index: %1$d sources, %2$d chunks.', 'agent-wordpress-terminal'),
+            $count,
+            $chunks,
+        );
+
+        if ($stale) {
+            $line .= ' ' . __('Index is stale — rebuild recommended.', 'agent-wordpress-terminal');
+        }
+
+        if ([] !== $labels) {
+            $line .=
+                ' '
+                . sprintf(
+                    /* translators: %s: sample source labels */
+                    __('Samples: %s', 'agent-wordpress-terminal'),
+                    implode('; ', $labels),
+                );
+        }
+
+        return $line;
     }
 
     /** @param array<array-key, mixed> $output */

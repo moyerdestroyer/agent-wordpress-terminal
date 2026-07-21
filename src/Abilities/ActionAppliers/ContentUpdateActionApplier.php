@@ -167,12 +167,21 @@ final class ContentUpdateActionApplier {
         return ['post_id' => $post_id];
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * Detect intervening edits since the proposal was staged.
+     *
+     * When the live value already matches the proposed value, treat the field as
+     * idempotent (another proposal may have already applied the same change)
+     * instead of blocking with a 409.
+     *
+     * @param array<string, mixed> $payload
+     */
     private function concurrency_conflict(\WP_Post $post, array $payload): ?string {
         if (
             array_key_exists('post_title', $payload)
             && array_key_exists('original_post_title', $payload)
             && (string) $payload['original_post_title'] !== $post->post_title
+            && (string) $payload['post_title'] !== $post->post_title
         ) {
             return 'the title';
         }
@@ -183,6 +192,7 @@ final class ContentUpdateActionApplier {
             array_key_exists('post_content', $payload)
             && array_key_exists('original_post_content', $payload)
             && (string) $payload['original_post_content'] !== $post->post_content
+            && (string) $payload['post_content'] !== $post->post_content
         ) {
             return 'the content';
         }
@@ -191,23 +201,46 @@ final class ContentUpdateActionApplier {
             array_key_exists('post_status', $payload)
             && array_key_exists('original_post_status', $payload)
             && (string) $payload['original_post_status'] !== $post->post_status
+            && (string) $payload['post_status'] !== $post->post_status
         ) {
             return 'the status';
         }
 
         $original_meta = is_array($payload['original_post_meta'] ?? null) ? $payload['original_post_meta'] : [];
+        $desired_meta = is_array($payload['post_meta'] ?? null) ? $payload['post_meta'] : [];
 
-        foreach (array_keys(is_array($payload['post_meta'] ?? null) ? $payload['post_meta'] : []) as $key) {
+        foreach (array_keys($desired_meta) as $key) {
             $meta_key = sanitize_key((string) $key);
 
-            if (
-                array_key_exists($meta_key, $original_meta)
-                && get_post_meta($post->ID, $meta_key, true) !== $original_meta[$meta_key]
-            ) {
+            if ('' === $meta_key || !array_key_exists($meta_key, $original_meta)) {
+                continue;
+            }
+
+            $live = $this->meta_scalar(get_post_meta($post->ID, $meta_key, true));
+            $original = $this->meta_scalar($original_meta[$meta_key] ?? null);
+            $desired = $this->meta_scalar($desired_meta[$meta_key] ?? null);
+
+            // Live moved away from the staged baseline and is not already the
+            // proposed value (another apply may have landed the same change).
+            if ($live !== $original && $live !== $desired) {
                 return sprintf('meta field %s', $meta_key);
             }
         }
 
         return null;
+    }
+
+    private function meta_scalar(mixed $value): string {
+        if (is_bool($value)) {
+            return $value ? '1' : '';
+        }
+
+        if (is_scalar($value) || null === $value) {
+            return (string) ($value ?? '');
+        }
+
+        $encoded = wp_json_encode($value);
+
+        return is_string($encoded) ? $encoded : '';
     }
 }

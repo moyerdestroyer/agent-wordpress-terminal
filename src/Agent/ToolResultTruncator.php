@@ -91,6 +91,25 @@ final class ToolResultTruncator {
             $output['results'] = $this->clip_array_items($output['results'] ?? [], 8);
         }
 
+        if ('awpt/read-theme-file' === $tool) {
+            // Never ship a full minified stylesheet into the model or transcript.
+            $output['content'] = $this->clip_string((string) ($output['content'] ?? ''), 4_000);
+            $output['matches'] = $this->clip_array_items($output['matches'] ?? [], 6);
+            unset($output['absolute_path']);
+            $output['note'] = $this->clip_string((string) ($output['note'] ?? ''), 500);
+        }
+
+        if ('awpt/inspect-frontend' === $tool) {
+            $output['html_snippet'] = $this->clip_string((string) ($output['html_snippet'] ?? ''), 2_500);
+            $output['body_excerpt'] = $this->clip_string((string) ($output['body_excerpt'] ?? ''), 600);
+            $output['class_inventory'] = $this->clip_array_items($output['class_inventory'] ?? [], 16);
+            $output['stylesheets'] = $this->clip_array_items($output['stylesheets'] ?? [], 12);
+        }
+
+        if ('awpt/list-knowledge-sources' === $tool) {
+            $output['samples'] = $this->clip_array_items($output['samples'] ?? [], 16);
+        }
+
         return $output;
     }
 

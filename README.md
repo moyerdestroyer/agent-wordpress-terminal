@@ -57,7 +57,7 @@ AWPT UI    →  where you collaborate and approve
 | `src/MCP/` | MCP adapter + WordPress MCP bridge |
 | `assets/` | React terminal UI (Vite) |
 
-For contributor detail, see [`AGENTS.md`](./AGENTS.md). Product direction lives in [`plan.txt`](./plan.txt) and [`Path_Forward.md`](./Path_Forward.md).
+For contributor detail, see [`AGENTS.md`](./AGENTS.md). Product intent lives in [`plan.txt`](./plan.txt) and [`PRODUCT.md`](./PRODUCT.md).
 
 ## License
 

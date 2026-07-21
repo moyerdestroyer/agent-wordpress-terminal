@@ -105,13 +105,10 @@ final class ReadContent implements AbilityInterface {
             return new \WP_Error('awpt_post_not_found', __('Post not found.', 'agent-wordpress-terminal'));
         }
 
-        if (new NewPostStagingDraft()->is_staging_draft($post_id)) {
-            return new \WP_Error('awpt_staging_draft_not_content', __(
-                'This ID belongs to a temporary staged-action preview, not ordinary site content.',
-                'agent-wordpress-terminal',
-            ));
-        }
+        $is_staging_draft = new NewPostStagingDraft()->is_staging_draft($post_id);
 
+        // Staging drafts are readable so the agent can revise an open proposal without
+        // inventing a second composition. They are still not ordinary site content.
         return [
             'id' => $post_id,
             'title' => get_the_title($post),
@@ -124,6 +121,13 @@ final class ReadContent implements AbilityInterface {
             'modified' => $post->post_modified_gmt,
             'author_id' => (int) $post->post_author,
             'meta' => $this->meta->for_post($post_id),
+            'is_staging_draft' => $is_staging_draft,
+            'staging_note' => $is_staging_draft
+                ? __(
+                    'This is a temporary AWPT staging draft for an open new-post proposal. Use its content when revising via awpt/propose-new-post with the open action_id; do not treat it as a published page.',
+                    'agent-wordpress-terminal',
+                )
+                : '',
         ];
     }
 }

@@ -4,7 +4,7 @@ Brief guide for humans and coding agents working in this repo.
 
 ## What this is
 
-AWPT is a WordPress admin app: a terminal-style cockpit for chatting with an agent, pinning site context, inspecting Abilities/MCP tools, previewing content, and approving proposed actions. See `plan.txt` for the full product spec.
+AWPT is a WordPress admin app: a terminal-style cockpit for chatting with an agent, pinning site context, inspecting Abilities/MCP tools, previewing content, and approving proposed actions. See `plan.txt` for product intent and non-goals.
 
 ## Architecture
 
