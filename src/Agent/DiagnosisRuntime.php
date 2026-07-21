@@ -169,7 +169,8 @@ final class DiagnosisRuntime {
         ];
 
         if ([] !== $diagnosis) {
-            $lines[] = 'Structured diagnosis seed: ' . wp_json_encode($diagnosis);
+            $encoded = wp_json_encode($diagnosis);
+            $lines[] = 'Structured diagnosis seed: ' . (is_string($encoded) ? $encoded : '{}');
         }
 
         $lines[] = DiagnosisInstructions::incident_response_guidance();

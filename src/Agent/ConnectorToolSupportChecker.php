@@ -28,27 +28,25 @@ final class ConnectorToolSupportChecker {
         }
 
         try {
-            $builder = call_user_func('wp_ai_client_prompt', '');
+            $raw = call_user_func('wp_ai_client_prompt', '');
 
-            if (!is_object($builder) || !method_exists($builder, 'using_provider')) {
+            if ($raw instanceof \AWPT_AI_Prompt_Builder) {
+                $builder = $raw;
+            } elseif (is_object($raw)) {
+                $builder = new AiPromptBuilderAdapter($raw);
+            } else {
                 return true;
             }
 
             $configured = $builder->using_provider($connector_id);
-            $configured = is_object($configured) ? $configured : $builder;
             $ability_names = new ToolRegistry()->get_auto_executable_ability_names();
             $declarations = WordPressAIClientProvider::build_function_declarations($ability_names);
 
-            if ([] !== $declarations && method_exists($configured, 'using_function_declarations')) {
-                $with_tools = $configured->using_function_declarations(...$declarations);
-                $configured = is_object($with_tools) ? $with_tools : $configured;
+            if ([] !== $declarations) {
+                $configured = $configured->using_function_declarations(...$declarations);
             }
 
-            if (!is_callable([$configured, 'is_supported_for_text_generation'])) {
-                return true;
-            }
-
-            return (bool) $configured->is_supported_for_text_generation();
+            return $configured->is_supported_for_text_generation();
         } catch (\Throwable) {
             return true;
         }

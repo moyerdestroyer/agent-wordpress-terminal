@@ -30,7 +30,7 @@ final class PluginInventory {
         $all = get_plugins();
 
         foreach ($all as $plugin_file => $data) {
-            $file = (string) $plugin_file;
+            $file = $plugin_file;
             $slug = dirname($file);
             $slug = '.' === $slug ? basename($file, '.php') : $slug;
             $active = $this->is_active($file);
@@ -41,8 +41,8 @@ final class PluginInventory {
 
             $plugins[] = [
                 'slug' => $slug,
-                'name' => (string) ($data['Name'] ?? $slug),
-                'version' => (string) ($data['Version'] ?? ''),
+                'name' => $data['Name'] ?? $slug,
+                'version' => $data['Version'] ?? '',
                 'file' => $file,
                 'active' => $active,
                 'network_active' => $this->is_network_active($file),

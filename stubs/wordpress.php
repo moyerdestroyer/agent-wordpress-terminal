@@ -31,4 +31,6 @@ namespace {
 
     // Debug mode, usually toggled in wp-config.php.
     define('WP_DEBUG', false);
+    define('WP_DEBUG_LOG', false);
+    define('WP_DEBUG_DISPLAY', false);
 }

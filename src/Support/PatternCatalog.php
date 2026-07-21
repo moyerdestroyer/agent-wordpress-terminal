@@ -188,7 +188,7 @@ final class PatternCatalog {
      * @return list<array<string, mixed>>
      */
     private function reusable_patterns(): array {
-        $posts_raw = get_posts([
+        $posts = get_posts([
             'post_type' => 'wp_block',
             'post_status' => ['publish', 'private'],
             'posts_per_page' => 200,
@@ -196,8 +196,6 @@ final class PatternCatalog {
             'order' => 'ASC',
         ]);
 
-        /** @var list<\WP_Post> $posts */
-        $posts = is_array($posts_raw) ? $posts_raw : [];
         /** @var list<array<string, mixed>> $items */
         $items = [];
 

@@ -31,22 +31,10 @@ message = "Assigning `mixed` type to a variable may lead to unexpected behavior.
 count = 1
 
 [[issues]]
-file = "src/Abilities/ProposeGlobalStylesUpdate.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Abilities/ProposeNewPost.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
-
-[[issues]]
-file = "src/Abilities/ReadGlobalStyles.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
 
 [[issues]]
 file = "src/Abilities/ReadPlugins.php"
@@ -58,12 +46,6 @@ count = 1
 file = "src/Abilities/ReadSiteHealth.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
-count = 1
-
-[[issues]]
-file = "src/Abilities/ReadThemeJson.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
 
 [[issues]]
@@ -106,7 +88,7 @@ count = 1
 file = "src/Agent/ChatCompletionsProvider.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 5
+count = 3
 
 [[issues]]
 file = "src/Agent/ChatCompletionsProvider.php"
@@ -122,20 +104,8 @@ count = 1
 
 [[issues]]
 file = "src/Agent/ConnectorToolSupportChecker.php"
-code = "ambiguous-object-method-access"
-message = "Cannot statically verify method call on a generic `object` type."
-count = 4
-
-[[issues]]
-file = "src/Agent/ConnectorToolSupportChecker.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
-
-[[issues]]
-file = "src/Agent/DiagnosisRuntime.php"
-code = "possibly-false-operand"
-message = "Possibly false right operand used in string concatenation (type `false|non-empty-string`)."
 count = 1
 
 [[issues]]
@@ -158,12 +128,6 @@ count = 1
 
 [[issues]]
 file = "src/Agent/ProposalRequestContext.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Agent/ProviderMessageBuilder.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
@@ -262,7 +226,7 @@ count = 1
 file = "src/Agent/WordPressAIClientResultParser.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 9
+count = 8
 
 [[issues]]
 file = "src/Agent/WordPressAIClientResultParser.php"
@@ -272,33 +236,9 @@ count = 1
 
 [[issues]]
 file = "src/Agent/WordPressAIClientRunner.php"
-code = "ambiguous-object-method-access"
-message = "Cannot statically verify method call on a generic `object` type."
-count = 5
-
-[[issues]]
-file = "src/Agent/WordPressAIClientRunner.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 14
-
-[[issues]]
-file = "src/Agent/WordPressAIClientRunner.php"
-code = "possibly-false-operand"
-message = "Possibly false right operand used in string concatenation (type `false|non-empty-string`)."
-count = 1
-
-[[issues]]
-file = "src/Agent/WordPressAIClientRunner.php"
-code = "redundant-condition"
-message = "This condition (type `true`) will always evaluate to true."
-count = 1
-
-[[issues]]
-file = "src/Agent/WordPressAIClientRunner.php"
-code = "redundant-logical-operation"
-message = "Redundant `||` operation: left operand is evaluated and right operand is always truthy."
-count = 1
+count = 3
 
 [[issues]]
 file = "src/Database/ActionContentPayloadSanitizer.php"
@@ -340,24 +280,12 @@ count = 1
 file = "src/Knowledge/EmbeddingApiClient.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 4
-
-[[issues]]
-file = "src/Knowledge/EmbeddingApiClient.php"
-code = "redundant-comparison"
-message = "Redundant `===` comparison: left-hand side is never identical to right-hand side."
-count = 1
+count = 3
 
 [[issues]]
 file = "src/Knowledge/EmbeddingApiClient.php"
 code = "redundant-docblock-type"
 message = "Redundant docblock type for variable `$data`."
-count = 1
-
-[[issues]]
-file = "src/Knowledge/EmbeddingApiClient.php"
-code = "redundant-logical-operation"
-message = "Redundant `||` operation: left operand is evaluated and right operand is always falsy."
 count = 1
 
 [[issues]]
@@ -376,12 +304,6 @@ count = 1
 file = "src/Knowledge/KnowledgeRepository.php"
 code = "invalid-type-cast"
 message = "Casting `mixed` to `array`."
-count = 1
-
-[[issues]]
-file = "src/Knowledge/KnowledgeSearchRanker.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
 count = 1
 
 [[issues]]
@@ -406,7 +328,7 @@ count = 4
 file = "src/Knowledge/KnowledgeSemanticRanker.php"
 code = "mixed-assignment"
 message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 3
+count = 1
 
 [[issues]]
 file = "src/Knowledge/PdfTextExtractor.php"
@@ -560,21 +482,9 @@ count = 1
 
 [[issues]]
 file = "src/Support/Diagnostics/ErrorLogReader.php"
-code = "mixed-operand"
-message = "Right operand in `&&` operation has `mixed` type."
-count = 2
-
-[[issues]]
-file = "src/Support/Diagnostics/ErrorLogReader.php"
 code = "redundant-logical-operation"
 message = "Redundant `&&` operation: left operand is always truthy and right operand is evaluated."
 count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/ErrorLogReader.php"
-code = "redundant-logical-operation"
-message = "Redundant `&&` operation: left operand is evaluated and right operand is always falsy."
-count = 2
 
 [[issues]]
 file = "src/Support/Diagnostics/ErrorLogReader.php"
@@ -626,12 +536,6 @@ count = 1
 
 [[issues]]
 file = "src/Support/Diagnostics/SiteHealthReader.php"
-code = "mixed-operand"
-message = "Right operand in `&&` operation has `mixed` type."
-count = 1
-
-[[issues]]
-file = "src/Support/Diagnostics/SiteHealthReader.php"
 code = "redundant-logical-operation"
 message = "Redundant `&&` operation: left operand is evaluated and right operand is always falsy."
 count = 2
@@ -649,33 +553,9 @@ message = "Cannot perform array access on possibly `null` value."
 count = 2
 
 [[issues]]
-file = "src/Support/Json.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
 file = "src/Support/NewPostStagingDraft.php"
 code = "mixed-operand"
 message = "Casting `mixed` to `bool`."
-count = 1
-
-[[issues]]
-file = "src/Support/PatternCatalog.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 1
-
-[[issues]]
-file = "src/Support/PatternCatalog.php"
-code = "redundant-logical-operation"
-message = "Redundant `||` operation: left operand is always false and right operand is evaluated."
-count = 1
-
-[[issues]]
-file = "src/Support/PatternCatalog.php"
-code = "redundant-type-comparison"
-message = "Redundant condition: variable `$post` (type `WP_Post`) is already known to be `WP_Post`."
 count = 1
 
 [[issues]]

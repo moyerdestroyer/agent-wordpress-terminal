@@ -28,8 +28,6 @@ final class Json {
             return [];
         }
 
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? ArrayKey::string_map($decoded) : [];
+        return ArrayKey::as_map(json_decode($json, true));
     }
 }

@@ -217,9 +217,9 @@ final class PatternCompositionPolicy {
         $names = [];
 
         foreach ($blocks as $block) {
-            $name = $block['blockName'] ?? null;
+            $name = ArrayKey::as_string($block['blockName'] ?? null);
 
-            if (!is_string($name) || '' === $name) {
+            if (null === $name || '' === $name) {
                 continue;
             }
 

@@ -59,8 +59,8 @@ final class ErrorLogReader {
                 'exists' => false,
                 'source' => null,
                 'lines' => [],
-                'wp_debug' => defined('WP_DEBUG') && \WP_DEBUG,
-                'wp_debug_log' => defined('WP_DEBUG_LOG') && \WP_DEBUG_LOG,
+                'wp_debug' => $this->flag_enabled('WP_DEBUG'),
+                'wp_debug_log' => $this->flag_enabled('WP_DEBUG_LOG'),
             ];
         }
 
@@ -68,9 +68,13 @@ final class ErrorLogReader {
             'exists' => true,
             'source' => $this->redact_path($found_label ?? $found_path),
             'lines' => $this->read_tail($found_path, $max_lines),
-            'wp_debug' => defined('WP_DEBUG') && \WP_DEBUG,
-            'wp_debug_log' => defined('WP_DEBUG_LOG') && \WP_DEBUG_LOG,
+            'wp_debug' => $this->flag_enabled('WP_DEBUG'),
+            'wp_debug_log' => $this->flag_enabled('WP_DEBUG_LOG'),
         ];
+    }
+
+    private function flag_enabled(string $constant): bool {
+        return defined($constant) && true === constant($constant);
     }
 
     /**

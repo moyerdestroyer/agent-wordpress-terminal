@@ -40,7 +40,7 @@ final class FrontendInspector {
         $status_code = (int) wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $header = wp_remote_retrieve_header($response, 'content-type');
-        $content_type = is_array($header) ? (string) ($header[0] ?? '') : $header;
+        $content_type = is_array($header) ? $header[0] ?? '' : $header;
         $selector = trim($selector);
         $snippet_chars = max(1_000, min(8_000, $snippet_chars));
         $class_inventory = $this->class_inventory($body);

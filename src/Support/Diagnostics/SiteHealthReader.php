@@ -300,7 +300,7 @@ final class SiteHealthReader {
             return in_array($type, ['local', 'development'], true);
         }
 
-        return defined('WP_DEBUG') && \WP_DEBUG;
+        return defined('WP_DEBUG') && true === constant('WP_DEBUG');
     }
 
     private function ensure_site_health_loaded(): bool {

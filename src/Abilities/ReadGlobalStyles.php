@@ -44,7 +44,7 @@ final class ReadGlobalStyles implements AbilityInterface {
             'order' => 'DESC',
         ]);
 
-        foreach (is_array($posts) ? $posts : [] as $post) {
+        foreach ($posts as $post) {
             if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
                 continue;
             }
