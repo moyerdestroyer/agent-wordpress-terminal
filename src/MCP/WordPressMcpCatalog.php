@@ -73,11 +73,15 @@ final class WordPressMcpCatalog {
         return $this->execute_ability($tool_name, $input, $tool);
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function list_tools_from_abilities(): array {
         if (!function_exists('wp_get_abilities')) {
             return [];
         }
 
+        /** @var list<array<string, mixed>> $tools */
         $tools = [];
 
         foreach (wp_get_abilities() as $ability) {

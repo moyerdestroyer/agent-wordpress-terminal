@@ -120,11 +120,6 @@ final class RemediationBasicHints {
         ];
     }
 
-    /**
-     * @param array<string, mixed> $context
-     * @return array<string, mixed>|null
-     */
-
     public function looks_environmental(?string $error_type, string $error_text): bool {
         if (in_array($error_type, ['js_error', 'js_unhandled_rejection'], true)) {
             return true;
@@ -140,10 +135,9 @@ final class RemediationBasicHints {
     }
 
     /**
-     * @param list<array<string, mixed>> $hints
-     * @return list<array<string, mixed>>
+     * @param array<string, mixed> $context
+     * @return array{type: string, attempted_action: string, reason: string}|null
      */
-
     public function fix_content(array $context): ?array {
         $attempted_action = (string) ($context['attempted_action'] ?? '');
         $fix_actions = [

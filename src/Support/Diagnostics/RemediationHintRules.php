@@ -32,7 +32,8 @@ final class RemediationHintRules {
      * @return list<?array<string, mixed>>
      */
     public function candidates(array $context): array {
-        return [
+        /** @var list<?array<string, mixed>> $candidates */
+        $candidates = [
             $this->basic->probe_url($context),
             $this->basic->check_site_health($context),
             $this->basic->fix_content($context),
@@ -41,6 +42,8 @@ final class RemediationHintRules {
             $this->basic->switch_theme($context),
             $this->deactivate_plugin($context),
         ];
+
+        return $candidates;
     }
 
     private function deactivate_plugin(array $context): ?array {
@@ -88,10 +91,8 @@ final class RemediationHintRules {
     }
 
     /**
-     * @param array<string, mixed> $context
-     * @return array<string, mixed>|null
+     * @param list<string> $evidence
      */
-
     private function evidence_mentions_plugin(array $evidence, string $slug): bool {
         if ('' === $slug) {
             return false;

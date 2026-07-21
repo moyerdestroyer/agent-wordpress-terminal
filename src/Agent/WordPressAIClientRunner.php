@@ -73,15 +73,18 @@ final class WordPressAIClientRunner {
 
         $parser = new WordPressAIClientResultParser();
         $parsed = $parser->parse($result);
-        $parsed['no_text_generation_model'] = $parser->is_text_generation_model_error($result);
 
-        return $parsed;
+        return [
+            'content' => $parsed['content'],
+            'raw_tool_calls' => $parsed['raw_tool_calls'],
+            'model' => $parsed['model'],
+            'no_text_generation_model' => $parser->is_text_generation_model_error($result),
+        ];
     }
 
     /**
-     * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string}
+     * @param array<int, array<string, mixed>> $messages
      */
-
     private function extract_system_instruction(array $messages): string {
         foreach ($messages as $message) {
             if ('system' === (string) ($message['role'] ?? '')) {

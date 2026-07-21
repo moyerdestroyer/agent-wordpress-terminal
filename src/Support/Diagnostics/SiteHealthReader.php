@@ -19,9 +19,9 @@ if (!defined('ABSPATH')) {
  */
 final class SiteHealthReader {
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|\WP_Error
      */
-    public function summary(): array {
+    public function summary(): array|\WP_Error {
         return $this->read([
             'scope' => 'summary',
             'run_async' => false,
@@ -168,6 +168,10 @@ final class SiteHealthReader {
         return $tests;
     }
 
+    /**
+     * @param array<string, mixed> $result
+     * @return array{slug: string, label: string, status: string, description: string, actions: string}
+     */
     private function normalize_result(string $slug, array $result): array {
         $status = (string) ($result['status'] ?? 'good');
 
@@ -232,13 +236,23 @@ final class SiteHealthReader {
      * @return array{good: int, recommended: int, critical: int}
      */
     private function count_statuses(array $tests): array {
-        $overall = ['good' => 0, 'recommended' => 0, 'critical' => 0];
+        $good = 0;
+        $recommended = 0;
+        $critical = 0;
 
         foreach ($tests as $test) {
-            ++$overall[(string) ($test['status'] ?? 'good')];
+            match ((string) ($test['status'] ?? 'good')) {
+                'recommended' => ++$recommended,
+                'critical' => ++$critical,
+                default => ++$good,
+            };
         }
 
-        return $overall;
+        return [
+            'good' => $good,
+            'recommended' => $recommended,
+            'critical' => $critical,
+        ];
     }
 
     /**

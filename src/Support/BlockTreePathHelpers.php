@@ -18,6 +18,9 @@ if (!defined('ABSPATH')) {
  * Dotted-path navigation and serialize helpers.
  */
 final class BlockTreePathHelpers {
+    /**
+     * @return list<int>
+     */
     public function path_segments(string $path): array {
         $path = trim($path);
 
@@ -30,10 +33,7 @@ final class BlockTreePathHelpers {
 
     /**
      * @param array<int|string, array<string, mixed>> $blocks
-     * @param list<int>                               $segments
-     * @return array<string, mixed>|null
      */
-
     public function raw_index_for_visible(array $blocks, int $visible_target): ?int {
         $visible_index = 0;
 

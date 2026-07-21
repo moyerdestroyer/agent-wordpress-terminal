@@ -29,7 +29,8 @@ final class PluginInventory {
         $plugins = [];
         $all = get_plugins();
 
-        foreach ($all as $file => $data) {
+        foreach ($all as $plugin_file => $data) {
+            $file = (string) $plugin_file;
             $slug = dirname($file);
             $slug = '.' === $slug ? basename($file, '.php') : $slug;
             $active = $this->is_active($file);

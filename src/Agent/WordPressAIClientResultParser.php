@@ -18,6 +18,9 @@ if (!defined('ABSPATH')) {
  * Normalizes WP AI Client results for ProviderRuntime.
  */
 final class WordPressAIClientResultParser {
+    /**
+     * @return array{content: string, raw_tool_calls: array<int, array<string, mixed>>, model: string}
+     */
     public function parse(mixed $result): array {
         if (is_wp_error($result)) {
             return [

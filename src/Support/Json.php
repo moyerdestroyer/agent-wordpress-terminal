@@ -21,7 +21,7 @@ final class Json {
     /**
      * Decode JSON into an associative array.
      *
-     * @return array<array-key, mixed>
+     * @return array<string, mixed>
      */
     public static function decode_array(string $json): array {
         if ('' === $json) {
@@ -30,6 +30,6 @@ final class Json {
 
         $decoded = json_decode($json, true);
 
-        return is_array($decoded) ? $decoded : [];
+        return is_array($decoded) ? ArrayKey::string_map($decoded) : [];
     }
 }

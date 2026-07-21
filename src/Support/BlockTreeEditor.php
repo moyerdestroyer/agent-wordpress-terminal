@@ -70,6 +70,10 @@ final class BlockTreeEditor {
         return new BlockTreeMutator()->normalize_block($block);
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @return array<string, mixed>|null
+     */
     public function get_block(array $blocks, string $path): ?array {
         $segments = $this->paths->path_segments($path);
 
@@ -85,7 +89,6 @@ final class BlockTreeEditor {
      * @param array<string, mixed>             $attrs
      * @return array{content: string, block: array<string, mixed>}|\WP_Error
      */
-
     public function update_attrs(
         array $blocks,
         string $path,
@@ -114,11 +117,10 @@ final class BlockTreeEditor {
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
-     * @param array<string, mixed>             $new_block
-     * @return array{content: string, block: array<string, mixed>, path: string}|\WP_Error
+     * @param array<int|string, array<string, mixed>> $blocks
+     * @param list<int>                               $segments
+     * @return array<string, mixed>|null
      */
-
     private function get_block_at_segments(array $blocks, array $segments): ?array {
         $target = array_shift($segments);
 
@@ -152,7 +154,6 @@ final class BlockTreeEditor {
      * @param array<string, mixed>                    $attrs
      * @return array<string, mixed>|\WP_Error
      */
-
     private function update_at_segments(
         array &$blocks,
         array $segments,
@@ -211,9 +212,4 @@ final class BlockTreeEditor {
             404,
         );
     }
-
-    /**
-     * @param array<int|string, array<string, mixed>> $blocks
-     * @param array<string, mixed>                    $new_block
-     */
 }

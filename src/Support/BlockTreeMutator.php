@@ -24,6 +24,11 @@ final class BlockTreeMutator {
         $this->paths = $paths ?? new BlockTreePathHelpers();
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @param array<string, mixed>             $new_block
+     * @return array{content: string, block: array<string, mixed>, path: string}|\WP_Error
+     */
     public function insert_block(
         array $blocks,
         string $path,
@@ -116,7 +121,7 @@ final class BlockTreeMutator {
                 return $result;
             }
 
-            /** @var array{content: string, block: array<string, mixed>, path: string} $result */
+            /** @var array<int, array<string, mixed>> $working */
             $working = parse_blocks($result['content']);
             $normalized[] = $result['block'];
             $paths[] = $result['path'];
@@ -216,9 +221,10 @@ final class BlockTreeMutator {
     }
 
     /**
-     * @return list<int>
+     * @param array<int|string, array<string, mixed>> $blocks
+     * @param array<string, mixed>                    $new_block
+     * @return true|\WP_Error
      */
-
     private function append(array &$blocks, string $path, array $new_block, string &$result_path): true|\WP_Error {
         if ('' === $path) {
             $blocks[] = $new_block;

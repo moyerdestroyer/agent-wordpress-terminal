@@ -109,10 +109,11 @@ final class ContentListService {
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param array<string, mixed> $filters
+     * @param list<string>         $post_types
+     * @param list<string>         $statuses
      * @return array<string, mixed>
      */
-
     private function query_args(array $filters, array $post_types, array $statuses): array {
         $args = [
             'post_type' => $post_types,

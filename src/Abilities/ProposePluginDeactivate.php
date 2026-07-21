@@ -135,7 +135,7 @@ final class ProposePluginDeactivate implements AbilityInterface {
     }
 
     /**
-     * @return array{slug: string, name: string, file: string, active: bool}|null
+     * @return array{slug: string, name: string, version: string, file: string, active: bool, network_active: bool}|null
      */
     private function find_plugin(string $plugin_file): ?array {
         foreach (new PluginInventory()->list() as $plugin) {

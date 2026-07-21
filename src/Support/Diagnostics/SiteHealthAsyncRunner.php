@@ -156,10 +156,6 @@ final class SiteHealthAsyncRunner {
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-
     private function is_development_environment(): bool {
         if (function_exists('wp_get_environment_type')) {
             $type = wp_get_environment_type();

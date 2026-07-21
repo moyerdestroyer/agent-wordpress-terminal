@@ -248,7 +248,7 @@ final class ProviderToolCallExecutor {
             ];
         }
 
-        return ['success', $result];
+        return ['success', \AWPT\Support\ArrayKey::string_map($result)];
     }
 
     /**
