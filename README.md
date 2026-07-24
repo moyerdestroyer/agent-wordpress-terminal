@@ -59,6 +59,38 @@ AWPT UI    →  where you collaborate and approve
 
 For contributor detail, see [`AGENTS.md`](./AGENTS.md). Product intent lives in [`plan.txt`](./plan.txt) and [`PRODUCT.md`](./PRODUCT.md).
 
+## Releases
+
+Version **0.1.0** is the MVP cut. Installable zips are built by GitHub Actions when a version tag is pushed.
+
+### Cutting a release
+
+1. Bump the version in **all three** places (they must match the tag without the `v` prefix):
+   - `agent-wordpress-terminal.php` plugin header `Version:`
+   - `AWPT_VERSION` constant in the same file
+   - `package.json` `"version"`
+2. Commit the bump on `master`.
+3. Tag and push:
+
+```bash
+git tag -a v0.1.0 -m "Release 0.1.0"
+git push origin master
+git push origin v0.1.0
+```
+
+The [Release](.github/workflows/release.yml) workflow will:
+
+- install production Composer deps + build frontend assets
+- package `agent-wordpress-terminal.zip` (installable plugin folder)
+- create a GitHub Release with the zip attached
+
+Local dry-run (same packaging as CI):
+
+```bash
+./bin/build-plugin-zip.sh
+# → agent-wordpress-terminal.zip in the repo root
+```
+
 ## License
 
 GPL-2.0-or-later

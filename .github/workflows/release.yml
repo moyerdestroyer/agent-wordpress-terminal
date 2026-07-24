@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release plugin zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Validate version matches tag
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          HEADER_VERSION="$(grep -E '^\s*\*\s*Version:' agent-wordpress-terminal.php | head -1 | sed -E 's/.*Version:[[:space:]]*//')"
+          CONST_VERSION="$(grep -E "define\\('AWPT_VERSION'" agent-wordpress-terminal.php | sed -E "s/.*'([^']+)'.*/\\1/")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+
+          echo "Tag version:       ${TAG}"
+          echo "Plugin header:     ${HEADER_VERSION}"
+          echo "AWPT_VERSION:      ${CONST_VERSION}"
+          echo "package.json:      ${PKG_VERSION}"
+
+          if [ "${TAG}" != "${HEADER_VERSION}" ] || [ "${TAG}" != "${CONST_VERSION}" ] || [ "${TAG}" != "${PKG_VERSION}" ]; then
+            echo "::error::Version mismatch. Tag v${TAG} must match plugin header (${HEADER_VERSION}), AWPT_VERSION (${CONST_VERSION}), and package.json (${PKG_VERSION})."
+            exit 1
+          fi
+
+      - name: Install Composer dependencies (production)
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Package plugin zip
+        env:
+          PLUGIN_SLUG: agent-wordpress-terminal
+        run: |
+          set -euo pipefail
+          mkdir -p "dist/${PLUGIN_SLUG}"
+          rsync -a --delete --exclude-from=.distignore ./ "dist/${PLUGIN_SLUG}/"
+
+          # Guardrails: required runtime paths must be present.
+          test -f "dist/${PLUGIN_SLUG}/agent-wordpress-terminal.php"
+          test -f "dist/${PLUGIN_SLUG}/vendor/autoload.php"
+          test -f "dist/${PLUGIN_SLUG}/build/manifest.json"
+          test -d "dist/${PLUGIN_SLUG}/build/assets"
+          test -n "$(find "dist/${PLUGIN_SLUG}/build/assets" -maxdepth 1 -type f \( -name '*.js' -o -name '*.css' \) | head -1)"
+          test ! -d "dist/${PLUGIN_SLUG}/node_modules"
+          test ! -d "dist/${PLUGIN_SLUG}/tests"
+          test ! -d "dist/${PLUGIN_SLUG}/assets"
+
+          (
+            cd dist
+            zip -r "../${PLUGIN_SLUG}.zip" "${PLUGIN_SLUG}"
+          )
+
+          ls -lh "${PLUGIN_SLUG}.zip"
+          unzip -l "${PLUGIN_SLUG}.zip" | head -80
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: agent-wordpress-terminal.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            Installable WordPress plugin zip for **Agent WordPress Terminal**.
+
+            1. Download `agent-wordpress-terminal.zip`
+            2. In wp-admin → Plugins → Add New → Upload Plugin
+            3. Activate, then open **Settings → Agent Terminal**
+
+            Requires WordPress 6.9+ and PHP 8.4+.

@@ -4,5 +4,5 @@
 !/build/.gitkeep
 /.env
 /mago
-composer.lock
-package-lock.json
+/dist/
+*.zip

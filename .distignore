@@ -1,0 +1,47 @@
+# Patterns use rsync exclude syntax (leading / = repo root only).
+
+# VCS / CI / packaging / local tool state
+.git/
+.github/
+.gitignore
+.gitattributes
+.distignore
+.DS_Store
+.env
+.env.*
+.cursor/
+.crush/
+.impeccable/
+.vscode/
+.idea/
+.agents/
+
+# Local packaging output
+/dist/
+*.zip
+
+# JS toolchain (runtime assets ship from build/)
+/node_modules/
+/package.json
+/package-lock.json
+/tsconfig.json
+/vite.config.ts
+/biome.json
+/assets/
+*.map
+
+# PHP toolchain / tests / stubs
+/tests/
+/stubs/
+/patches/
+/mago.toml
+/analyzer-baseline.toml
+/mago
+/composer.lock
+/bin/
+
+# Internal / contributor-only docs
+/AGENTS.md
+/plan.txt
+/todos.md
+/PRODUCT.md

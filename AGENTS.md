@@ -73,6 +73,7 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 | TS/TSX lint | `npm run lint` |
 | TS/TSX fix | `npm run lint:fix` |
 | Build assets | `npm run build` |
+| Plugin zip (local) | `./bin/build-plugin-zip.sh` |
 
 **PHP tooling:** [Mago](https://mago.carthage.software) via `composer install` dev dep (`carthage-software/mago`). Config: `mago.toml`. Analyzer uses `analyzer-baseline.toml` for WordPress stub gaps — shrink the baseline as types improve.
 
