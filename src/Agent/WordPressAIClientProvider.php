@@ -119,6 +119,13 @@ final class WordPressAIClientProvider implements ProviderInterface {
     }
 
     /**
+     * The current adapter flattens multipart messages into prompt text.
+     */
+    public function accepts_image_input(): bool {
+        return false;
+    }
+
+    /**
      * Shared helper for settings UI preflight.
      *
      * @param list<string> $ability_names

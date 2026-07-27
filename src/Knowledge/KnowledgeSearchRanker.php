@@ -143,9 +143,11 @@ final class KnowledgeSearchRanker {
         }
 
         $metadata = json_decode((string) ($row['metadata_json'] ?? ''), true);
+        $chunk_metadata = json_decode((string) ($row['chunk_metadata_json'] ?? ''), true);
 
         return [
             'id' => (int) $row['id'],
+            'chunk_id' => (string) ($row['chunk_id'] ?? ''),
             'source_kind' => (string) $row['source_kind'],
             'source_id' => (string) $row['source_id'],
             'source_post_id' => null !== $row['source_post_id'] ? (int) $row['source_post_id'] : null,
@@ -153,7 +155,11 @@ final class KnowledgeSearchRanker {
             'uri' => (string) $row['uri'],
             'excerpt' => $this->excerpt((string) $row['chunk_text'], $tokens),
             'score' => $score,
-            'metadata' => is_array($metadata) ? $metadata : [],
+            'retrieval_backend' => 'local',
+            'metadata' => array_merge(
+                is_array($metadata) ? $metadata : [],
+                is_array($chunk_metadata) ? $chunk_metadata : [],
+            ),
         ];
     }
 

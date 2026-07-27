@@ -35,5 +35,39 @@ function test_chat_progress_isolated_by_session_and_turn(): void {
     Assert::same('pending', $progress->read(50, 'turn-one')['state'] ?? null, 'sessions must not share progress');
 }
 
+function test_chat_progress_exposes_sanitized_provider_diagnostics(): void {
+    awpt_test_reset_state();
+    $progress = new ChatProgress();
+    $progress->begin(49, 'turn-diagnostics');
+    $updated = $progress->update(49, 'turn-diagnostics', [
+        'phase' => 'finalizing',
+        'label' => 'Staging proposal',
+        'diagnostics' => [
+            'provider' => '<b>DeepSeek</b>',
+            'mode' => 'proposal_only',
+            'tool_count' => 8,
+            'completion_budget' => 16_000,
+            'request_timeout_seconds' => 120,
+            'proposal_only' => true,
+            'nested' => ['must' => 'not leak'],
+        ],
+    ]);
+    $diagnostics = is_array($updated['diagnostics'] ?? null) ? $updated['diagnostics'] : [];
+
+    Assert::same('DeepSeek', $diagnostics['provider'] ?? null, 'diagnostic labels should be sanitized');
+    Assert::same('proposal_only', $diagnostics['mode'] ?? null, 'the orchestration mode should be visible');
+    Assert::same(8, $diagnostics['tool_count'] ?? null, 'the evidence count should be visible');
+    Assert::same(true, $diagnostics['proposal_only'] ?? null, 'boolean diagnostics should retain their type');
+    Assert::false(array_key_exists('nested', $diagnostics), 'nested provider data should not reach progress output');
+
+    $failed = $progress->failed(49, 'turn-diagnostics', 'Provider timed out.');
+    Assert::same(
+        'proposal_only',
+        $failed['diagnostics']['mode'] ?? null,
+        'terminal progress should retain the last orchestration diagnostics',
+    );
+}
+
 test_chat_progress_tracks_ordered_turn_phases();
 test_chat_progress_isolated_by_session_and_turn();
+test_chat_progress_exposes_sanitized_provider_diagnostics();

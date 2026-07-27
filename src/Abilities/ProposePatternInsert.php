@@ -106,7 +106,7 @@ final class ProposePatternInsert implements AbilityInterface {
             return $update;
         }
 
-        $summary = $this->patterns->summary($pattern);
+        $summary = $this->patterns->summary($pattern, $post->post_type);
         $payload = [
             'operation' => ActionOperations::PATTERN_INSERT,
             'post_id' => $post_id,
@@ -121,6 +121,7 @@ final class ProposePatternInsert implements AbilityInterface {
             'pattern_name' => $summary['name'],
             'pattern_title' => $summary['title'],
             'pattern_source' => $summary['source'],
+            'pattern_owner' => $summary['owner'],
             'blocks' => $update['blocks'],
             'inserted_paths' => $update['paths'],
             'affected' => sprintf(__('Insert pattern %s', 'agent-wordpress-terminal'), (string) $summary['title']),

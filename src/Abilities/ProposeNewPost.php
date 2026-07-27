@@ -15,6 +15,7 @@ use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PatternCompositionPolicy;
+use AWPT\Support\PatternFallbackPolicy;
 use AWPT\Support\PostCompositionNormalizer;
 use AWPT\Support\PostCompositionValidator;
 use AWPT\Support\PostContentSanitizer;
@@ -189,6 +190,13 @@ final class ProposeNewPost implements AbilityInterface {
                         'enum' => ['prepend', 'adapted'],
                         'description' => __(
                             'adapted (default when pattern_name is set): post_content is the complete customized composition; pattern_name is provenance only. prepend: server inserts the unchanged pattern; pass only a short body tail in post_content — never a second filled layout.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_fallback_reason' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Required when active/parent-theme or reusable patterns exist but a Core, plugin, or custom composition is a better fit. State the concrete reason briefly.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -390,6 +398,10 @@ final class ProposeNewPost implements AbilityInterface {
         $pattern_name = '' !== $input_pattern_name
             ? $input_pattern_name
             : sanitize_text_field((string) ($existing_payload['pattern_name'] ?? ''));
+        $input_fallback_reason = sanitize_textarea_field((string) ($input['pattern_fallback_reason'] ?? ''));
+        $pattern_fallback_reason = '' !== $input_fallback_reason
+            ? $input_fallback_reason
+            : sanitize_textarea_field((string) ($existing_payload['pattern_fallback_reason'] ?? ''));
         $existing_attachment_ids = is_array($existing_payload['required_attachment_ids'] ?? null)
             ? $existing_payload['required_attachment_ids']
             : [];
@@ -477,6 +489,7 @@ final class ProposeNewPost implements AbilityInterface {
         }
 
         $pattern_content = '';
+        $pattern_summary = [];
 
         if ('' !== $pattern_name) {
             $pattern = $this->patterns->find($pattern_name);
@@ -490,7 +503,7 @@ final class ProposeNewPost implements AbilityInterface {
                     [
                         'status' => 404,
                         'requested_pattern' => $pattern_name,
-                        'available_patterns' => $this->patterns->suggestions($pattern_name, 12),
+                        'available_patterns' => $this->patterns->suggestions($pattern_name, 12, $post_type),
                         'validation_issues' => $validator->diagnose(
                             $post_content,
                             $required_attachment_ids,
@@ -515,6 +528,7 @@ final class ProposeNewPost implements AbilityInterface {
                 );
             }
 
+            $pattern_summary = $this->patterns->summary($pattern, $post_type);
             $pattern_content = trim((string) ($pattern['content'] ?? ''));
 
             if ('' === $pattern_content) {
@@ -538,6 +552,18 @@ final class ProposeNewPost implements AbilityInterface {
             if ($composition->should_prepend($pattern_mode, $pattern_content, $post_content)) {
                 $post_content = $pattern_content . "\n\n" . $post_content;
             }
+        }
+
+        $pattern_owner = '' !== $pattern_name ? (string) ($pattern_summary['owner'] ?? 'other') : 'custom';
+        $fallback_error = new PatternFallbackPolicy()->validate(
+            $this->patterns,
+            $post_type,
+            $pattern_owner,
+            $pattern_fallback_reason,
+        );
+
+        if (null !== $fallback_error) {
+            return $fallback_error;
         }
 
         $validator = new PostCompositionValidator();
@@ -600,7 +626,7 @@ final class ProposeNewPost implements AbilityInterface {
 
             if (!array_key_exists('recovery', $data)) {
                 $data['recovery'] = __(
-                    'Fix the listed composition issues, then resubmit one awpt/propose-new-post with pattern_mode adapted and a single full composition when using a pattern. Do not prepend a raw pattern under a filled layout.',
+                    'Fix the listed composition issues, then resubmit one awpt/propose-new-post with pattern_mode adapted and a single full composition when using a pattern. Reuse pattern markup already returned by awpt/read-pattern in this turn — do not re-list or re-read the same patterns unless switching pattern_name. Do not prepend a raw pattern under a filled layout.',
                     'agent-wordpress-terminal',
                 );
             }
@@ -620,6 +646,13 @@ final class ProposeNewPost implements AbilityInterface {
         if ('' !== $pattern_name) {
             $payload['pattern_name'] = $pattern_name;
             $payload['pattern_mode'] = $pattern_mode;
+            $payload['pattern_title'] = (string) ($pattern_summary['title'] ?? '');
+            $payload['pattern_source'] = (string) ($pattern_summary['source'] ?? '');
+            $payload['pattern_owner'] = $pattern_owner;
+        }
+
+        if ('' !== $pattern_fallback_reason) {
+            $payload['pattern_fallback_reason'] = $pattern_fallback_reason;
         }
 
         if ([] !== $required_attachment_ids) {

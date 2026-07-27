@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
  * Reads Core Knowledge and compatible legacy guideline sources.
  */
 final class KnowledgeRepository {
-    public const SITE_CONTENT_INDEX_CAP = 500;
+    public const SITE_CONTENT_INDEX_CAP = 0;
 
     private KnowledgePostSourceMapper $mapper;
     private KnowledgeSiteContentTypes $site_content_types;
@@ -70,6 +70,21 @@ final class KnowledgeRepository {
     }
 
     /**
+     * List cheap post locators for background indexing.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function list_source_descriptors(): array {
+        $backend = $this->active_backend($this->backends());
+
+        if (null === $backend) {
+            return [];
+        }
+
+        return $this->list_post_descriptors($backend['post_type'], $backend['kind']);
+    }
+
+    /**
      * List WordPress content sources that are useful for retrieval but not durable Knowledge.
      *
      * @return list<array<string, mixed>>
@@ -82,6 +97,15 @@ final class KnowledgeRepository {
         }
 
         return $this->list_post_sources($post_types, '', 'wp_content');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function list_site_content_descriptors(): array {
+        $post_types = $this->site_content_types->installed();
+
+        return [] !== $post_types ? $this->list_post_descriptors($post_types, 'wp_content') : [];
     }
 
     /**
@@ -273,27 +297,111 @@ final class KnowledgeRepository {
             $statuses[] = 'inherit';
         }
 
-        $query = new \WP_Query([
-            'post_type' => $post_type,
-            'post_status' => $statuses,
-            'posts_per_page' => self::SITE_CONTENT_INDEX_CAP,
-            'orderby' => 'modified',
-            'order' => 'DESC',
-            'no_found_rows' => true,
-            'update_post_meta_cache' => false,
-            'update_post_term_cache' => '' !== $taxonomy,
-        ]);
-
         $sources = [];
+        $offset = 0;
+        $page_size = 100;
 
-        foreach ($query->posts as $post) {
-            if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
-                continue;
+        do {
+            $query = new \WP_Query([
+                'post_type' => $post_type,
+                'post_status' => $statuses,
+                'posts_per_page' => $page_size,
+                'offset' => $offset,
+                'orderby' => 'modified',
+                'order' => 'DESC',
+                'no_found_rows' => true,
+                'update_post_meta_cache' => false,
+                'update_post_term_cache' => '' !== $taxonomy,
+            ]);
+
+            foreach ($query->posts as $post) {
+                if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
+                    continue;
+                }
+
+                $sources[] = $this->mapper->from_post($post, $kind, $taxonomy);
             }
 
-            $sources[] = $this->mapper->from_post($post, $kind, $taxonomy);
+            $offset += count($query->posts);
+        } while (count($query->posts) === $page_size);
+
+        if ('wp_content' === $kind) {
+            usort($sources, static fn(array $left, array $right): int => strcmp(
+                (string) ($right['modified_at'] ?? ''),
+                (string) ($left['modified_at'] ?? ''),
+            ));
         }
 
         return $sources;
+    }
+
+    /**
+     * @param string|list<string> $post_type
+     * @return list<array<string, mixed>>
+     */
+    private function list_post_descriptors(string|array $post_type, string $kind): array {
+        $statuses = ['publish', 'draft', 'pending', 'private'];
+
+        if ('attachment' === $post_type || is_array($post_type) && in_array('attachment', $post_type, true)) {
+            $statuses[] = 'inherit';
+        }
+
+        $descriptors = [];
+        $offset = 0;
+        $page_size = 100;
+
+        do {
+            $query = new \WP_Query([
+                'post_type' => $post_type,
+                'post_status' => $statuses,
+                'posts_per_page' => $page_size,
+                'offset' => $offset,
+                'orderby' => 'modified',
+                'order' => 'DESC',
+                'no_found_rows' => true,
+                'update_post_meta_cache' => false,
+                'update_post_term_cache' => false,
+            ]);
+
+            foreach ($query->posts as $post) {
+                if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
+                    continue;
+                }
+
+                $mime = strtolower((string) get_post_mime_type($post->ID));
+                $title = get_the_title($post);
+                $descriptors[] = [
+                    'kind' => $kind,
+                    'source_id' => $kind . ':' . $post->ID,
+                    'post_id' => $post->ID,
+                    'label' => '' !== $title ? $title : sprintf('%s #%d', $post->post_type, $post->ID),
+                    'uri' => get_permalink($post),
+                    'content' => '',
+                    'content_type' => 'attachment' === $post->post_type && str_contains($mime, 'pdf')
+                        ? 'pdf'
+                        : (
+                            in_array($post->post_type, ['wp_template', 'wp_template_part'], true)
+                                ? 'gutenberg'
+                                : 'prose'
+                        ),
+                    'semantic_eligible' => true,
+                    'discovery_fingerprint' => hash('sha256', implode(':', [
+                        KnowledgeIndexProfile::SOURCE_POLICY_VERSION,
+                        (string) $post->ID,
+                        $post->post_modified_gmt,
+                        $post->post_status,
+                    ])),
+                    'modified_at' => $post->post_modified_gmt,
+                    'metadata' => [
+                        'post_type' => $post->post_type,
+                        'status' => $post->post_status,
+                    ],
+                ];
+            }
+
+            $offset += count($query->posts);
+        } while (count($query->posts) === $page_size);
+
+        return $descriptors;
     }
 }

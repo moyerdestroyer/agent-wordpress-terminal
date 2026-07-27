@@ -43,23 +43,57 @@ final class KnowledgeSearchService {
     public function search(string $query, int $limit = 6): array {
         $query = trim($query);
         $limit = max(1, min($limit, 12));
+        return array_slice($this->ranked_candidates($query, $limit), 0, $limit);
+    }
+
+    /**
+     * @param list<string> $seen_chunk_ids
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     known_matches: list<array<array-key, mixed>>,
+     *     novel_count: int,
+     *     reused_count: int,
+     *     exhausted: bool
+     * }
+     */
+    public function search_with_novelty(string $query, int $limit, array $seen_chunk_ids): array {
+        $limit = max(1, min($limit, 12));
+
+        return new KnowledgeNoveltyFilter()->select(
+            $this->ranked_candidates(trim($query), max(12, $limit * 4)),
+            $seen_chunk_ids,
+            $limit,
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function ranked_candidates(string $query, int $limit): array {
+        if ('' === $query) {
+            return [];
+        }
+
+        $limit = max(1, min($limit, 48));
         $tokens = $this->ranker->tokens($query);
-        $keyword_ranked = [] === $tokens ? [] : $this->rank_keyword_rows($this->index->search_chunks($tokens), $tokens);
-        $semantic_ranked = $this->semantic->rank($query);
+        $keyword_ranked = [] === $tokens
+            ? []
+            : $this->rank_keyword_rows($this->index->search_chunks($tokens), $tokens, $query);
+        $semantic_ranked = $this->weight_semantic_rows($this->semantic->rank($query), $query);
 
         if ([] === $keyword_ranked && [] === $semantic_ranked) {
             return [];
         }
 
         if ([] === $semantic_ranked) {
-            return array_slice($keyword_ranked, 0, $limit);
+            return $this->diversify($keyword_ranked, $limit);
         }
 
         if ([] === $keyword_ranked) {
-            return array_slice($semantic_ranked, 0, $limit);
+            return $this->diversify($semantic_ranked, $limit);
         }
 
-        return $this->fusion->fuse($keyword_ranked, $semantic_ranked, $limit);
+        return $this->diversify($this->fusion->fuse($keyword_ranked, $semantic_ranked, $limit * 3), $limit);
     }
 
     public function format_context_for_prompt(string $query): string {
@@ -90,7 +124,7 @@ final class KnowledgeSearchService {
      * @param list<string>               $tokens
      * @return list<array<string, mixed>>
      */
-    private function rank_keyword_rows(array $rows, array $tokens): array {
+    private function rank_keyword_rows(array $rows, array $tokens, string $query): array {
         $ranked = [];
 
         foreach ($rows as $row) {
@@ -101,11 +135,110 @@ final class KnowledgeSearchService {
             }
 
             $result['match'] = 'keyword';
+            $result['score'] =
+                (float) $result['score']
+                * $this->source_weight(
+                    (string) ($result['source_kind'] ?? ''),
+                    (array) ($result['metadata'] ?? []),
+                    $query,
+                );
             $ranked[] = $result;
         }
 
         usort($ranked, static fn(array $left, array $right): int => $right['score'] <=> $left['score']);
 
         return $ranked;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $results
+     * @return list<array<string, mixed>>
+     */
+    private function diversify(array $results, int $limit): array {
+        $selected = [];
+        $overflow = [];
+        $per_source = [];
+        $seen_sections = [];
+
+        foreach ($results as $result) {
+            $source_id = (string) ($result['source_id'] ?? '');
+            $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
+            $section = (string) ($metadata['section_key'] ?? $result['chunk_id'] ?? '');
+            $section_key = $source_id . "\0" . $section;
+
+            if (($per_source[$source_id] ?? 0) >= 1) {
+                if (array_key_exists($section_key, $seen_sections)) {
+                    continue;
+                }
+
+                $overflow[] = $result;
+                $seen_sections[$section_key] = true;
+                continue;
+            }
+
+            $selected[] = $result;
+            $per_source[$source_id] = ($per_source[$source_id] ?? 0) + 1;
+            $seen_sections[$section_key] = true;
+
+            if (count($selected) >= $limit) {
+                return $selected;
+            }
+        }
+
+        foreach ($overflow as $result) {
+            $selected[] = $result;
+
+            if (count($selected) >= $limit) {
+                break;
+            }
+        }
+
+        return $selected;
+    }
+
+    /**
+     * @param array<array-key, mixed> $metadata
+     */
+    private function source_weight(string $kind, array $metadata, string $query): float {
+        if (in_array($kind, ['core_knowledge', 'legacy_guideline'], true)) {
+            return 1.30;
+        }
+
+        if ('wp_content' === $kind) {
+            return 1.15;
+        }
+
+        $extension = strtolower((string) ($metadata['extension'] ?? ''));
+
+        if (in_array($extension, ['md', 'markdown', 'txt'], true)) {
+            return 1.20;
+        }
+
+        if (in_array($extension, ['scss', 'css'], true)) {
+            if ((bool) preg_match('/\b(css|scss|selector|class|frontend|style|responsive|breakpoint)\b/i', $query)) {
+                return 1.20;
+            }
+
+            return 0.80;
+        }
+
+        return 1.0;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function weight_semantic_rows(array $rows, string $query): array {
+        foreach ($rows as &$row) {
+            $row['score'] =
+                (float) ($row['score'] ?? 0.0)
+                * $this->source_weight((string) ($row['source_kind'] ?? ''), (array) ($row['metadata'] ?? []), $query);
+        }
+        unset($row);
+
+        usort($rows, static fn(array $left, array $right): int => $right['score'] <=> $left['score']);
+
+        return $rows;
     }
 }

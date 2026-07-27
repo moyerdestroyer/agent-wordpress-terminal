@@ -102,7 +102,7 @@ final class ActionsController extends RestController {
             return $preview;
         }
 
-        if (ActionOperations::CONTENT_UPDATE === $operation && array_key_exists('autosave_id', $preview)) {
+        if (array_key_exists('autosave_id', $preview)) {
             $payload['preview_autosave_id'] = (int) $preview['autosave_id'];
             $this->actions->update_payload((int) $action['id'], $payload);
         }

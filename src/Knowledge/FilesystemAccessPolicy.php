@@ -52,7 +52,7 @@ final class FilesystemAccessPolicy {
      *
      * @var list<string>
      */
-    private const THEME_EXTENSIONS = ['txt', 'md', 'markdown', 'html', 'htm', 'json', 'css', 'scss'];
+    private const THEME_EXTENSIONS = ['txt', 'md', 'markdown', 'html', 'htm', 'json', 'css', 'scss', 'php'];
 
     /**
      * Dependency and generated trees that should never become Knowledge.
@@ -142,12 +142,16 @@ final class FilesystemAccessPolicy {
             return false;
         }
 
-        if (in_array($basename, ['theme.json', 'style.css', 'style.min.css'], true)) {
+        if ('php' === $extension) {
+            return str_starts_with($relative, 'patterns/');
+        }
+
+        if ('theme.json' === $basename) {
             return true;
         }
 
         if (in_array($extension, ['css', 'scss'], true)) {
-            return true;
+            return !str_ends_with($basename, '.min.css');
         }
 
         // Theme author docs (CivicPress docs/, AGENTS guides, pattern write-ups).

@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Knowledge;
 
 use AWPT\Database\KnowledgeIndexRepository;
+use AWPT\Database\KnowledgeRunRepository;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -22,35 +23,28 @@ if (!defined('ABSPATH')) {
 final class KnowledgeIndexerStatus {
     private KnowledgeIndexRepository $index;
     private EmbeddingService $embeddings;
+    private KnowledgeRunRepository $runs;
 
-    public function __construct(?KnowledgeIndexRepository $index = null, ?EmbeddingService $embeddings = null) {
+    public function __construct(
+        ?KnowledgeIndexRepository $index = null,
+        ?EmbeddingService $embeddings = null,
+        ?KnowledgeRunRepository $runs = null,
+    ) {
         $this->index = $index ?? new KnowledgeIndexRepository();
         $this->embeddings = $embeddings ?? new EmbeddingService();
+        $this->runs = $runs ?? new KnowledgeRunRepository();
     }
 
-    /**
-     * @return array{
-     *     source_count: int,
-     *     source_kinds: array<string, int|string>,
-     *     chunk_count: int,
-     *     stale: bool,
-     *     needs_rebuild: bool,
-     *     last_indexed_at: string,
-     *     last_error: string,
-     *     progress: array<string, mixed>,
-     *     embedding: array<string, mixed>,
-     *     filesystem: array{allowed_roots: mixed, max_file_size: int},
-     *     repository: array<string, mixed>,
-     *     site_content_index: array<string, mixed>
-     * }
-     */
+    /** @return array<string, mixed> */
     public function build(): array {
         $source_count = $this->index->count_sources();
         $source_kinds = $this->index->count_sources_by_kind();
-        $counts = KnowledgeIndexer::cached_counts();
-        $chunk_count = $counts['chunk_count'];
-        $embedded_count = $counts['embedded_chunks'];
+        $chunk_count = $this->index->count_chunks();
+        $semantic_count = $this->index->count_semantic_chunks();
+        $embedded_count = $this->index->count_chunks_with_embedding_profile($this->embeddings->profile());
         $stale = '1' === (string) get_option('awpt_knowledge_stale', '0');
+        $progress = KnowledgeIndexer::progress();
+        $run_id = (int) ($progress['run_id'] ?? 0);
 
         return [
             'source_count' => $source_count,
@@ -60,8 +54,15 @@ final class KnowledgeIndexerStatus {
             'needs_rebuild' => 0 === $source_count || $stale,
             'last_indexed_at' => (string) get_option('awpt_knowledge_last_indexed_at', ''),
             'last_error' => (string) get_option('awpt_knowledge_last_error', ''),
-            'progress' => KnowledgeIndexer::progress(),
-            'embedding' => $this->embedding_status($embedded_count, $chunk_count),
+            'progress' => $progress,
+            'embedding' => $this->embedding_status($embedded_count, $semantic_count),
+            'profiles' => [
+                'index' => KnowledgeIndexProfile::value(),
+                'chunker' => KnowledgeTextChunker::VERSION,
+                'embedding' => $this->embeddings->profile(),
+            ],
+            'vector_backend' => KnowledgeVectorIndex::resolve()->health(),
+            'recent_failures' => $run_id > 0 ? $this->runs->recent_failures($run_id) : [],
             'filesystem' => [
                 'allowed_roots' => new FilesystemSourceReader()->allowed_roots(),
                 'max_file_size' => (int) get_option(
@@ -79,7 +80,7 @@ final class KnowledgeIndexerStatus {
     /**
      * @return array<string, mixed>
      */
-    private function embedding_status(int $embedded_count, int $chunk_count): array {
+    private function embedding_status(int $embedded_count, int $semantic_count): array {
         $available = $this->embeddings->is_available();
         $enabled = $this->embeddings->is_enabled();
         $provider = $this->embeddings->provider_label();
@@ -104,7 +105,7 @@ final class KnowledgeIndexerStatus {
                 /* translators: 1: embedded chunk count, 2: total chunk count, 3: provider, 4: model */
                 __('Hybrid retrieval (%1$d/%2$d chunks embedded via %3$s · %4$s).', 'agent-wordpress-terminal'),
                 $embedded_count,
-                $chunk_count,
+                $semantic_count,
                 $provider,
                 $model,
             );
@@ -126,6 +127,7 @@ final class KnowledgeIndexerStatus {
             'provider' => $provider,
             'model' => $model,
             'embedded_chunks' => $embedded_count,
+            'backlog_chunks' => $enabled ? max(0, $semantic_count - $embedded_count) : 0,
             'last_error' => $last_error,
             'label' => $label,
         ];

@@ -62,6 +62,47 @@ final class MessageRepository {
     }
 
     /**
+     * Fetch recent persisted tool evidence for session-level reuse.
+     *
+     * @return list<array{tool: string, input: array<array-key, mixed>, output: array<array-key, mixed>, status: string}>
+     */
+    public function recent_tool_calls(int $session_id, int $limit = 160): array {
+        $wpdb = WpDb::get();
+        $limit = max(1, min(400, $limit));
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT tool_name, input_json, output_json, status
+                FROM {$wpdb->prefix}awpt_tool_calls
+                WHERE session_id = %d
+                ORDER BY id DESC
+                LIMIT %d",
+                $session_id,
+                $limit,
+            ),
+            ARRAY_A,
+        );
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $calls = [];
+
+        foreach (array_reverse($rows) as $row) {
+            $input = json_decode((string) ($row['input_json'] ?? ''), true);
+            $output = json_decode((string) ($row['output_json'] ?? ''), true);
+            $calls[] = [
+                'tool' => (string) ($row['tool_name'] ?? ''),
+                'input' => is_array($input) ? $input : [],
+                'output' => is_array($output) ? $output : [],
+                'status' => (string) ($row['status'] ?? ''),
+            ];
+        }
+
+        return $calls;
+    }
+
+    /**
      * Fetch session transcript messages, oldest first.
      *
      * @return array<int, array<string, string>>

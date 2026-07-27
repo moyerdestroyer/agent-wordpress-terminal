@@ -176,10 +176,23 @@ export async function getKnowledgeStatus(): Promise<KnowledgeStatus> {
 export async function rebuildKnowledge(): Promise<{
 	status: KnowledgeStatus;
 	in_progress?: boolean;
+	run_id?: number;
 }> {
-	return apiFetch<{ status: KnowledgeStatus; in_progress?: boolean }>({
+	return apiFetch<{ status: KnowledgeStatus; in_progress?: boolean; run_id?: number }>({
 		path: path('/knowledge/rebuild'),
 		method: 'POST',
+	});
+}
+
+export async function processKnowledge(runId: number): Promise<{
+	status: KnowledgeStatus;
+	in_progress?: boolean;
+	run_id?: number;
+}> {
+	return apiFetch({
+		path: path('/knowledge/process'),
+		method: 'POST',
+		data: { run_id: runId },
 	});
 }
 

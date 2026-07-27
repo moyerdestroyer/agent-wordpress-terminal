@@ -4,6 +4,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import {
 	getKnowledgeSettings,
 	getKnowledgeStatus,
+	processKnowledge,
 	rebuildKnowledge,
 	updateKnowledgeSettings,
 } from '../api';
@@ -108,7 +109,10 @@ export function KnowledgePanel(): JSX.Element {
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [isRebuilding, setIsRebuilding] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const isIndexing = isRebuilding || status?.progress.state === 'indexing';
+	const isIndexing =
+		isRebuilding ||
+		status?.progress.state === 'discovering' ||
+		status?.progress.state === 'indexing';
 	const progress = status?.progress;
 
 	const refresh = async (): Promise<KnowledgeStatus> => {
@@ -153,16 +157,29 @@ export function KnowledgePanel(): JSX.Element {
 			return;
 		}
 
+		let processing = false;
 		const poll = (): void => {
-			void getKnowledgeStatus()
-				.then(setStatus)
-				.catch(() => {});
+			if (processing) {
+				return;
+			}
+
+			processing = true;
+			const runId = status?.progress.run_id ?? 0;
+			const request = runId > 0 ? processKnowledge(runId) : getKnowledgeStatus();
+			void request
+				.then((response) => {
+					setStatus('status' in response ? response.status : response);
+				})
+				.catch(() => {})
+				.finally(() => {
+					processing = false;
+				});
 		};
 		poll();
-		const interval = window.setInterval(poll, 1000);
+		const interval = window.setInterval(poll, 1500);
 
 		return () => window.clearInterval(interval);
-	}, [isIndexing]);
+	}, [isIndexing, status?.progress.run_id]);
 
 	const handleRebuild = async (): Promise<void> => {
 		setIsRebuilding(true);
@@ -245,9 +262,13 @@ export function KnowledgePanel(): JSX.Element {
 					</progress>
 					<p>
 						{sprintf(
-							/* translators: 1: indexed source count, 2: indexed chunk count */
-							__('%1$d indexed · %2$d chunks prepared', 'agent-wordpress-terminal'),
+							/* translators: 1: indexed source count, 2: unchanged source count, 3: indexed chunk count */
+							__(
+								'%1$d updated · %2$d unchanged · %3$d chunks prepared',
+								'agent-wordpress-terminal',
+							),
 							progress?.indexed_sources ?? 0,
+							progress?.unchanged_sources ?? 0,
 							progress?.indexed_chunks ?? 0,
 						)}
 					</p>
@@ -265,7 +286,10 @@ export function KnowledgePanel(): JSX.Element {
 			<dl className="awpt-knowledge-status">
 				<div>
 					<dt>{__('Backend', 'agent-wordpress-terminal')}</dt>
-					<dd>{status?.repository.label ?? __('Unknown', 'agent-wordpress-terminal')}</dd>
+					<dd>
+						{status?.repository.label ?? __('Unknown', 'agent-wordpress-terminal')} ·{' '}
+						{status?.vector_backend.backend ?? 'local'}
+					</dd>
 				</div>
 				<div>
 					<dt>{__('Index', 'agent-wordpress-terminal')}</dt>
@@ -288,7 +312,7 @@ export function KnowledgePanel(): JSX.Element {
 						{(status?.filesystem.allowed_roots.length ?? 0) > 0
 							? sprintf(
 									/* translators: %d: number of document roots */
-									__('%d folders (theme + uploads + custom)', 'agent-wordpress-terminal'),
+									__('%d folders (theme + custom)', 'agent-wordpress-terminal'),
 									status?.filesystem.allowed_roots.length ?? 0,
 								)
 							: __('None', 'agent-wordpress-terminal')}
@@ -312,6 +336,11 @@ export function KnowledgePanel(): JSX.Element {
 			{status?.embedding.last_error ? (
 				<p className="awpt-knowledge-error">{status.embedding.last_error}</p>
 			) : null}
+			{status?.recent_failures?.map((failure) => (
+				<p className="awpt-knowledge-error" key={`${failure.source_kind}:${failure.source_id}`}>
+					<strong>{failure.source_id}</strong>: {failure.error_text}
+				</p>
+			))}
 
 			<Button variant="secondary" onClick={() => void handleRebuild()} disabled={isIndexing}>
 				{isIndexing
@@ -325,7 +354,7 @@ export function KnowledgePanel(): JSX.Element {
 					{sprintf(
 						/* translators: %s: file size label */
 						__(
-							'Indexes theme design context (theme.json, styles, templates, CSS, and docs) plus documents from uploads and extra folders. Dependency and generated directories are excluded. Default max file size: %s.',
+							'Indexes authored site content, Media Library documents, theme.json, templates, patterns, docs, and canonical source styles. Compiled CSS, dependency trees, and automatic uploads traversal are excluded. Default max file size: %s.',
 							'agent-wordpress-terminal',
 						),
 						formatBytes(settings?.max_file_size ?? 2097152),
@@ -343,7 +372,7 @@ export function KnowledgePanel(): JSX.Element {
 				<TextareaControl
 					label={__('Extra document folders', 'agent-wordpress-terminal')}
 					help={__(
-						'One absolute path per line under wp-content. Document formats are indexed; code, dependencies, and generated files are excluded.',
+						'One explicit path per line under wp-content. Media Library files do not need to be added here. Dependencies and generated files are excluded.',
 						'agent-wordpress-terminal',
 					)}
 					value={rootsText}
@@ -382,11 +411,11 @@ export function KnowledgePanel(): JSX.Element {
 					help={
 						settings?.embedding_provider === 'openrouter'
 							? __(
-									'OpenRouter model id (for example, openai/text-embedding-3-small). Rebuild after changing.',
+									'OpenRouter model id (for example, openai/text-embedding-3-small). Changing it schedules a compatible embedding refresh without reusing old vectors.',
 									'agent-wordpress-terminal',
 								)
 							: __(
-									'Provider model id (for OpenAI, text-embedding-3-small). Rebuild after changing.',
+									'Provider model id (for OpenAI, text-embedding-3-small). Changing it schedules a compatible embedding refresh without reusing old vectors.',
 									'agent-wordpress-terminal',
 								)
 					}

@@ -31,5 +31,29 @@ function test_generation_budget_recognizes_revision_requests(): void {
     );
 }
 
+function test_generation_budget_inherits_content_path_on_retry(): void {
+    $budget = new GenerationBudget();
+    $retry = 'Try again, please.';
+    $prior = 'Make a new page, please. Make a civicpress landing page for WMLS.';
+
+    Assert::false(
+        $budget->is_content_request($retry),
+        'retry alone without session context must stay on the short path',
+    );
+    Assert::true($budget->is_content_request($retry, [
+        'prior_user_messages' => [$prior, $retry],
+    ]), 'retry after a page-create request should inherit the content budget');
+    Assert::same(24_000, $budget->for_message($retry, 3, [
+        'prior_user_messages' => [$prior, $retry],
+    ]), 'retry composition after tools should get the large content budget');
+    Assert::true($budget->is_content_request('Hey, try it again!', [
+        'has_open_new_post_proposal' => true,
+    ]), 'retry with an open new-post proposal should use the content path');
+    Assert::false($budget->is_content_request('What plugins are active?', [
+        'has_open_new_post_proposal' => true,
+    ]), 'factual questions must not inherit content budget from an open proposal alone');
+}
+
 test_generation_budget_recognizes_generate_page_requests();
 test_generation_budget_recognizes_revision_requests();
+test_generation_budget_inherits_content_path_on_retry();

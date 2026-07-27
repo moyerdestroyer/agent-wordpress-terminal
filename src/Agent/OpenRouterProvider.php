@@ -21,17 +21,21 @@ final class OpenRouterProvider extends ChatCompletionsProvider {
     /**
      * Default OpenRouter model when no explicit model is configured.
      *
-     * DeepSeek V4 Flash is the balanced agent default: tool-capable, long context,
-     * and cheap enough for multi-step ability loops. Override with Pro or another
-     * OpenRouter ID when a site needs more headroom.
+     * DeepSeek V4 Pro is the agent default: stronger at long-horizon tool loops and
+     * large structured post_content (pattern-adapted landing pages). Override with
+     * deepseek/deepseek-v4-flash or another OpenRouter ID when cost matters more.
      */
-    private const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
+    private const DEFAULT_MODEL = 'deepseek/deepseek-v4-pro';
 
     /**
      * Get provider name.
      */
     public function get_name(): string {
         return 'OpenRouter';
+    }
+
+    public function accepts_image_input(): bool {
+        return new OpenRouterModelCapabilities()->accepts_images($this->get_model());
     }
 
     /**

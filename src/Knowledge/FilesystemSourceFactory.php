@@ -34,19 +34,34 @@ final class FilesystemSourceFactory {
         string $root,
         string $root_type = FilesystemAccessPolicy::ROOT_CUSTOM,
     ): ?array {
+        $descriptor = $this->describe_file($path, $root, $root_type);
+
+        return null !== $descriptor ? $this->load_descriptor($descriptor) : null;
+    }
+
+    /**
+     * Build a cheap source descriptor without reading or extracting file content.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function describe_file(
+        string $path,
+        string $root,
+        string $root_type = FilesystemAccessPolicy::ROOT_CUSTOM,
+    ): ?array {
         if (!$this->policy->can_read_file($path, $root, $root_type)) {
             return null;
         }
 
         $real = (string) realpath($path);
-        $extension = strtolower(pathinfo($real, PATHINFO_EXTENSION));
-        $content = 'pdf' === $extension ? $this->pdf->extract($real) : $this->read_text_file($real, $extension);
 
-        if ('' === trim($content)) {
+        if (FilesystemAccessPolicy::ROOT_CUSTOM === $root_type && $this->is_media_library_file($real)) {
             return null;
         }
 
+        $extension = strtolower(pathinfo($real, PATHINFO_EXTENSION));
         $size = filesize($real);
+        $modified = filemtime($real);
         $relative = $this->relative_path($real, $root);
         $label = '' !== $relative ? $relative : basename($real);
 
@@ -63,8 +78,16 @@ final class FilesystemSourceFactory {
             'path' => $real,
             'label' => $label,
             'uri' => $real,
-            'content' => $content,
-            'modified_at' => gmdate('Y-m-d H:i:s', (int) filemtime($real)),
+            'content' => '',
+            'content_type' => $this->content_type($extension),
+            'semantic_eligible' => !in_array($extension, ['css', 'scss'], true),
+            'discovery_fingerprint' => hash('sha256', implode(':', [
+                KnowledgeIndexProfile::SOURCE_POLICY_VERSION,
+                $real,
+                (string) (is_int($size) ? $size : 0),
+                (string) (is_int($modified) ? $modified : 0),
+            ])),
+            'modified_at' => gmdate('Y-m-d H:i:s', (int) $modified),
             'metadata' => [
                 'extension' => $extension,
                 'size' => is_int($size) ? $size : 0,
@@ -73,6 +96,59 @@ final class FilesystemSourceFactory {
                 'relative_path' => $relative,
             ],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $descriptor
+     * @return array<string, mixed>|null
+     */
+    public function load_descriptor(array $descriptor): ?array {
+        $path = (string) ($descriptor['path'] ?? '');
+        $extension = strtolower((string) ($descriptor['metadata']['extension'] ?? ''));
+
+        if ('' === $path || !is_readable($path)) {
+            return null;
+        }
+
+        $content = 'pdf' === $extension ? $this->pdf->extract($path) : $this->read_text_file($path, $extension);
+
+        if ('' === trim($content)) {
+            return null;
+        }
+
+        $descriptor['content'] = $content;
+
+        return $descriptor;
+    }
+
+    private function content_type(string $extension): string {
+        return match ($extension) {
+            'json' => 'json',
+            'csv' => 'csv',
+            'pdf' => 'pdf',
+            'css' => 'css',
+            'scss' => 'scss',
+            'html', 'htm', 'php' => 'gutenberg',
+            default => 'prose',
+        };
+    }
+
+    private function is_media_library_file(string $path): bool {
+        if (!function_exists('attachment_url_to_postid')) {
+            return false;
+        }
+
+        $uploads = wp_get_upload_dir();
+        $basedir = is_string($uploads['basedir'] ?? null) ? rtrim($uploads['basedir'], '/\\') : '';
+        $baseurl = is_string($uploads['baseurl'] ?? null) ? rtrim($uploads['baseurl'], '/') : '';
+
+        if ('' === $basedir || '' === $baseurl || !str_starts_with($path, trailingslashit($basedir))) {
+            return false;
+        }
+
+        $relative = ltrim(str_replace('\\', '/', substr($path, strlen($basedir))), '/');
+
+        return attachment_url_to_postid($baseurl . '/' . $relative) > 0;
     }
 
     private function relative_path(string $path, string $root): string {
@@ -99,7 +175,7 @@ final class FilesystemSourceFactory {
             return '';
         }
 
-        if (in_array($extension, ['html', 'htm'], true)) {
+        if (in_array($extension, ['html', 'htm', 'php'], true)) {
             $content = $this->preserve_wordpress_block_markup($content);
         }
 

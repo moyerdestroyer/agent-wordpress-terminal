@@ -19,6 +19,10 @@ if (!defined('ABSPATH')) {
  * that has one canonical representation in the editor.
  */
 final class PostCompositionNormalizer {
+    public function __construct(
+        private readonly AttachmentBlockUrlNormalizer $attachment_urls = new AttachmentBlockUrlNormalizer(),
+    ) {}
+
     /**
      * @return array{content: string, repairs: list<array{kind: string, block_path: string, block_name: string, description: string}>}
      */
@@ -51,6 +55,21 @@ final class PostCompositionNormalizer {
 
             if (in_array($name, ['core/group', 'core/cover'], true)) {
                 $this->normalize_wrapper($block, $attrs, $path, $name, $repairs);
+                $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : $attrs;
+            }
+
+            $repaired_attachment_id = $this->attachment_urls->normalize($block, $attrs, $name);
+
+            if ($repaired_attachment_id > 0) {
+                $repairs[] = [
+                    'kind' => 'canonical_attachment_url',
+                    'block_path' => $path,
+                    'block_name' => $name,
+                    'description' => sprintf(
+                        'Used the canonical Media Library URL for attachment #%d.',
+                        $repaired_attachment_id,
+                    ),
+                ];
             }
 
             if ('core/cover' === $name && (int) ($attrs['id'] ?? 0) > 0) {
@@ -69,6 +88,10 @@ final class PostCompositionNormalizer {
                 }
             }
 
+            if ('core/list' === $name) {
+                $this->normalize_list_items($block, $path, $repairs);
+            }
+
             $inner_blocks = new BlockTreePathHelpers()->inner_blocks($block);
 
             if ([] !== $inner_blocks) {
@@ -79,6 +102,86 @@ final class PostCompositionNormalizer {
         }
 
         return $blocks;
+    }
+
+    /**
+     * Convert legacy bare-&lt;li&gt; lists into nested core/list-item blocks.
+     *
+     * @param array<string, mixed> $block
+     * @param list<array{kind: string, block_path: string, block_name: string, description: string}> $repairs
+     */
+    private function normalize_list_items(array &$block, string $path, array &$repairs): void {
+        $inner_blocks = new BlockTreePathHelpers()->inner_blocks($block);
+        $inner_html = (string) ($block['innerHTML'] ?? '');
+
+        if ($this->has_named_inner_block($inner_blocks, 'core/list-item')) {
+            return;
+        }
+
+        if (!str_contains(strtolower($inner_html), '<li')) {
+            return;
+        }
+
+        $matches = [];
+
+        if (false === preg_match_all('/<li\b[^>]*>.*?<\/li>/is', $inner_html, $matches) || [] === $matches[0]) {
+            return;
+        }
+
+        $items = [];
+
+        foreach ($matches[0] as $li_html) {
+            if ('' === $li_html) {
+                continue;
+            }
+
+            $items[] = [
+                'blockName' => 'core/list-item',
+                'attrs' => [],
+                'innerBlocks' => [],
+                'innerHTML' => $li_html,
+                'innerContent' => [$li_html],
+            ];
+        }
+
+        if ([] === $items) {
+            return;
+        }
+
+        $tag = (bool) preg_match('/<\s*ol\b/i', $inner_html) ? 'ol' : 'ul';
+        $class_match = [];
+        $class_attr = '';
+
+        if (preg_match('/<\s*' . $tag . '\b[^>]*\bclass=("|\')(.*?)\1/i', $inner_html, $class_match)) {
+            $class_attr = ' class=' . $class_match[1] . $class_match[2] . $class_match[1];
+        } elseif (!str_contains(strtolower($inner_html), 'wp-block-list')) {
+            $class_attr = ' class="wp-block-list"';
+        }
+
+        $open = '<' . $tag . $class_attr . '>';
+        $close = '</' . $tag . '>';
+        $inner_content = [$open];
+
+        foreach ($items as $_) {
+            $inner_content[] = null;
+        }
+
+        $inner_content[] = $close;
+        $joined_items = implode('', array_map(static fn(array $item): string => $item['innerHTML'], $items));
+
+        $block['innerBlocks'] = $items;
+        $block['innerContent'] = $inner_content;
+        $block['innerHTML'] = $open . $joined_items . $close;
+
+        $repairs[] = [
+            'kind' => 'list_item_delimiters',
+            'block_path' => $path,
+            'block_name' => 'core/list',
+            'description' => __(
+                'Wrapped bare list items in core/list-item block delimiters.',
+                'agent-wordpress-terminal',
+            ),
+        ];
     }
 
     /**
@@ -215,5 +318,18 @@ final class PostCompositionNormalizer {
         }
 
         unset($part);
+    }
+
+    /**
+     * @param array<int|string, array<string, mixed>> $blocks
+     */
+    private function has_named_inner_block(array $blocks, string $name): bool {
+        foreach ($blocks as $inner) {
+            if ($name === (string) ($inner['blockName'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

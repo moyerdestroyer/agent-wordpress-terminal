@@ -92,7 +92,7 @@ final class Page {
         register_setting('awpt_settings', 'awpt_openrouter_model', [
             'type' => 'string',
             'sanitize_callback' => [$this, 'sanitize_openrouter_model'],
-            'default' => 'deepseek/deepseek-v4-flash',
+            'default' => 'deepseek/deepseek-v4-pro',
         ]);
     }
 
@@ -378,15 +378,15 @@ final class Page {
                     value="<?php echo
                         esc_attr($this->sanitize_openrouter_model(get_option(
                             'awpt_openrouter_model',
-                            'deepseek/deepseek-v4-flash',
+                            'deepseek/deepseek-v4-pro',
                         )))
                     ; ?>"
-                    placeholder="deepseek/deepseek-v4-flash"
+                    placeholder="deepseek/deepseek-v4-pro"
                 />
                 <p class="description">
                     <?php echo
                         esc_html(__(
-                            'Defaults to DeepSeek V4 Flash (deepseek/deepseek-v4-flash) — strong for agent tool loops at low cost. Override with deepseek/deepseek-v4-pro or any other exact OpenRouter model ID.',
+                            'Defaults to DeepSeek V4 Pro (deepseek/deepseek-v4-pro) for multi-step tool loops and page composition. When this model cannot read images, AWPT automatically uses an OpenRouter vision model once to describe them, then returns control to DeepSeek. Image-bearing turns therefore include an additional, variably priced request. Override the primary model with deepseek/deepseek-v4-flash for lower cost, or any exact OpenRouter model ID.',
                             'agent-wordpress-terminal',
                         ))
                     ; ?>
@@ -448,10 +448,10 @@ final class Page {
         $model = trim(sanitize_text_field((string) $value));
 
         if ('' === $model || in_array($model, ['openrouter/auto', 'openrouter/auto-beta'], true)) {
-            return 'deepseek/deepseek-v4-flash';
+            return 'deepseek/deepseek-v4-pro';
         }
 
-        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'deepseek/deepseek-v4-flash';
+        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'deepseek/deepseek-v4-pro';
     }
 
     /**

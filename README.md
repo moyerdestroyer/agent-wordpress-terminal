@@ -13,13 +13,14 @@ AWPT is an admin cockpit where you chat with an AI agent that can inspect your s
 | **Requires** | WordPress 6.9+, PHP 8.4+ |
 | **Where** | Settings → Agent Terminal |
 | **Providers** | OpenRouter or OpenAI API keys (WordPress Connectors optional) |
-| **Status** | MVP `0.1.0` |
+| **Status** | `0.2.0` |
 
 ## What it does
 
 - **Chat terminal** in wp-admin with sessions, tool calls, and staged action cards
 - **Open tool discovery** — site Abilities and WordPress MCP tools are available; turn individual tools off if you want
 - **Block-aware editing** — path/fingerprint block tree, propose attr updates, insert/remove blocks
+- **Vision-aware composition** — text-only primary models use a bounded OpenRouter vision sidecar for supplied media
 - **Knowledge** — index site content, theme files, docs, and PDFs; keyword search with optional hybrid embeddings
 - **Human-in-the-loop writes** — destructive or content-changing work is proposed, previewed, then applied only on approval
 
@@ -61,21 +62,25 @@ For contributor detail, see [`AGENTS.md`](./AGENTS.md). Product intent lives in 
 
 ## Releases
 
-Version **0.1.0** is the MVP cut. Installable zips are built by GitHub Actions when a version tag is pushed.
+Version **0.2.0** adds theme-aware page composition, vision fallback for text-only models, bounded
+discovery and proposal finalization, vector-ready Knowledge indexing, richer diagnostics, and
+deterministic Media Library handling. Installable zips are built by GitHub Actions when a version
+tag is pushed.
 
 ### Cutting a release
 
-1. Bump the version in **all three** places (they must match the tag without the `v` prefix):
+1. Bump the version in **all four** places (they must match the tag without the `v` prefix):
    - `agent-wordpress-terminal.php` plugin header `Version:`
    - `AWPT_VERSION` constant in the same file
    - `package.json` `"version"`
+   - `package-lock.json` root/package versions
 2. Commit the bump on `master`.
 3. Tag and push:
 
 ```bash
-git tag -a v0.1.0 -m "Release 0.1.0"
+git tag -a v0.2.0 -m "Release 0.2.0"
 git push origin master
-git push origin v0.1.0
+git push origin v0.2.0
 ```
 
 The [Release](.github/workflows/release.yml) workflow will:

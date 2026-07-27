@@ -33,7 +33,7 @@ final class ToolResultContentFormatter {
             return $listed;
         }
 
-        if ('awpt/knowledge-auto-retrieval' === $tool) {
+        if (in_array($tool, ['awpt/knowledge-auto-retrieval', 'awpt/search-knowledge'], true)) {
             return $this->format_knowledge($output);
         }
 
@@ -203,7 +203,13 @@ final class ToolResultContentFormatter {
         }
 
         foreach (array_slice($patterns, 0, 12) as $pattern) {
-            $lines[] = sprintf('- %s — %s', (string) ($pattern['name'] ?? ''), (string) ($pattern['title'] ?? ''));
+            $owner = str_replace('_', ' ', (string) ($pattern['owner'] ?? ''));
+            $lines[] = sprintf(
+                '- %s — %s%s',
+                (string) ($pattern['name'] ?? ''),
+                (string) ($pattern['title'] ?? ''),
+                '' !== $owner ? sprintf(' [%s]', $owner) : '',
+            );
         }
 
         $suggestions = $this->list_items($output['suggested_patterns'] ?? []);
@@ -346,14 +352,13 @@ final class ToolResultContentFormatter {
      * @param array<array-key, mixed> $output
      */
     private function format_knowledge(array $output): string {
-        $results = $this->list_items($output['results'] ?? []);
+        $results = $this->list_items($output['results'] ?? $output['items'] ?? []);
+        $known = $this->list_items($output['known_matches'] ?? []);
 
-        if ([] === $results) {
-            return __('No automatic Knowledge excerpts were added to context.', 'agent-wordpress-terminal');
+        if ([] === $results && [] === $known) {
+            return __('No Knowledge excerpts matched this query.', 'agent-wordpress-terminal');
         }
 
-        $lines = [__('Automatic Knowledge context added.', 'agent-wordpress-terminal')];
-        // fix string - use original
         $lines = [__('Automatic Knowledge context added:', 'agent-wordpress-terminal')];
 
         foreach (array_slice($results, 0, 5) as $result) {
@@ -362,6 +367,21 @@ final class ToolResultContentFormatter {
                 __('- %1$s (%2$s)', 'agent-wordpress-terminal'),
                 (string) ($result['label'] ?? ''),
                 (string) ($result['source_kind'] ?? ''),
+            );
+        }
+
+        if ([] !== $known) {
+            $lines[] = sprintf(
+                /* translators: %d: number of previously seen matching chunks */
+                __('Reused %d matching chunk reference(s) already known in this session.', 'agent-wordpress-terminal'),
+                count($known),
+            );
+        }
+
+        if ((bool) ($output['exhausted'] ?? false)) {
+            $lines[] = __(
+                'No new chunks remain for this query; refine the evidence gap or act.',
+                'agent-wordpress-terminal',
             );
         }
 

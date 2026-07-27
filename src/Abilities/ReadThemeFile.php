@@ -48,6 +48,13 @@ final class ReadThemeFile implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    'purpose' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional concrete compatibility question this file read should answer.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                     'stylesheet' => [
                         'type' => 'string',
                         'description' => __(

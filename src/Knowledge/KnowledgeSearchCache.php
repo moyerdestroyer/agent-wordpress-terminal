@@ -52,6 +52,39 @@ final class KnowledgeSearchCache {
         return self::$results[$key];
     }
 
+    /**
+     * @param list<string> $seen_chunk_ids
+     * @return array{
+     *     query: string,
+     *     query_fingerprint: string,
+     *     items: list<array<string, mixed>>,
+     *     known_matches: list<array<array-key, mixed>>,
+     *     novel_count: int,
+     *     reused_count: int,
+     *     exhausted: bool
+     * }
+     */
+    public function context(string $query, int $limit = 6, array $seen_chunk_ids = []): array {
+        $retrieval_query = new KnowledgeQueryNormalizer()->for_retrieval(trim($query));
+        $empty = [
+            'query' => $retrieval_query,
+            'query_fingerprint' => hash('sha256', mb_strtolower($retrieval_query)),
+            'items' => [],
+            'known_matches' => [],
+            'novel_count' => 0,
+            'reused_count' => 0,
+            'exhausted' => false,
+        ];
+
+        if ('' === $retrieval_query || !KnowledgeIndexer::retrieval_is_available()) {
+            return $empty;
+        }
+
+        $novelty = new KnowledgeSearchService()->search_with_novelty($retrieval_query, $limit, $seen_chunk_ids);
+
+        return array_merge($empty, $novelty);
+    }
+
     public function format_context_for_prompt(string $query): string {
         $normalized = trim($query);
 
@@ -87,6 +120,56 @@ final class KnowledgeSearchCache {
                 (string) ($result['label'] ?? ''),
                 (string) ($result['excerpt'] ?? ''),
             );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<array-key, mixed> $context
+     */
+    public function format_retrieval_context(array $context): string {
+        $items = is_array($context['items'] ?? null) ? $context['items'] : [];
+        $known = is_array($context['known_matches'] ?? null) ? $context['known_matches'] : [];
+
+        if ([] === $items && [] === $known) {
+            return 'Retrieved knowledge: none.';
+        }
+
+        $lines = [
+            'Retrieved Knowledge evidence. [new] excerpts are new to this session; [known] references were already shown and remain reusable:',
+        ];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $metadata = is_array($item['metadata'] ?? null) ? $item['metadata'] : [];
+            $lines[] = sprintf(
+                '- [new chunk:%s] %s%s: %s',
+                substr((string) ($item['chunk_id'] ?? ''), 0, 12),
+                (string) ($item['label'] ?? ''),
+                '' !== (string) ($metadata['heading_path'] ?? '') ? ' § ' . (string) $metadata['heading_path'] : '',
+                (string) ($item['excerpt'] ?? ''),
+            );
+        }
+
+        foreach ($known as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $lines[] = sprintf(
+                '- [known chunk:%s] %s%s',
+                substr((string) ($item['chunk_id'] ?? ''), 0, 12),
+                (string) ($item['label'] ?? ''),
+                '' !== (string) ($item['heading_path'] ?? '') ? ' § ' . (string) $item['heading_path'] : '',
+            );
+        }
+
+        if ((bool) ($context['exhausted'] ?? false)) {
+            $lines[] = 'This query produced no new chunks; refine the missing evidence or act on the known evidence.';
         }
 
         return implode("\n", $lines);

@@ -91,10 +91,11 @@ function test_theme_policy_keeps_design_context_only(): void {
     $files = [
         'theme.json' => true,
         'style.css' => true,
+        'style.min.css' => false,
         'styles/brand.json' => true,
         'templates/page.html' => true,
         'parts/header.html' => true,
-        'patterns/call-to-action.php' => false,
+        'patterns/call-to-action.php' => true,
         'patterns/call-to-action.html' => true,
         'patterns/call-to-action.json' => true,
         'README.md' => true,

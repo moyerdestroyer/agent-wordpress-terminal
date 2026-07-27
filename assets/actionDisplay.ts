@@ -151,6 +151,25 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 			value: postReference,
 		},
 		{
+			label: __('Design basis', 'agent-wordpress-terminal'),
+			value: payload.composition_context
+				? [
+						payload.composition_context.theme_name,
+						payload.composition_context.stylesheet
+							? `(${payload.composition_context.stylesheet})`
+							: '',
+						payload.composition_context.pattern_name
+							? `· ${payload.composition_context.pattern_name}`
+							: '',
+						payload.composition_context.fallback_reason
+							? `· ${payload.composition_context.fallback_reason}`
+							: '',
+					]
+						.filter(Boolean)
+						.join(' ')
+				: '',
+		},
+		{
 			label: __('Status', 'agent-wordpress-terminal'),
 			value: statusValue,
 		},

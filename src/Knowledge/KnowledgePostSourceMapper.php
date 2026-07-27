@@ -59,6 +59,20 @@ final class KnowledgePostSourceMapper {
             'label' => $this->label($post),
             'uri' => get_permalink($post),
             'content' => $content,
+            'content_type' => match (true) {
+                'attachment' === $post->post_type
+                    && str_contains(strtolower((string) get_post_mime_type($post->ID)), 'pdf')
+                    => 'pdf',
+                'wp_template' === $post->post_type || 'wp_template_part' === $post->post_type => 'gutenberg',
+                default => 'prose',
+            },
+            'semantic_eligible' => true,
+            'discovery_fingerprint' => hash('sha256', implode(':', [
+                KnowledgeIndexProfile::SOURCE_POLICY_VERSION,
+                (string) $post->ID,
+                $post->post_modified_gmt,
+                $post->post_status,
+            ])),
             'modified_at' => $post->post_modified_gmt,
             'types' => $types,
             'metadata' => [

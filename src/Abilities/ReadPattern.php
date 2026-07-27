@@ -23,7 +23,16 @@ final class ReadPattern implements AbilityInterface {
             ),
             'input_schema' => [
                 'type' => 'object',
-                'properties' => ['name' => ['type' => 'string']],
+                'properties' => [
+                    'name' => ['type' => 'string'],
+                    'purpose' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional concrete layout role or compatibility question this read should answer.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                ],
                 'required' => ['name'],
             ],
             'output_schema' => ['type' => 'object'],
@@ -52,9 +61,12 @@ final class ReadPattern implements AbilityInterface {
         $content = (string) ($pattern['content'] ?? '');
         $tree = BlockTree::from_content($content);
 
-        return array_merge(new PatternCatalog()->summary($pattern), [
+        $catalog = new PatternCatalog();
+
+        return array_merge($catalog->summary($pattern), [
             'content' => $content,
             'blocks' => $tree->normalized(),
+            'design_dependencies' => $catalog->design_dependencies($content),
         ]);
     }
 }

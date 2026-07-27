@@ -80,6 +80,12 @@ final class KnowledgeRrfFusion {
      * @param array<string, mixed> $item
      */
     private function result_key(array $item): string {
+        $chunk_id = (string) ($item['chunk_id'] ?? '');
+
+        if ('' !== $chunk_id) {
+            return 'chunk:' . $chunk_id;
+        }
+
         $id = (int) ($item['id'] ?? 0);
 
         if ($id > 0) {

@@ -58,7 +58,7 @@ final class ReadKnowledge implements AbilityInterface {
     public function can_read(array $input): bool {
         $post_id = (int) ($input['id'] ?? 0);
 
-        return $post_id > 0 && current_user_can('read_post', $post_id);
+        return $post_id > 0 && current_user_can('manage_options') && current_user_can('read_post', $post_id);
     }
 
     /**

@@ -31,6 +31,13 @@ final class ListPatterns implements AbilityInterface {
                         ),
                     ],
                     'max' => ['type' => 'integer'],
+                    'post_type' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional target post type, such as page or post, used to rank compatibility.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                 ],
             ],
             'output_schema' => ['type' => 'object'],
@@ -50,12 +57,15 @@ final class ListPatterns implements AbilityInterface {
     public function execute(array $input): array|\WP_Error {
         $catalog = new PatternCatalog();
         $search = sanitize_text_field((string) ($input['search'] ?? ''));
-        $patterns = $catalog->list($search, (int) ($input['max'] ?? 100));
+        $post_type = sanitize_key((string) ($input['post_type'] ?? ''));
+        $patterns = $catalog->list($search, (int) ($input['max'] ?? 100), $post_type);
 
         $output = [
             'count' => count($patterns),
             'patterns' => $patterns,
             'search' => $search,
+            'post_type' => $post_type,
+            'design_context' => $catalog->design_context(),
         ];
 
         if ('' !== $search && [] === $patterns) {
@@ -63,10 +73,13 @@ final class ListPatterns implements AbilityInterface {
                 'No pattern metadata matched this search. Pattern search matches names, titles, descriptions, and categories—not the subject of the page. This does not mean compatible patterns are unavailable.',
                 'agent-wordpress-terminal',
             );
-            $output['available_count'] = count($catalog->list('', 200));
-            $output['suggested_patterns'] = $catalog->suggestions($search, 12);
+            $output['available_count'] = count($catalog->list('', 200, $post_type));
+            $output['suggested_patterns'] = $catalog->suggestions($search, 12, $post_type);
             $output['recommended_next_tools'] = [
-                ['tool' => 'awpt/list-patterns', 'input' => ['search' => '', 'max' => 24]],
+                [
+                    'tool' => 'awpt/list-patterns',
+                    'input' => ['search' => '', 'max' => 24, 'post_type' => $post_type],
+                ],
             ];
         }
 

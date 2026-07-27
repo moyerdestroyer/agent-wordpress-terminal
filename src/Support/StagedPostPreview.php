@@ -93,7 +93,7 @@ final class StagedPostPreview {
             return;
         }
 
-        if (ActionOperations::CONTENT_UPDATE === $operation || ActionOperations::BLOCK_ATTRS_UPDATE === $operation) {
+        if (in_array($operation, ActionOperations::PREVIEWABLE, true) && ActionOperations::NEW_POST !== $operation) {
             $this->content_autosaves->discard($payload);
         }
     }
@@ -186,7 +186,15 @@ final class StagedPostPreview {
             );
         }
 
-        $preview_url = get_preview_post_link($post);
+        // WordPress only overlays a per-user autosave onto the frontend post when the
+        // preview URL carries preview_id + preview_nonce. Plain `?preview=true` (what
+        // get_preview_post_link() emits by default) leaves published/saved content in
+        // place — so staged content_update / block edits would show the old page.
+        // Core's own "Preview" button does the same when latest edits live in autosave.
+        $preview_url = get_preview_post_link($post, [
+            'preview_id' => $post_id,
+            'preview_nonce' => wp_create_nonce('post_preview_' . $post_id),
+        ]);
 
         if (!is_string($preview_url) || '' === $preview_url) {
             $preview_url = get_permalink($post);

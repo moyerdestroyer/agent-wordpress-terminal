@@ -80,6 +80,18 @@ export interface ActionPayload {
 	pattern_mode?: 'prepend' | 'adapted';
 	pattern_title?: string;
 	pattern_source?: string;
+	pattern_owner?: string;
+	pattern_fallback_reason?: string;
+	composition_context?: {
+		policy?: string;
+		theme_name?: string;
+		stylesheet?: string;
+		template?: string;
+		pattern_name?: string;
+		pattern_owner?: string;
+		fallback_used?: boolean;
+		fallback_reason?: string;
+	};
 	required_attachment_ids?: number[];
 	required_minimum_library_images?: number;
 	required_minimum_visuals?: number;
@@ -196,12 +208,16 @@ export interface KnowledgeStatus {
 	last_indexed_at: string;
 	last_error: string;
 	progress: {
-		state: 'indexing' | 'idle' | 'failed';
+		run_id: number;
+		state: 'discovering' | 'indexing' | 'idle' | 'failed';
+		phase: string;
 		processed_sources: number;
 		total_sources: number;
 		indexed_sources: number;
 		indexed_chunks: number;
 		embedded_chunks: number;
+		unchanged_sources: number;
+		failed_sources: number;
 	};
 	embedding: {
 		available: boolean;
@@ -209,9 +225,25 @@ export interface KnowledgeStatus {
 		provider: string;
 		model: string;
 		embedded_chunks?: number;
+		backlog_chunks?: number;
 		last_error?: string;
 		label: string;
 	};
+	profiles: {
+		index: string;
+		chunker: string;
+		embedding: string;
+	};
+	vector_backend: {
+		backend: string;
+		available: boolean;
+		detail: string;
+	};
+	recent_failures: Array<{
+		source_kind: string;
+		source_id: string;
+		error_text: string;
+	}>;
 	filesystem: {
 		allowed_roots: string[];
 		max_file_size: number;
@@ -279,4 +311,25 @@ export interface ChatProgress {
 	total: number;
 	sequence: number;
 	updated_at: string;
+	diagnostics?: {
+		provider?: string;
+		mode?: string;
+		tool_count?: number;
+		completion_budget?: number;
+		request_timeout_seconds?: number;
+		proposal_only?: boolean;
+		last_completed_call?: {
+			provider?: string;
+			model?: string;
+			tool_round?: number | string;
+			outcome?: string;
+			error_code?: string;
+			completion_budget?: number | string;
+			prompt_tokens?: number | string;
+			completion_tokens?: number | string;
+			total_tokens?: number | string;
+			duration_ms?: number | string;
+			created_at?: string;
+		};
+	};
 }

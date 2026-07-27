@@ -57,9 +57,40 @@ final class FilesystemSourceReader {
     public function list_sources(): array {
         $sources = [];
 
+        foreach ($this->list_descriptors() as $descriptor) {
+            $source = $this->load_descriptor($descriptor);
+
+            if (null !== $source) {
+                $sources[] = $source;
+            }
+        }
+
+        return $sources;
+    }
+
+    /**
+     * Discover files using only path metadata.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function list_descriptors(): array {
+        $sources = [];
+
         foreach ($this->roots->root_definitions() as $definition) {
-            foreach ($this->files_in_root($definition['path']) as $path) {
-                $source = $this->factory->from_file($path, $definition['path'], $definition['type']);
+            $files = $this->files_in_root($definition['path']);
+            $has_scss =
+                FilesystemAccessPolicy::ROOT_THEME === $definition['type']
+                && [] !== array_filter(
+                    $files,
+                    static fn(string $path): bool => 'scss' === strtolower(pathinfo($path, PATHINFO_EXTENSION)),
+                );
+
+            foreach ($files as $path) {
+                if ($has_scss && 'css' === strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+                    continue;
+                }
+
+                $source = $this->factory->describe_file($path, $definition['path'], $definition['type']);
 
                 if (null !== $source) {
                     $sources[] = $source;
@@ -68,6 +99,14 @@ final class FilesystemSourceReader {
         }
 
         return $sources;
+    }
+
+    /**
+     * @param array<string, mixed> $descriptor
+     * @return array<string, mixed>|null
+     */
+    public function load_descriptor(array $descriptor): ?array {
+        return $this->factory->load_descriptor($descriptor);
     }
 
     /**

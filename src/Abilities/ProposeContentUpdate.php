@@ -11,10 +11,14 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
+use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\NewPostStagingDraft;
+use AWPT\Support\PatternCatalog;
+use AWPT\Support\PatternFallbackPolicy;
 use AWPT\Support\PostContentSanitizer;
+use AWPT\Support\SiteDesignContext;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -99,6 +103,21 @@ final class ProposeContentUpdate implements AbilityInterface {
                         'type' => 'string',
                         'description' => __('Affected block range or content area.', 'agent-wordpress-terminal'),
                     ],
+                    'pattern_name' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional registered or reusable pattern used as provenance for a substantial layout rewrite. Read it before adapting.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_fallback_reason' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'For a substantial layout rewrite, explain why Core or custom composition is preferable when theme-native patterns are available.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_read_verified' => ['type' => 'boolean'],
                 ],
                 'required' => ['session_id', 'post_id', 'title', 'description'],
             ],
@@ -173,6 +192,73 @@ final class ProposeContentUpdate implements AbilityInterface {
 
         if (array_key_exists('post_content', $input)) {
             $payload['post_content'] = PostContentSanitizer::for_staged_update((string) $input['post_content']);
+        }
+
+        $design_level = new SiteDesignContext()->request_level(new MessageRepository()->latest_user_message(
+            $session_id,
+        ));
+        $substantial_design_update =
+            array_key_exists('post_content', $input)
+            && in_array($design_level, [SiteDesignContext::LEVEL_COMPOSITION, SiteDesignContext::LEVEL_SECTION], true);
+        $pattern_name = sanitize_text_field((string) ($input['pattern_name'] ?? ''));
+        $fallback_reason = sanitize_textarea_field((string) ($input['pattern_fallback_reason'] ?? ''));
+        $pattern_owner = 'custom';
+
+        if ('' !== $pattern_name) {
+            $patterns = new PatternCatalog();
+            $pattern = $patterns->find($pattern_name);
+
+            if (null === $pattern) {
+                return new \WP_Error(
+                    'awpt_pattern_not_found',
+                    __('The requested pattern is not available.', 'agent-wordpress-terminal'),
+                    ['status' => 404],
+                );
+            }
+
+            if (
+                array_key_exists('pattern_read_verified', $input)
+                && !filter_var($input['pattern_read_verified'], FILTER_VALIDATE_BOOLEAN)
+            ) {
+                return new \WP_Error(
+                    'awpt_pattern_not_read',
+                    __(
+                        'Read the selected pattern before using it as the basis for a layout rewrite.',
+                        'agent-wordpress-terminal',
+                    ),
+                    [
+                        'status' => 400,
+                        'recommended_next_tools' => [
+                            ['tool' => 'awpt/read-pattern', 'input' => ['name' => $pattern_name]],
+                        ],
+                    ],
+                );
+            }
+
+            $summary = $patterns->summary($pattern, $post->post_type);
+            $pattern_owner = (string) ($summary['owner'] ?? 'other');
+            $payload['pattern_name'] = $pattern_name;
+            $payload['pattern_mode'] = 'adapted';
+            $payload['pattern_title'] = (string) ($summary['title'] ?? '');
+            $payload['pattern_source'] = (string) ($summary['source'] ?? '');
+            $payload['pattern_owner'] = $pattern_owner;
+        }
+
+        if ($substantial_design_update) {
+            $fallback_error = new PatternFallbackPolicy()->validate(
+                new PatternCatalog(),
+                $post->post_type,
+                $pattern_owner,
+                $fallback_reason,
+            );
+
+            if (null !== $fallback_error) {
+                return $fallback_error;
+            }
+        }
+
+        if ('' !== $fallback_reason) {
+            $payload['pattern_fallback_reason'] = $fallback_reason;
         }
 
         if (array_key_exists('post_status', $input)) {

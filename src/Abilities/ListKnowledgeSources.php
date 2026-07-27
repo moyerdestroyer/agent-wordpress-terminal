@@ -65,7 +65,7 @@ final class ListKnowledgeSources implements AbilityInterface {
     public function can_list(array $input): bool {
         unset($input);
 
-        return current_user_can('edit_posts');
+        return current_user_can('manage_options');
     }
 
     /**

@@ -22,6 +22,10 @@ final class AwptBudgetTestProvider implements ProviderInterface {
         return 'Budget test';
     }
 
+    public function accepts_image_input(): bool {
+        return false;
+    }
+
     /** @return array<string, mixed> */
     public function tool_result(int $number): array {
         $calls = [[
@@ -100,6 +104,10 @@ final class AwptRecoveryStallTestProvider implements ProviderInterface {
 
     public function get_name(): string {
         return 'Recovery stall test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
     }
 
     /** @return array<string, mixed> */
@@ -191,6 +199,10 @@ final class AwptFailedFollowUpProvider implements ProviderInterface {
     public function get_name(): string {
         return 'Failed follow-up test';
     }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
 }
 
 function test_provider_runtime_formats_discovery_only_once_after_follow_up_failure(): void {
@@ -231,3 +243,223 @@ function test_provider_runtime_formats_discovery_only_once_after_follow_up_failu
 }
 
 test_provider_runtime_formats_discovery_only_once_after_follow_up_failure();
+
+final class AwptCompositionGateProvider implements ProviderInterface {
+    public int $completions = 0;
+    public bool $timeout_first = false;
+    public bool $timeout_always = false;
+
+    public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
+        ++$this->completions;
+        Assert::same(1, count($tools), 'composition phase should expose only the proposal tool');
+        Assert::true(
+            is_array($options['tool_choice'] ?? null),
+            'direct providers should receive a forced proposal function choice',
+        );
+        Assert::same(
+            16_000,
+            (int) ($options['max_completion_tokens'] ?? 0),
+            'proposal-only finalization should use the bounded composition budget',
+        );
+
+        if ($this->timeout_always || $this->timeout_first && 1 === $this->completions) {
+            return new WP_Error('http_request_failed', 'Operation timed out.');
+        }
+
+        if ($this->timeout_first) {
+            Assert::same(3, count($messages), 'timeout retry should use compact evidence messages');
+        }
+
+        $calls = [[
+            'id' => 'call-proposal-' . $this->completions,
+            'function' => ['name' => 'awpt__propose_new_post', 'arguments' => '{}'],
+        ]];
+
+        return [
+            'content' => '',
+            'raw_tool_calls' => $calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+            'model' => 'fake',
+            'usage' => [],
+        ];
+    }
+
+    public function get_name(): string {
+        return 'Composition gate test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
+}
+
+/** @return array<string, mixed> */
+function awpt_discovery_result_for_runtime(): array {
+    $calls = [
+        [
+            'id' => 'call-patterns',
+            'function' => ['name' => 'awpt__list_patterns', 'arguments' => '{"post_type":"page"}'],
+        ],
+        [
+            'id' => 'call-media',
+            'function' => [
+                'name' => 'awpt__list_content',
+                'arguments' => '{"post_type":"attachment","limit":8}',
+            ],
+        ],
+        [
+            'id' => 'call-layout',
+            'function' => [
+                'name' => 'awpt__read_pattern',
+                'arguments' => '{"name":"civicpress/layout-page-landing-page","purpose":"Establish the page structure"}',
+            ],
+        ],
+        [
+            'id' => 'call-hero',
+            'function' => [
+                'name' => 'awpt__read_pattern',
+                'arguments' => '{"name":"civicpress/header-hero","purpose":"Adapt the hero"}',
+            ],
+        ],
+        [
+            'id' => 'call-tagline',
+            'function' => [
+                'name' => 'awpt__read_pattern',
+                'arguments' => '{"name":"civicpress/section-tagline","purpose":"Adapt the tagline"}',
+            ],
+        ],
+        [
+            'id' => 'call-list',
+            'function' => [
+                'name' => 'awpt__read_pattern',
+                'arguments' => '{"name":"civicpress/section-graphic-list","purpose":"Adapt league highlights"}',
+            ],
+        ],
+        [
+            'id' => 'call-cta',
+            'function' => [
+                'name' => 'awpt__read_pattern',
+                'arguments' => '{"name":"civicpress/section-call-to-action","purpose":"Adapt ticket CTA"}',
+            ],
+        ],
+    ];
+
+    return [
+        'content' => '',
+        'raw_tool_calls' => $calls,
+        'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+        'model' => 'fake',
+        'usage' => [],
+    ];
+}
+
+function awpt_register_composition_gate_tools(): ToolRegistry {
+    add_filter('awpt_mcp_tools', static fn(): array => [
+        ['name' => 'awpt/list-patterns', 'description' => 'List patterns.', 'readonly' => true],
+        ['name' => 'awpt/list-content', 'description' => 'List media.', 'readonly' => true],
+        ['name' => 'awpt/read-pattern', 'description' => 'Read pattern.', 'readonly' => true],
+        [
+            'name' => 'awpt/propose-new-post',
+            'description' => 'Stage proposal.',
+            'readonly' => false,
+            'destructive' => false,
+            'requires_approval' => true,
+        ],
+    ]);
+    add_filter(
+        'awpt_mcp_execute_tool',
+        static function (mixed $result, string $tool_name): array {
+            unset($result);
+
+            return match ($tool_name) {
+                'awpt/list-patterns' => ['patterns' => [['name' => 'civicpress/layout-page-landing-page']]],
+                'awpt/list-content' => ['items' => [['id' => 128, 'type' => 'attachment']]],
+                'awpt/read-pattern' => [
+                    'name' => 'civicpress/layout-page-landing-page',
+                    'composition_scope' => 'layout',
+                    'design_dependencies' => ['requires_theme_research' => true],
+                    'content' => '<!-- wp:group /-->',
+                ],
+                default => ['id' => 91, 'title' => 'Staged landing page', 'status' => 'proposed'],
+            };
+        },
+        10,
+        2,
+    );
+
+    return new ToolRegistry();
+}
+
+function test_provider_runtime_forces_proposal_after_sufficient_discovery(): void {
+    awpt_test_reset_state();
+    $provider = new AwptCompositionGateProvider();
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Create a page using images from my media library.']],
+        awpt_discovery_result_for_runtime(),
+        [
+            'tool_registry' => awpt_register_composition_gate_tools(),
+            'is_content_turn' => true,
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 240,
+        ],
+    );
+
+    Assert::same(1, $provider->completions, 'sufficient discovery should immediately enter composition');
+    Assert::same(1, count($result['actions']), 'proposal-only completion should stage an action');
+}
+
+function test_provider_runtime_retries_timed_out_finalization_once_with_compact_evidence(): void {
+    awpt_test_reset_state();
+    $provider = new AwptCompositionGateProvider();
+    $provider->timeout_first = true;
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Create a page using images from my media library.']],
+        awpt_discovery_result_for_runtime(),
+        [
+            'tool_registry' => awpt_register_composition_gate_tools(),
+            'is_content_turn' => true,
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 240,
+        ],
+    );
+
+    Assert::same(2, $provider->completions, 'finalization timeout should retry exactly once');
+    Assert::same(1, count($result['actions']), 'successful retry should stage the proposal');
+}
+
+function test_provider_runtime_explains_failed_finalization_with_turn_diagnostics(): void {
+    awpt_test_reset_state();
+    $provider = new AwptCompositionGateProvider();
+    $provider->timeout_always = true;
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Create a page using images from my media library.']],
+        awpt_discovery_result_for_runtime(),
+        [
+            'tool_registry' => awpt_register_composition_gate_tools(),
+            'is_content_turn' => true,
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 240,
+        ],
+    );
+
+    Assert::same(2, $provider->completions, 'failed finalization should make only one compact retry');
+    Assert::true(str_contains($result['content'], 'proposal retry'), 'failure should identify the orchestration phase');
+    Assert::true(
+        str_contains($result['content'], '7 verified tool results'),
+        'failure should report the evidence count',
+    );
+    Assert::true(
+        str_contains($result['content'], '16000-token completion budget'),
+        'failure should report the bounded budget',
+    );
+}
+
+test_provider_runtime_forces_proposal_after_sufficient_discovery();
+test_provider_runtime_retries_timed_out_finalization_once_with_compact_evidence();
+test_provider_runtime_explains_failed_finalization_with_turn_diagnostics();

@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Database;
 
 use AWPT\Support\ActionOperations;
+use AWPT\Support\CompositionActionContext;
 use AWPT\Support\Json;
 
 if (!defined('ABSPATH')) {
@@ -325,6 +326,6 @@ final class ActionRepository {
      * @return array<string, mixed>
      */
     public function sanitize_payload(array $payload): array {
-        return new ActionPayloadSanitizer()->sanitize($payload);
+        return new ActionPayloadSanitizer()->sanitize(new CompositionActionContext()->enrich($payload));
     }
 }

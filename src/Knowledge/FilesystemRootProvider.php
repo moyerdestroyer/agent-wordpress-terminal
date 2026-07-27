@@ -74,15 +74,6 @@ final class FilesystemRootProvider {
      */
     private function configured_roots(): array {
         $roots = [];
-        $upload_dir = wp_get_upload_dir();
-
-        if (is_string($upload_dir['basedir'] ?? null)) {
-            $roots[] = [
-                'path' => $upload_dir['basedir'],
-                'type' => FilesystemAccessPolicy::ROOT_UPLOADS,
-            ];
-        }
-
         $stylesheet = get_stylesheet_directory();
         $template = get_template_directory();
 

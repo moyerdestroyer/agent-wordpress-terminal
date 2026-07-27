@@ -29,6 +29,11 @@ interface ProviderInterface {
     public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error;
 
     /**
+     * Whether this provider's active model accepts image_url message parts.
+     */
+    public function accepts_image_input(): bool;
+
+    /**
      * Provider identifier.
      */
     public function get_name(): string;

@@ -61,6 +61,7 @@ final class MediaLibraryVisualEvidence {
                     $url,
                 ),
             ];
+
             $data_url = $this->data_url($id, $total_bytes);
 
             if (null !== $data_url) {
@@ -71,7 +72,108 @@ final class MediaLibraryVisualEvidence {
         return count($parts) > 1 ? ['role' => 'user', 'content' => $parts] : null;
     }
 
-    private function data_url(int $attachment_id, int &$total_bytes): ?string {
+    /**
+     * Build multimodal parts for composer-pasted Media Library attachments.
+     *
+     * Prefers local data URLs so private/dev hosts never depend on the provider
+     * fetching WordPress URLs. Falls back to a remote URL only when it looks
+     * provider-fetchable; otherwise text-only evidence is enough for block attrs.
+     *
+     * @param array<array-key, mixed> $attachments
+     * @return list<array<string, mixed>>
+     */
+    public function parts_for_composer_attachments(array $attachments): array {
+        $parts = [];
+        $total_bytes = 0;
+        $image_count = 0;
+
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment) || $image_count >= self::MAX_IMAGES) {
+                break;
+            }
+
+            $id = (int) ($attachment['id'] ?? 0);
+            $url = trim((string) ($attachment['url'] ?? ''));
+
+            if ($id <= 0 && '' === $url) {
+                continue;
+            }
+
+            $parts[] = [
+                'type' => 'text',
+                'text' => sprintf(
+                    'Attached image: %s (Media Library attachment #%d)',
+                    '' !== $url ? $url : '(no url)',
+                    $id,
+                ),
+            ];
+            ++$image_count;
+
+            $image_url = null;
+
+            if ($id > 0) {
+                $image_url = $this->data_url($id, $total_bytes);
+            }
+
+            if (null === $image_url && '' !== $url && $this->is_provider_fetchable_url($url)) {
+                $image_url = $url;
+            }
+
+            if (null !== $image_url) {
+                $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $image_url]];
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Whether a remote provider can realistically fetch this image URL.
+     *
+     * Blocks localhost, private networks, and common local/dev TLDs. Public
+     * https hosts remain eligible when a local data URL is unavailable.
+     */
+    public function is_provider_fetchable_url(string $url): bool {
+        $parts = wp_parse_url($url);
+
+        if (!is_array($parts)) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $host = strtolower((string) ($parts['host'] ?? ''));
+
+        if ('' === $host) {
+            return false;
+        }
+
+        if (in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true)) {
+            return false;
+        }
+
+        foreach (['.local', '.totem', '.internal', '.lan', '.localhost', '.test', '.invalid'] as $suffix) {
+            if (str_ends_with($host, $suffix)) {
+                return false;
+            }
+        }
+
+        if (false !== filter_var($host, FILTER_VALIDATE_IP)) {
+            return false !== filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+            );
+        }
+
+        return true;
+    }
+
+    public function data_url(int $attachment_id, int &$total_bytes): ?string {
         if (!function_exists('get_attached_file') || !function_exists('get_post_mime_type')) {
             return null;
         }

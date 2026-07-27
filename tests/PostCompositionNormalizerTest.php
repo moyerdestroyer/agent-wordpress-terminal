@@ -57,6 +57,56 @@ function test_post_composition_normalizer_repairs_cover_and_media_text_classes()
     );
 }
 
+function test_post_composition_normalizer_uses_canonical_attachment_urls(): void {
+    awpt_test_reset_state();
+
+    foreach ([113, 126, 128] as $id) {
+        $attachment = new WP_Post();
+        $attachment->ID = $id;
+        $attachment->post_type = 'attachment';
+        $GLOBALS['awpt_test_posts'][$id] = $attachment;
+        $GLOBALS['awpt_test_attachment_is_image'][$id] = true;
+        $GLOBALS['awpt_test_attachment_urls'][$id] = "https://example.test/uploads/real-{$id}.png";
+    }
+
+    $source =
+        '<!-- wp:cover {"id":128,"url":"https://example.test/uploads/image-128.png"} -->'
+        . '<div class="wp-block-cover"><img src="https://example.test/uploads/image-128.png" '
+        . 'srcset="https://example.test/uploads/image-128-2x.png 2x" class="wp-image-128" /></div>'
+        . '<!-- /wp:cover -->'
+        . '<!-- wp:image {"id":126,"sizeSlug":"large"} --><figure class="wp-block-image">'
+        . '<img src="https://example.test/uploads/image-126.png" class="wp-image-126" /></figure>'
+        . '<!-- /wp:image -->'
+        . '<!-- wp:media-text {"mediaId":113,"mediaType":"image"} --><div class="wp-block-media-text">'
+        . '<figure><img src="https://example.test/uploads/image-113.png" class="wp-image-113 size-full" /></figure>'
+        . '</div><!-- /wp:media-text -->';
+    $result = new PostCompositionNormalizer()->normalize($source);
+
+    foreach ([113, 126, 128] as $id) {
+        Assert::true(
+            str_contains($result['content'], "https://example.test/uploads/real-{$id}.png"),
+            "attachment #{$id} should use its canonical Media Library URL",
+        );
+        Assert::false(
+            str_contains($result['content'], "https://example.test/uploads/image-{$id}.png"),
+            "the invented URL for attachment #{$id} should be removed",
+        );
+    }
+
+    Assert::false(str_contains($result['content'], 'srcset='), 'stale responsive candidates should be removed');
+    Assert::same(
+        3,
+        count(array_filter(
+            $result['repairs'],
+            static fn(array $repair): bool => 'canonical_attachment_url' === ($repair['kind'] ?? ''),
+        )),
+        'each repaired image-bearing block should be reported',
+    );
+
+    $second = new PostCompositionNormalizer()->normalize($result['content']);
+    Assert::same([], $second['repairs'], 'canonical attachment URL repair should be idempotent');
+}
+
 function test_post_composition_normalizer_is_idempotent_and_does_not_rewrite_copy(): void {
     $normalizer = new PostCompositionNormalizer();
     $first = $normalizer->normalize(
@@ -77,6 +127,38 @@ function test_post_composition_normalizer_is_idempotent_and_does_not_rewrite_cop
     );
 }
 
+function test_post_composition_normalizer_wraps_bare_list_items(): void {
+    $source =
+        '<!-- wp:list -->'
+        . '<ul>'
+        . '<li>If you are under a winter storm warning, <a href="">find shelter</a> right away.</li>'
+        . '<li>Sign up for <a href="">your community’s warning system</a>.</li>'
+        . '</ul>'
+        . '<!-- /wp:list -->';
+    $result = new PostCompositionNormalizer()->normalize($source);
+
+    Assert::same(
+        'list_item_delimiters',
+        $result['repairs'][0]['kind'] ?? '',
+        'bare list items should be wrapped in core/list-item delimiters',
+    );
+    Assert::true(
+        str_contains($result['content'], '<!-- wp:list-item -->'),
+        'serialized content should include list-item block comments',
+    );
+    Assert::true(str_contains($result['content'], 'find shelter'), 'list copy must be preserved through the repair');
+    Assert::same(
+        null,
+        new PostCompositionValidator()->validate($result['content']),
+        'the repaired list should validate for the editor',
+    );
+
+    $second = new PostCompositionNormalizer()->normalize($result['content']);
+    Assert::same([], $second['repairs'], 'list-item repair should be idempotent');
+}
+
 test_post_composition_normalizer_aligns_group_wrapper_metadata();
 test_post_composition_normalizer_repairs_cover_and_media_text_classes();
+test_post_composition_normalizer_uses_canonical_attachment_urls();
 test_post_composition_normalizer_is_idempotent_and_does_not_rewrite_copy();
+test_post_composition_normalizer_wraps_bare_list_items();

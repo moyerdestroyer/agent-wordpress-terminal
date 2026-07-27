@@ -9,7 +9,7 @@
  * Plugin Name:       Agent WordPress Terminal
  * Plugin URI:        https://github.com/awpt/agent-wordpress-terminal
  * Description:       A WordPress-native terminal for agent-assisted site work.
- * Version:           0.1.0
+ * Version:           0.2.0
  * Requires at least: 6.9
  * Requires PHP:      8.4
  * Author:            AWPT Contributors
@@ -35,7 +35,7 @@ function constants(): void {
     }
 
     if (!defined('AWPT_VERSION')) {
-        define('AWPT_VERSION', '0.1.0');
+        define('AWPT_VERSION', '0.2.0');
     }
 
     if (!defined('AWPT_PLUGIN_DIR')) {

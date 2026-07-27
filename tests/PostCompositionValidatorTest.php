@@ -52,10 +52,34 @@ function test_post_composition_validator_rejects_malformed_blocks(): void {
         $unbalanced_error?->get_error_data()['actual_closing_block'] ?? null,
         'mismatch diagnostics should identify the incorrect closing block',
     );
+    Assert::true(
+        str_contains((string) $unbalanced_error?->get_error_message(), 'Open stack:'),
+        'mismatch diagnostics should surface the open block stack',
+    );
     Assert::same(
         'awpt_invalid_block_html',
         $nested_error?->get_error_code(),
         'block-level HTML inside a paragraph should be rejected',
+    );
+}
+
+function test_post_composition_validator_explains_columns_mismatch(): void {
+    $content =
+        '<!-- wp:columns --><div class="wp-block-columns">'
+        . '<!-- wp:column --><div class="wp-block-column"><p>A</p></div><!-- /wp:columns -->';
+    $error = new PostCompositionValidator()->validate($content);
+
+    Assert::same('awpt_unbalanced_block_markup', $error?->get_error_code(), 'columns mismatch should fail');
+    Assert::same('column', $error?->get_error_data()['expected_closing_block'] ?? null, 'expected column closer');
+    Assert::same('columns', $error?->get_error_data()['actual_closing_block'] ?? null, 'found columns closer');
+    Assert::true(
+        str_contains((string) $error?->get_error_message(), 'columns'),
+        'columns-specific recovery hint should appear in the message',
+    );
+    Assert::true(
+        is_string($error?->get_error_data()['recovery'] ?? null)
+        && str_contains((string) ($error?->get_error_data()['recovery'] ?? ''), 're-read'),
+        'recovery should discourage pointless pattern re-reads',
     );
 }
 
@@ -105,6 +129,36 @@ function test_post_composition_validator_enforces_distinct_library_image_count()
     Assert::same(null, new PostCompositionValidator()->validate($three_images, [77], [], '', [
         'minimum_library_images' => 3,
     ]), 'distinct valid image and cover attachment IDs should satisfy the media count');
+}
+
+function test_post_composition_validator_counts_mixed_library_image_blocks(): void {
+    awpt_test_reset_state();
+
+    foreach ([125, 126, 127, 128] as $id) {
+        $attachment = new WP_Post();
+        $attachment->ID = $id;
+        $attachment->post_type = 'attachment';
+        $GLOBALS['awpt_test_posts'][$id] = $attachment;
+        $GLOBALS['awpt_test_attachment_is_image'][$id] = true;
+        $GLOBALS['awpt_test_attachment_urls'][$id] = "https://example.test/image-{$id}.png";
+    }
+
+    $content =
+        '<!-- wp:cover {"dimRatio":10} --><div class="wp-block-cover">'
+        . '<img class="wp-block-cover__image-background" src="https://example.test/image-128.png" />'
+        . '</div><!-- /wp:cover -->'
+        . '<!-- wp:image {"id":126} --><figure class="wp-block-image">'
+        . '<img class="wp-image-126" src="https://example.test/image-126.png" /></figure><!-- /wp:image -->'
+        . '<!-- wp:media-text {"mediaId":127,"mediaType":"image"} --><div class="wp-block-media-text">'
+        . '<figure><img class="wp-image-127 size-full" src="https://example.test/image-127.png" /></figure>'
+        . '</div><!-- /wp:media-text -->'
+        . '<!-- wp:media-text {"mediaId":125,"mediaType":"image"} --><div class="wp-block-media-text">'
+        . '<figure><img class="wp-image-125 size-full" src="https://example.test/image-125.png" /></figure>'
+        . '</div><!-- /wp:media-text -->';
+
+    Assert::same(null, new PostCompositionValidator()->validate($content, [], [], '', [
+        'minimum_library_images' => 4,
+    ]), 'Cover URLs and Media & Text attachment IDs should count as distinct Media Library images');
 }
 
 function test_post_composition_validator_accepts_flexible_visual_placements(): void {
@@ -182,8 +236,10 @@ function test_post_composition_validator_rejects_visible_pattern_placeholders():
 test_post_composition_validator_accepts_required_media_and_link();
 test_post_composition_validator_rejects_featured_only_media();
 test_post_composition_validator_rejects_malformed_blocks();
+test_post_composition_validator_explains_columns_mismatch();
 test_post_composition_validator_accepts_block_after_closed_paragraph();
 test_post_composition_validator_enforces_distinct_library_image_count();
+test_post_composition_validator_counts_mixed_library_image_blocks();
 test_post_composition_validator_accepts_flexible_visual_placements();
 test_post_composition_validator_reports_independent_issues_together();
 test_post_composition_validator_rejects_editor_invalid_static_markup();

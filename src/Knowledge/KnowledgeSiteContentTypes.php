@@ -21,14 +21,39 @@ final class KnowledgeSiteContentTypes {
     /**
      * @var list<string>
      */
-    private const CANDIDATES = ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'];
+    private const STRUCTURAL_TYPES = ['wp_block', 'wp_template', 'wp_template_part'];
+
+    private const FALLBACK_TYPES = ['post', 'page', 'attachment', 'wp_block', 'wp_template', 'wp_template_part'];
 
     /**
      * @return list<string>
      */
     public function installed(): array {
-        return array_values(array_filter(self::CANDIDATES, static fn(string $post_type): bool => post_type_exists(
-            $post_type,
+        $types = self::FALLBACK_TYPES;
+
+        if (function_exists('get_post_types')) {
+            $public = get_post_types(['public' => true, 'show_ui' => true], 'names');
+            $types = [...array_values(array_map('strval', $public)), 'attachment', ...self::STRUCTURAL_TYPES];
+        }
+
+        $types = array_values(array_unique(array_filter(
+            $types,
+            static fn(string $post_type): bool => (
+                !in_array($post_type, ['revision', 'nav_menu_item', 'custom_css', 'customize_changeset'], true)
+                && post_type_exists($post_type)
+            ),
+        )));
+
+        /** @var mixed $filtered */
+        $filtered = apply_filters('awpt_knowledge_site_post_types', $types);
+
+        if (!is_array($filtered)) {
+            return $types;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn(mixed $type): string => sanitize_key((string) $type), $filtered),
+            static fn(string $type): bool => '' !== $type && post_type_exists($type),
         )));
     }
 

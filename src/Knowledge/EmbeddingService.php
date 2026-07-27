@@ -22,6 +22,7 @@ final class EmbeddingService {
     public const OPTION_MODEL = 'awpt_knowledge_embedding_model';
     public const OPTION_LAST_ERROR = 'awpt_knowledge_embedding_last_error';
     public const DEFAULT_MODEL = 'text-embedding-3-small';
+    public const PAYLOAD_VERSION = '2';
 
     private EmbeddingApiClient $client;
 
@@ -45,6 +46,14 @@ final class EmbeddingService {
 
     public function provider_label(): string {
         return $this->client->provider_label();
+    }
+
+    public function profile(): string {
+        return implode(':', [
+            sanitize_key($this->provider_label()),
+            $this->model(),
+            'payload-' . self::PAYLOAD_VERSION,
+        ]);
     }
 
     public function last_error(): string {
@@ -77,15 +86,15 @@ final class EmbeddingService {
     }
 
     /**
-     * Cosine similarity in [0, 1] after shifting from [-1, 1].
+     * Raw cosine similarity in [-1, 1].
      *
      * @param list<float> $left
      * @param list<float> $right
      */
     public function cosine_similarity(array $left, array $right): float {
-        $n = min(count($left), count($right));
+        $n = count($left);
 
-        if ($n <= 0) {
+        if ($n <= 0 || $n !== count($right)) {
             return 0.0;
         }
 
@@ -103,8 +112,6 @@ final class EmbeddingService {
             return 0.0;
         }
 
-        $cosine = $dot / (sqrt($left_norm) * sqrt($right_norm));
-
-        return max(0.0, min(1.0, ($cosine + 1.0) / 2.0));
+        return max(-1.0, min(1.0, $dot / (sqrt($left_norm) * sqrt($right_norm))));
     }
 }

@@ -29,6 +29,14 @@ function test_staged_post_preview(): void {
         str_contains((string) ($prepared['preview_url'] ?? ''), '501'),
         'preview URL should reference the staging draft',
     );
+    Assert::true(
+        str_contains((string) ($prepared['preview_url'] ?? ''), 'preview_id=501'),
+        'preview URL should include preview_id so WP can authorize preview',
+    );
+    Assert::true(
+        str_contains((string) ($prepared['preview_url'] ?? ''), 'preview_nonce='),
+        'preview URL should include preview_nonce so WP overlays staged content',
+    );
     Assert::same(
         1,
         $GLOBALS['awpt_test_post_meta_updates'][501]['_awpt_staging_draft'] ?? null,
@@ -51,6 +59,14 @@ function test_staged_post_preview(): void {
     ]);
     Assert::false(is_wp_error($result), 'existing staging drafts should preview');
     Assert::same('Updated title', $result['title'] ?? null, 'preview title should come from payload');
+    Assert::true(
+        str_contains((string) ($result['preview_url'] ?? ''), 'preview_id=77'),
+        'existing staging draft preview should include preview_id',
+    );
+    Assert::true(
+        str_contains((string) ($result['iframe']['src'] ?? ''), 'preview_nonce='),
+        'iframe src should carry the preview nonce',
+    );
 
     awpt_test_reset_state();
     $GLOBALS['awpt_test_post_meta_updates'][88]['_awpt_staging_draft'] = 1;

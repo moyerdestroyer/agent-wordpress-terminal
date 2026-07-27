@@ -88,7 +88,17 @@ final class ToolResultTruncator {
         }
 
         if (in_array($tool, ['awpt/search-knowledge', 'awpt/knowledge-auto-retrieval'], true)) {
-            $output['results'] = $this->clip_array_items($output['results'] ?? [], 8);
+            if (array_key_exists('results', $output)) {
+                $output['results'] = $this->clip_array_items($output['results'], 8);
+            }
+
+            if (array_key_exists('items', $output)) {
+                $output['items'] = $this->clip_array_items($output['items'], 8);
+            }
+
+            if (array_key_exists('known_matches', $output)) {
+                $output['known_matches'] = $this->clip_array_items($output['known_matches'], 4);
+            }
         }
 
         if ('awpt/read-theme-file' === $tool) {

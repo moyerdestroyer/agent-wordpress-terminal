@@ -62,4 +62,39 @@ final class ProviderCallRepository {
         );
         return is_array($rows) ? array_reverse($rows) : [];
     }
+
+    /** @return array<string, mixed>|null */
+    public function latest_for_turn(int $session_id, string $turn_id): ?array {
+        if ($session_id <= 0 || '' === $turn_id) {
+            return null;
+        }
+
+        global $wpdb;
+
+        if (!$wpdb instanceof \wpdb) {
+            return null;
+        }
+
+        $wpdb = WpDb::get();
+
+        if (!method_exists($wpdb, 'get_row')) {
+            return null;
+        }
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT provider, model, tool_round, outcome, error_code, completion_budget,
+                    prompt_tokens, completion_tokens, total_tokens, duration_ms, created_at
+                FROM {$wpdb->prefix}awpt_provider_calls
+                WHERE session_id = %d AND turn_id = %s
+                ORDER BY id DESC
+                LIMIT 1",
+                $session_id,
+                $turn_id,
+            ),
+            ARRAY_A,
+        );
+
+        return is_array($row) ? $row : null;
+    }
 }

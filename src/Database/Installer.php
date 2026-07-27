@@ -23,7 +23,7 @@ final class Installer {
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '8';
+    private const SCHEMA_VERSION = '9';
 
     /**
      * Plugin activation hook.
@@ -52,6 +52,10 @@ final class Installer {
             self::create_tables();
 
             update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
+
+            if ('' !== $installed_version && version_compare($installed_version, '9', '<')) {
+                update_option('awpt_knowledge_stale', '1', false);
+            }
         } finally {
             delete_option(self::UPGRADE_LOCK_OPTION);
         }
@@ -167,27 +171,81 @@ final class Installer {
 			label varchar(191) NOT NULL DEFAULT '',
 			uri text NULL,
 			content_hash varchar(64) NOT NULL DEFAULT '',
+			discovery_fingerprint varchar(64) NOT NULL DEFAULT '',
+			index_profile varchar(191) NOT NULL DEFAULT '',
+			content_type varchar(50) NOT NULL DEFAULT 'prose',
+			semantic_eligible tinyint(1) unsigned NOT NULL DEFAULT 1,
+			last_seen_run_id bigint(20) unsigned NULL,
 			modified_at datetime NULL,
 			indexed_at datetime NOT NULL,
 			metadata_json longtext NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY source (source_kind, source_id),
 			KEY source_post_id (source_post_id),
-			KEY source_path_hash (source_path_hash)
+			KEY source_path_hash (source_path_hash),
+			KEY last_seen_run_id (last_seen_run_id)
 		) {$charset_collate};";
 
         $knowledge_chunks = "CREATE TABLE {$prefix}knowledge_chunks (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			index_id bigint(20) unsigned NOT NULL,
 			chunk_index int unsigned NOT NULL DEFAULT 0,
+			chunk_id varchar(64) NOT NULL DEFAULT '',
+			chunk_hash varchar(64) NOT NULL DEFAULT '',
 			chunk_text longtext NOT NULL,
 			embedding_json longtext NULL,
+			embedding_profile varchar(191) NOT NULL DEFAULT '',
+			embedding_dimensions int unsigned NOT NULL DEFAULT 0,
+			embedding_state varchar(20) NOT NULL DEFAULT 'none',
 			metadata_json longtext NULL,
 			char_count int unsigned NOT NULL DEFAULT 0,
+			word_count int unsigned NOT NULL DEFAULT 0,
+			token_estimate int unsigned NOT NULL DEFAULT 0,
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			KEY index_id (index_id),
+			KEY chunk_id (chunk_id),
+			KEY embedding_state (embedding_state),
 			FULLTEXT KEY chunk_text (chunk_text)
+		) {$charset_collate};";
+
+        $knowledge_runs = "CREATE TABLE {$prefix}knowledge_runs (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			status varchar(20) NOT NULL DEFAULT 'queued',
+			phase varchar(20) NOT NULL DEFAULT 'discovering',
+			index_profile varchar(191) NOT NULL DEFAULT '',
+			discovered_sources int unsigned NOT NULL DEFAULT 0,
+			processed_sources int unsigned NOT NULL DEFAULT 0,
+			updated_sources int unsigned NOT NULL DEFAULT 0,
+			unchanged_sources int unsigned NOT NULL DEFAULT 0,
+			failed_sources int unsigned NOT NULL DEFAULT 0,
+			indexed_chunks int unsigned NOT NULL DEFAULT 0,
+			embedded_chunks int unsigned NOT NULL DEFAULT 0,
+			error_text longtext NULL,
+			started_at datetime NULL,
+			heartbeat_at datetime NULL,
+			finished_at datetime NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY status (status),
+			KEY created_at (created_at)
+		) {$charset_collate};";
+
+        $knowledge_jobs = "CREATE TABLE {$prefix}knowledge_jobs (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			run_id bigint(20) unsigned NOT NULL,
+			source_kind varchar(50) NOT NULL,
+			source_id varchar(191) NOT NULL,
+			discovery_fingerprint varchar(64) NOT NULL DEFAULT '',
+			payload_json longtext NOT NULL,
+			status varchar(20) NOT NULL DEFAULT 'queued',
+			attempts tinyint unsigned NOT NULL DEFAULT 0,
+			error_text text NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY run_source (run_id, source_kind, source_id),
+			KEY run_status (run_id, status)
 		) {$charset_collate};";
 
         $incidents = "CREATE TABLE {$prefix}incidents (
@@ -230,6 +288,8 @@ final class Installer {
         dbDelta($actions);
         dbDelta($knowledge_index);
         dbDelta($knowledge_chunks);
+        dbDelta($knowledge_runs);
+        dbDelta($knowledge_jobs);
         dbDelta($incidents);
         dbDelta($captures);
     }

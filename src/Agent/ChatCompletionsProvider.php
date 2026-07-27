@@ -19,6 +19,13 @@ if (!defined('ABSPATH')) {
  */
 abstract class ChatCompletionsProvider implements ProviderInterface {
     /**
+     * Whether the configured model accepts image input.
+     */
+    public function accepts_image_input(): bool {
+        return ProviderImageCapability::model_accepts_images($this->get_model());
+    }
+
+    /**
      * Complete a chat request.
      *
      * @param array<int, array<string, mixed>> $messages Conversation messages.
@@ -46,6 +53,17 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                 'Fallback model is not configured. Add a model in AWPT AI connection settings.',
                 'agent-wordpress-terminal',
             ));
+        }
+
+        // DeepSeek and other text-only OpenRouter routes 404 when image_url parts
+        // are present ("No endpoints found that support image input"). Strip before
+        // the first attempt so discovery turns do not burn a failed multimodal hop.
+        if ($this->has_images($messages) && !$this->accepts_image_input()) {
+            $text_only = $this->without_images($messages);
+
+            if (null !== $text_only) {
+                $messages = $text_only;
+            }
         }
 
         $payload = [
@@ -104,9 +122,17 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         $data = json_decode($body, true);
 
         if ($status < 200 || $status >= 300) {
+            $error_text = strtolower(
+                (is_array($data) ? (string) ($data['error']['message'] ?? $data['message'] ?? '') : '') . ' ' . $body,
+            );
+            $image_routing_failure =
+                str_contains($error_text, 'image input')
+                || str_contains($error_text, 'image_url')
+                || str_contains($error_text, 'multimodal')
+                || str_contains($error_text, 'vision');
             $text_only_messages = $this->without_images($messages);
 
-            if (null !== $text_only_messages) {
+            if ($image_routing_failure && null !== $text_only_messages) {
                 $text_only_payload = $payload;
                 $text_only_payload['messages'] = $text_only_messages;
                 $encoded_payload = wp_json_encode($text_only_payload);
@@ -191,6 +217,23 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         }
 
         return $changed ? $messages : null;
+    }
+
+    /** @param array<int, array<string, mixed>> $messages */
+    private function has_images(array $messages): bool {
+        foreach ($messages as $message) {
+            if (!is_array($message['content'] ?? null)) {
+                continue;
+            }
+
+            foreach ($message['content'] as $part) {
+                if (is_array($part) && 'image_url' === ($part['type'] ?? null)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

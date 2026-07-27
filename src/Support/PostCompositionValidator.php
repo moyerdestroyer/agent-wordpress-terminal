@@ -336,7 +336,11 @@ final class PostCompositionValidator {
 
             $inner_blocks = is_array($block['innerBlocks'] ?? null) ? $block['innerBlocks'] : [];
 
-            if ('core/list' === $name && str_contains($inner_html, '<li') && [] === $inner_blocks) {
+            if (
+                'core/list' === $name
+                && str_contains($inner_html, '<li')
+                && !$this->has_named_inner_block($inner_blocks, 'core/list-item')
+            ) {
                 return $this->static_markup_error(
                     $path,
                     $name,
@@ -421,13 +425,17 @@ final class PostCompositionValidator {
             $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
             $inner_html = (string) ($block['innerHTML'] ?? '');
 
-            if (in_array($name, ['core/image', 'core/cover'], true)) {
+            if (in_array($name, ['core/image', 'core/cover', 'core/media-text'], true)) {
                 $id = (int) ($attrs['id'] ?? $attrs['mediaId'] ?? 0);
 
                 $matches = [];
 
                 if ($id <= 0 && preg_match('/\bwp-image-(\d+)\b/', $inner_html, $matches)) {
                     $id = (int) ($matches[1] ?? 0);
+                }
+
+                if ($id <= 0) {
+                    $id = $this->attachment_id_from_image_markup($inner_html);
                 }
 
                 if ($id > 0 && wp_attachment_is_image($id)) {
@@ -443,6 +451,21 @@ final class PostCompositionValidator {
         }
 
         return array_map('intval', array_keys($ids));
+    }
+
+    private function attachment_id_from_image_markup(string $html): int {
+        $matches = [];
+
+        if (
+            !function_exists('attachment_url_to_postid')
+            || !preg_match('/<img\b[^>]*\bsrc=(["\'])(.*?)\1/is', $html, $matches)
+        ) {
+            return 0;
+        }
+
+        $url = html_entity_decode($matches[2] ?? '', ENT_QUOTES | ENT_HTML5);
+
+        return '' !== $url ? absint(attachment_url_to_postid($url)) : 0;
     }
 
     private function validate_block_delimiters(string $content): ?\WP_Error {
@@ -496,22 +519,47 @@ final class PostCompositionValidator {
                 $open = (string) array_pop($stack);
 
                 if ($name !== $open) {
+                    /** @var list<string> $open_stack */
+                    $open_stack = array_values(array_filter(
+                        [...$stack, $open],
+                        static fn(string $block_name): bool => '' !== $block_name,
+                    ));
+                    $stack_preview = [] === $open_stack
+                        ? __('none', 'agent-wordpress-terminal')
+                        : implode(' > ', array_map(static fn(string $name): string => $name, $open_stack));
+                    $hint = '';
+
+                    if (in_array($open, ['columns', 'column'], true) || in_array($name, ['columns', 'column'], true)) {
+                        $hint =
+                            ' '
+                            . __(
+                                'Nested core/columns and core/column closers must match open order: close each column before its parent columns wrapper.',
+                                'agent-wordpress-terminal',
+                            );
+                    }
+
                     return new \WP_Error(
                         'awpt_unbalanced_block_markup',
                         sprintf(
-                            /* translators: 1: expected Gutenberg block name, 2: encountered closing block name. */
+                            /* translators: 1: expected Gutenberg block name, 2: encountered closing block name, 3: open block stack. */
                             __(
-                                'Generated Gutenberg block delimiters are mismatched: expected /wp:%1$s but found /wp:%2$s.',
+                                'Generated Gutenberg block delimiters are mismatched: expected /wp:%1$s but found /wp:%2$s. Open stack: %3$s.',
                                 'agent-wordpress-terminal',
                             ),
                             '' !== $open ? $open : __('none', 'agent-wordpress-terminal'),
                             $name,
-                        ),
+                            $stack_preview,
+                        )
+                            . $hint,
                         [
                             'status' => 400,
                             'expected_closing_block' => $open,
                             'actual_closing_block' => $name,
-                            'open_block_stack' => [...$stack, $open],
+                            'open_block_stack' => $open_stack,
+                            'recovery' => __(
+                                'Fix the mismatched block closers (especially nested columns/column), reuse pattern markup already read in this turn, and resubmit one full post_content. Do not re-list or re-read the same patterns unless switching pattern_name.',
+                                'agent-wordpress-terminal',
+                            ),
                         ],
                     );
                 }
@@ -535,6 +583,19 @@ final class PostCompositionValidator {
         }
 
         return null;
+    }
+
+    /**
+     * @param array<int|string, mixed> $blocks
+     */
+    private function has_named_inner_block(array $blocks, string $name): bool {
+        foreach (ArrayKey::list_of_maps($blocks) as $inner) {
+            if ($name === (string) ($inner['blockName'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

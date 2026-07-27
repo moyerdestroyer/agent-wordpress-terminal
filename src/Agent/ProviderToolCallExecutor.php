@@ -25,6 +25,47 @@ final class ProviderToolCallExecutor {
     /** @var array<int, array<string, true>> */
     private array $read_patterns = [];
 
+    /** @var array<int, array<string, true>> */
+    private array $knowledge_chunks = [];
+
+    /** @var array<int, array<string, true>> */
+    private array $knowledge_queries = [];
+
+    /** @var array<int, list<string>> */
+    private array $knowledge_query_texts = [];
+
+    /** @param array<array-key, mixed> $items */
+    public function seed_knowledge_chunks(int $session_id, array $items): void {
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $chunk_id = (string) ($item['chunk_id'] ?? '');
+
+            if ('' !== $chunk_id) {
+                $this->knowledge_chunks[$session_id][$chunk_id] = true;
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $context */
+    public function seed_knowledge_context(int $session_id, array $context): void {
+        $items = is_array($context['items'] ?? null) ? $context['items'] : [];
+        $this->seed_knowledge_chunks($session_id, $items);
+        $fingerprint = (string) ($context['query_fingerprint'] ?? '');
+
+        if ('' !== $fingerprint) {
+            $this->knowledge_queries[$session_id][$fingerprint] = true;
+        }
+
+        $query = trim((string) ($context['query'] ?? ''));
+
+        if ('' !== $query) {
+            $this->knowledge_query_texts[$session_id][] = $query;
+        }
+    }
+
     /**
      * Execute provider-requested read-only tools.
      *
@@ -150,13 +191,28 @@ final class ProviderToolCallExecutor {
             $input['session_id'] = $session_id;
         }
 
+        if ('awpt/search-knowledge' === $tool_name) {
+            $input['session_id'] = $session_id;
+            $input['seen_chunk_ids'] = array_values(array_keys($this->knowledge_chunks[$session_id] ?? []));
+            $input['seen_query_fingerprints'] = array_values(array_keys($this->knowledge_queries[$session_id] ?? []));
+            $input['seen_queries'] = $this->knowledge_query_texts[$session_id] ?? [];
+        }
+
         if ('awpt/propose-new-post' === $tool_name) {
             $input = ArrayKey::string_map(new ProposalRequestContext()->enrich($session_id, $input, $turn_context));
+        }
 
+        if (in_array($tool_name, ['awpt/propose-new-post', 'awpt/propose-content-update'], true)) {
             $pattern_name = (string) ($input['pattern_name'] ?? '');
             $pattern_mode = (string) ($input['pattern_mode'] ?? '');
             // Omitted mode defaults to adapted when a pattern is named (server policy).
-            $requires_pattern_read = '' !== $pattern_name && ('adapted' === $pattern_mode || '' === $pattern_mode);
+            $requires_pattern_read =
+                '' !== $pattern_name
+                && (
+                    'awpt/propose-content-update' === $tool_name
+                    || 'adapted' === $pattern_mode
+                    || '' === $pattern_mode
+                );
 
             if ($requires_pattern_read) {
                 $read_patterns = $this->read_patterns[$session_id] ?? [];
@@ -171,6 +227,22 @@ final class ProviderToolCallExecutor {
 
             if ('' !== $pattern_name) {
                 $this->read_patterns[$session_id][$pattern_name] = true;
+            }
+        }
+
+        if ('success' === $status && 'awpt/search-knowledge' === $tool_name) {
+            $items = is_array($output['items'] ?? null) ? $output['items'] : [];
+            $this->seed_knowledge_chunks($session_id, $items);
+            $fingerprint = (string) ($output['query_fingerprint'] ?? '');
+
+            if ('' !== $fingerprint) {
+                $this->knowledge_queries[$session_id][$fingerprint] = true;
+            }
+
+            $query = trim((string) ($output['query'] ?? $input['query'] ?? ''));
+
+            if ('' !== $query) {
+                $this->knowledge_query_texts[$session_id][] = $query;
             }
         }
         $tool = $tool_name ?? $function_name;

@@ -1,6 +1,6 @@
 import { Button, Spinner } from '@wordpress/components';
 import { useEffect, useRef, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import {
 	createPreviewCapture,
 	createSession,
@@ -60,24 +60,90 @@ function focusMeta(session: SessionSummary): string {
 		.join(' · ');
 }
 
-const CHAT_REQUEST_TIMEOUT_MS = 135_000;
+const CHAT_REQUEST_TIMEOUT_MS = 255_000;
 
 function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
-	return Promise.race([
-		promise,
-		new Promise<T>((_resolve, reject) => {
-			window.setTimeout(() => {
-				reject(
-					new Error(
-						__(
-							'The agent request timed out. Retry the message, or check the selected AI model.',
-							'agent-wordpress-terminal',
-						),
-					),
-				);
-			}, milliseconds);
-		}),
-	]);
+	return new Promise<T>((resolve, reject) => {
+		const timer = window.setTimeout(() => {
+			const error = new Error(
+				__(
+					'The browser stopped waiting for the agent request. The backend may still be finishing it.',
+					'agent-wordpress-terminal',
+				),
+			);
+			error.name = 'AwptChatTimeout';
+			reject(error);
+		}, milliseconds);
+
+		promise.then(
+			(value) => {
+				window.clearTimeout(timer);
+				resolve(value);
+			},
+			(error: unknown) => {
+				window.clearTimeout(timer);
+				reject(error);
+			},
+		);
+	});
+}
+
+function progressDiagnostic(progress: ChatProgress): string {
+	const diagnostics = progress.diagnostics;
+	const lines = [
+		sprintf(
+			/* translators: 1: backend phase label, 2: backend phase detail */
+			__('Backend phase: %1$s. %2$s', 'agent-wordpress-terminal'),
+			progress.label || progress.phase,
+			progress.detail || '',
+		).trim(),
+	];
+
+	if (diagnostics?.provider || diagnostics?.mode) {
+		lines.push(
+			sprintf(
+				/* translators: 1: provider name, 2: orchestration mode */
+				__('Provider: %1$s · mode: %2$s', 'agent-wordpress-terminal'),
+				diagnostics.provider || __('unknown', 'agent-wordpress-terminal'),
+				diagnostics.mode || __('unknown', 'agent-wordpress-terminal'),
+			),
+		);
+	}
+
+	if (diagnostics?.tool_count !== undefined || diagnostics?.completion_budget !== undefined) {
+		lines.push(
+			sprintf(
+				/* translators: 1: evidence tool count, 2: completion token budget, 3: request timeout seconds */
+				__(
+					'Evidence tools: %1$d · completion budget: %2$d · provider allowance: %3$ds',
+					'agent-wordpress-terminal',
+				),
+				diagnostics.tool_count ?? 0,
+				diagnostics.completion_budget ?? 0,
+				diagnostics.request_timeout_seconds ?? 0,
+			),
+		);
+	}
+
+	const last = diagnostics?.last_completed_call;
+
+	if (last) {
+		lines.push(
+			sprintf(
+				/* translators: 1: provider call outcome, 2: tool round, 3: duration in milliseconds, 4: error code */
+				__(
+					'Last completed provider call: %1$s at tool round %2$s in %3$sms%4$s',
+					'agent-wordpress-terminal',
+				),
+				last.outcome || __('unknown', 'agent-wordpress-terminal'),
+				String(last.tool_round ?? '0'),
+				String(last.duration_ms ?? '0'),
+				last.error_code ? ` · ${last.error_code}` : '',
+			),
+		);
+	}
+
+	return lines.filter(Boolean).join('\n');
 }
 
 function cacheBustPreview(preview: PreviewDetails, revision: string): PreviewDetails {
@@ -480,6 +546,13 @@ export function Terminal(): JSX.Element {
 				error.message.trim() !== ''
 			) {
 				messageText = error.message;
+			}
+
+			try {
+				const diagnosticProgress = await getChatProgress(activeSessionId, turnId);
+				messageText = `${messageText}\n\n${progressDiagnostic(diagnosticProgress)}`;
+			} catch {
+				// Preserve the original request error when diagnostics are unavailable.
 			}
 
 			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);

@@ -75,4 +75,46 @@ final class KnowledgeIndexMaintenance {
             $wpdb->delete($index_table, ['id' => $id], ['%d']);
         }
     }
+
+    /**
+     * Remove sources not discovered by a completed reconciliation run.
+     *
+     * @return list<string> Stable chunk IDs removed from the canonical corpus.
+     */
+    public function delete_sources_not_seen_in_run(int $run_id): array {
+        $wpdb = WpDb::get();
+        $index_table = $wpdb->prefix . 'awpt_knowledge_index';
+        $chunks_table = $wpdb->prefix . 'awpt_knowledge_chunks';
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT i.id, c.chunk_id
+             FROM {$index_table} i
+             LEFT JOIN {$chunks_table} c ON c.index_id = i.id
+             WHERE i.last_seen_run_id IS NULL OR i.last_seen_run_id != %d", $run_id), output: \ARRAY_A);
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $index_ids = [];
+        $chunk_ids = [];
+
+        foreach ($rows as $row) {
+            $index_ids[(int) ($row['id'] ?? 0)] = true;
+            $chunk_id = (string) ($row['chunk_id'] ?? '');
+
+            if ('' !== $chunk_id) {
+                $chunk_ids[] = $chunk_id;
+            }
+        }
+
+        foreach (array_keys($index_ids) as $index_id) {
+            if ($index_id <= 0) {
+                continue;
+            }
+
+            $wpdb->delete($chunks_table, ['index_id' => $index_id], ['%d']);
+            $wpdb->delete($index_table, ['id' => $index_id], ['%d']);
+        }
+
+        return array_values(array_unique($chunk_ids));
+    }
 }

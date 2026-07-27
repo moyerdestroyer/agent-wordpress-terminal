@@ -81,6 +81,31 @@ final class ActionContentPayloadSanitizer {
             }, $payload['repairs_applied'])));
         }
 
+        return $this->copy_composition_context($clean, $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $clean
+     * @param array<array-key, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function copy_composition_context(array $clean, array $payload): array {
+        if (!is_array($payload['composition_context'] ?? null)) {
+            return $clean;
+        }
+
+        $context = $payload['composition_context'];
+        $clean['composition_context'] = [
+            'policy' => sanitize_key((string) ($context['policy'] ?? '')),
+            'theme_name' => sanitize_text_field((string) ($context['theme_name'] ?? '')),
+            'stylesheet' => sanitize_key((string) ($context['stylesheet'] ?? '')),
+            'template' => sanitize_key((string) ($context['template'] ?? '')),
+            'pattern_name' => sanitize_text_field((string) ($context['pattern_name'] ?? '')),
+            'pattern_owner' => sanitize_key((string) ($context['pattern_owner'] ?? '')),
+            'fallback_used' => filter_var($context['fallback_used'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'fallback_reason' => sanitize_textarea_field((string) ($context['fallback_reason'] ?? '')),
+        ];
+
         return $clean;
     }
 
@@ -100,6 +125,8 @@ final class ActionContentPayloadSanitizer {
             'pattern_mode',
             'pattern_title',
             'pattern_source',
+            'pattern_owner',
+            'pattern_fallback_reason',
             'required_pattern_prefix',
             'template_type',
             'template_area',

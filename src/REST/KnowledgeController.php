@@ -40,6 +40,14 @@ final class KnowledgeController extends RestController {
             ],
         ]);
 
+        register_rest_route(AWPT_REST_NAMESPACE, '/knowledge/process', [
+            [
+                'methods' => \WP_REST_Server::CREATABLE,
+                'callback' => [$this, 'process'],
+                'permission_callback' => [$this, 'can_manage'],
+            ],
+        ]);
+
         register_rest_route(AWPT_REST_NAMESPACE, '/knowledge/settings', [
             [
                 'methods' => \WP_REST_Server::READABLE,
@@ -71,9 +79,24 @@ final class KnowledgeController extends RestController {
             ], 500);
         }
 
-        return new \WP_REST_Response(array_merge($result, [
-            'status' => new KnowledgeIndexer()->status(),
-        ]), 200);
+        return new \WP_REST_Response(
+            array_merge($result, [
+                'status' => new KnowledgeIndexer()->status(),
+            ]),
+            true === ($result['in_progress'] ?? false) ? 202 : 200,
+        );
+    }
+
+    public function process(\WP_REST_Request $request): \WP_REST_Response {
+        $run_id = max(0, (int) $request->get_param('run_id'));
+        $result = new KnowledgeIndexer()->process_batch($run_id);
+
+        return new \WP_REST_Response(
+            array_merge($result, [
+                'status' => new KnowledgeIndexer()->status(),
+            ]),
+            true === ($result['in_progress'] ?? false) ? 202 : 200,
+        );
     }
 
     public function settings(): \WP_REST_Response {
@@ -87,7 +110,6 @@ final class KnowledgeController extends RestController {
         $sanitized_roots = $reader->sanitize_configured_roots(is_array($roots) ? array_map('strval', $roots) : []);
 
         update_option('awpt_knowledge_roots', implode("\n", $sanitized_roots), false);
-        KnowledgeIndexer::mark_stale();
 
         if ($max_file_size > 0) {
             update_option('awpt_knowledge_max_file_size', max(1024, min($max_file_size, 20_971_520)), false);
@@ -107,6 +129,8 @@ final class KnowledgeController extends RestController {
                 false,
             );
         }
+
+        KnowledgeIndexer::mark_stale();
 
         return new \WP_REST_Response($this->settings_payload(), 200);
     }
