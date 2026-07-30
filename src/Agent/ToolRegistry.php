@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Builds provider tools from every registered WordPress ability and connected MCP tool.
+ * Builds provider tools from registered WordPress abilities and connected MCP tools.
  *
  * Plugins/themes register Abilities (or MCP integrations hook `awpt_mcp_tools`);
  * AWPT offers them to the agent unless the admin disables them. A small deny-list
@@ -93,9 +93,9 @@ final class ToolRegistry {
                 continue;
             }
 
-            $function_name = $this->names->to_function_name($tool['name']);
+            $function_name = $this->function_name_for_ability($tool['name']);
 
-            if ('' === $function_name || array_key_exists($function_name, $seen_functions)) {
+            if (null === $function_name || '' === $function_name || array_key_exists($function_name, $seen_functions)) {
                 continue;
             }
 
@@ -117,12 +117,56 @@ final class ToolRegistry {
         return $tools;
     }
 
+    /**
+     * Tools for a classified turn. Additional abilities remain reachable through
+     * awpt/find-abilities without bloating every provider request.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_chat_completion_tools_for_profile(TurnProfile $profile): array {
+        $allow = $profile->tool_allowlist();
+
+        return $this->get_chat_completion_tools_for_allowlist($allow);
+    }
+
+    /**
+     * Exploration starts with the profile's relevant evidence tools. The model
+     * can discover other eligible tools through awpt/find-abilities.
+     *
+     * @param list<string> $preferred
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_exploration_tools(array $preferred = []): array {
+        return $this->get_chat_completion_tools_for_allowlist($preferred);
+    }
+
+    /**
+     * @param list<string> $allow Ability allow-list; empty means discovery only.
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_chat_completion_tools_for_allowlist(array $allow): array {
+        if ([] === $allow) {
+            $allow = ['awpt/find-abilities'];
+        }
+
+        $replacements = new AbilityReplacementRegistry();
+        $resolved = ['awpt/find-abilities'];
+
+        foreach ($allow as $name) {
+            $resolved[] = $replacements->preferred($name);
+        }
+
+        return $this->get_chat_completion_tools(array_values(array_unique($resolved)));
+    }
+
     public function function_name_for_ability(string $ability_name): ?string {
         if ('' === $ability_name || !$this->is_discovered($ability_name)) {
             return null;
         }
 
-        $function_name = $this->names->to_function_name($ability_name);
+        $function_name = $this->is_ability($ability_name) && class_exists('WP_AI_Client_Ability_Function_Resolver')
+            ? \WP_AI_Client_Ability_Function_Resolver::ability_name_to_function_name($ability_name)
+            : $this->names->to_function_name($ability_name);
 
         return '' !== $function_name ? $function_name : null;
     }
@@ -223,6 +267,34 @@ final class ToolRegistry {
         }
 
         return $names;
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string, parameters: array<string, mixed>, annotations: array<string, bool|null>}>
+     */
+    public function discovered_tools(): array {
+        return array_merge($this->ability_tools(), $this->mcp_only_tools());
+    }
+
+    /**
+     * Resolve provider declarations back to their canonical tool names.
+     *
+     * @param array<int, array<string, mixed>> $tools
+     * @return list<string>
+     */
+    public function names_from_declarations(array $tools): array {
+        $names = [];
+
+        foreach ($tools as $tool) {
+            $function = is_array($tool['function'] ?? null) ? $tool['function'] : [];
+            $name = $this->tool_name_for_function((string) ($function['name'] ?? ''));
+
+            if (null !== $name) {
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     /**

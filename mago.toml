@@ -12,6 +12,7 @@ paths = ["src", "agent-wordpress-terminal.php"]
 # NOTE: do not add "vendor/**" to excludes below — it would shadow the stubs package.
 includes = [
     "vendor/php-stubs/wordpress-stubs",
+    "vendor/smalot/pdfparser/src",
     "stubs/wordpress.php",
     "stubs/awpt-external.php",
 ]

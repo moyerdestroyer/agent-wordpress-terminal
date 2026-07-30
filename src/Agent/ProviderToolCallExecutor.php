@@ -34,18 +34,16 @@ final class ProviderToolCallExecutor {
     /** @var array<int, list<string>> */
     private array $knowledge_query_texts = [];
 
-    /** @param array<array-key, mixed> $items */
+    /** @param list<array<array-key, mixed>>|array<array-key, mixed> $items */
     public function seed_knowledge_chunks(int $session_id, array $items): void {
-        foreach ($items as $item) {
-            if (!is_array($item)) {
+        foreach (ArrayKey::list_of_maps($items) as $item) {
+            $chunk_id = (string) ($item['chunk_id'] ?? '');
+
+            if ('' === $chunk_id) {
                 continue;
             }
 
-            $chunk_id = (string) ($item['chunk_id'] ?? '');
-
-            if ('' !== $chunk_id) {
-                $this->knowledge_chunks[$session_id][$chunk_id] = true;
-            }
+            $this->knowledge_chunks[$session_id][$chunk_id] = true;
         }
     }
 
@@ -67,11 +65,15 @@ final class ProviderToolCallExecutor {
     }
 
     /**
-     * Execute provider-requested read-only tools.
+     * Execute provider-requested tools (parallel-safe reads batched; proposals serial).
      *
      * @param mixed        $raw_tool_calls Provider tool call payloads.
      * @param ToolRegistry $tool_registry Tool registry.
-     * @return array{tool_calls: array<int, array<string, mixed>>, messages: array<int, array<string, mixed>>}
+     * @return array{
+     *     tool_calls: array<int, array<string, mixed>>,
+     *     messages: array<int, array<string, mixed>>,
+     *     parallel_batch_size: int
+     * }
      */
     public function execute(
         mixed $raw_tool_calls,
@@ -83,46 +85,98 @@ final class ProviderToolCallExecutor {
             return [
                 'tool_calls' => [],
                 'messages' => [],
+                'parallel_batch_size' => 0,
             ];
         }
+
+        $items = [];
+        $parallel_safe_count = 0;
+        $parallelism = new ToolParallelism();
+
+        foreach (array_keys($raw_tool_calls) as $key) {
+            $call = ArrayKey::as_map_or_null(ArrayKey::passthrough($raw_tool_calls[$key] ?? null));
+
+            if (null === $call) {
+                continue;
+            }
+
+            $function = ArrayKey::as_map($call['function'] ?? null);
+            $function_name = (string) ($function['name'] ?? '');
+            $tool_name = $tool_registry->tool_name_for_function($function_name) ?? $function_name;
+            $index = count($items);
+
+            if ($parallelism->is_parallel_safe($tool_name)) {
+                ++$parallel_safe_count;
+            }
+
+            $items[] = [
+                'index' => $index,
+                'tool_name' => $tool_name,
+                'raw' => $call,
+            ];
+        }
+
+        $total = count($items);
+        $turn_id = (string) ($turn_context['turn_id'] ?? '');
+        $phase = sanitize_key((string) ($turn_context['progress_phase'] ?? 'tools'));
+        $phase = '' !== $phase ? $phase : 'tools';
+
+        if ($total > 1) {
+            new ChatProgress()->update($session_id, $turn_id, [
+                'phase' => $phase,
+                'label' => __('Running tools', 'agent-wordpress-terminal'),
+                'detail' => sprintf(
+                    /* translators: 1: tool count, 2: parallel-safe count */
+                    __('Batch of %1$d tool(s) (%2$d parallel-safe)…', 'agent-wordpress-terminal'),
+                    $total,
+                    $parallel_safe_count,
+                ),
+                'completed' => 0,
+                'total' => $total,
+                'diagnostics' => [
+                    'parallel_batch_size' => $parallel_safe_count,
+                    'tool_batch_total' => $total,
+                ],
+            ]);
+        }
+
+        $results = new ToolBatchRunner($parallelism)->run(
+            $items,
+            function (array $raw, int $index) use ($tool_registry, $session_id, $turn_context): array {
+                unset($index);
+
+                return $this->execute_single_tool_call($raw, $tool_registry, $session_id, $turn_context);
+            },
+            function (int $completed, int $batch_total, string $tool, string $wave_kind) use (
+                $session_id,
+                $turn_id,
+                $phase,
+                $parallel_safe_count,
+            ): void {
+                unset($wave_kind);
+                new ChatProgress()->update($session_id, $turn_id, [
+                    'phase' => $phase,
+                    'label' => $this->progress_label($tool),
+                    'detail' => sprintf(
+                        __('Completed tool %1$d of %2$d', 'agent-wordpress-terminal'),
+                        $completed,
+                        $batch_total,
+                    ),
+                    'completed' => $completed,
+                    'total' => $batch_total,
+                    'diagnostics' => [
+                        'parallel_batch_size' => $parallel_safe_count,
+                        'tool_batch_total' => $batch_total,
+                    ],
+                ]);
+            },
+        );
 
         $tool_calls = [];
         $messages = [];
         $visual_messages = [];
 
-        $valid_calls = [];
-
-        foreach (array_keys($raw_tool_calls) as $key) {
-            $call = ArrayKey::as_map_or_null(ArrayKey::passthrough($raw_tool_calls[$key] ?? null));
-
-            if (null !== $call) {
-                $valid_calls[] = $call;
-            }
-        }
-
-        $total = count($valid_calls);
-
-        foreach ($valid_calls as $index => $raw_tool_call) {
-            $function = ArrayKey::as_map($raw_tool_call['function'] ?? null);
-            $function_name = (string) ($function['name'] ?? '');
-            $tool_name = $tool_registry->tool_name_for_function($function_name) ?? $function_name;
-            $progress_label = $this->progress_label($tool_name);
-            new ChatProgress()->update($session_id, (string) ($turn_context['turn_id'] ?? ''), [
-                'phase' => 'tools',
-                'label' => $progress_label,
-                'detail' => sprintf(__('Tool %1$d of %2$d', 'agent-wordpress-terminal'), $index + 1, $total),
-                'completed' => $index,
-                'total' => $total,
-            ]);
-
-            $execution = $this->execute_single_tool_call($raw_tool_call, $tool_registry, $session_id, $turn_context);
-            new ChatProgress()->update($session_id, (string) ($turn_context['turn_id'] ?? ''), [
-                'phase' => 'tools',
-                'label' => $progress_label,
-                'detail' => sprintf(__('Completed tool %1$d of %2$d', 'agent-wordpress-terminal'), $index + 1, $total),
-                'completed' => $index + 1,
-                'total' => $total,
-            ]);
+        foreach ($results as $execution) {
             $tool_calls[] = $execution['tool_call'];
             $messages[] = $execution['message'];
 
@@ -136,6 +190,7 @@ final class ProviderToolCallExecutor {
             // Tool responses must immediately follow the assistant tool call.
             // Append optional user-role visual evidence only after every response.
             'messages' => [...$messages, ...$visual_messages],
+            'parallel_batch_size' => $parallel_safe_count,
         ];
     }
 
@@ -198,7 +253,18 @@ final class ProviderToolCallExecutor {
             $input['seen_queries'] = $this->knowledge_query_texts[$session_id] ?? [];
         }
 
-        if ('awpt/propose-new-post' === $tool_name) {
+        if (in_array(
+            $tool_name,
+            [
+                'awpt/propose-new-post',
+                'awpt/propose-content-update',
+                'awpt/propose-block-attrs-update',
+                'awpt/propose-block-insert',
+                'awpt/propose-block-remove',
+                'awpt/propose-pattern-insert',
+            ],
+            true,
+        )) {
             $input = ArrayKey::string_map(new ProposalRequestContext()->enrich($session_id, $input, $turn_context));
         }
 
@@ -220,9 +286,19 @@ final class ProviderToolCallExecutor {
             }
         }
 
-        [$status, $output] = $this->run_safe_tool($tool_name, $function_name, $input, $tool_registry);
+        $execution_input = $this->ability_input($tool_name, $input, $tool_registry);
+        $offered = is_array($turn_context['offered_tool_names'] ?? null)
+            ? array_values(array_filter($turn_context['offered_tool_names'], 'is_string'))
+            : null;
+        [$status, $output] = $this->run_safe_tool(
+            $tool_name,
+            $function_name,
+            $execution_input,
+            $tool_registry,
+            $offered,
+        );
 
-        if ('success' === $status && 'awpt/read-pattern' === $tool_name) {
+        if ('success' === $status && 'awpt/read-pattern' === $tool_name && is_array($output)) {
             $pattern_name = (string) ($output['name'] ?? $input['name'] ?? '');
 
             if ('' !== $pattern_name) {
@@ -230,7 +306,7 @@ final class ProviderToolCallExecutor {
             }
         }
 
-        if ('success' === $status && 'awpt/search-knowledge' === $tool_name) {
+        if ('success' === $status && 'awpt/search-knowledge' === $tool_name && is_array($output)) {
             $items = is_array($output['items'] ?? null) ? $output['items'] : [];
             $this->seed_knowledge_chunks($session_id, $items);
             $fingerprint = (string) ($output['query_fingerprint'] ?? '');
@@ -249,12 +325,18 @@ final class ProviderToolCallExecutor {
         $truncator = new ToolResultTruncator();
         $provider_output = $truncator->for_provider($tool, $output);
         $storage_output = $truncator->for_storage($tool, $output);
-        $visual_message = 'success' === $status
-            ? new MediaLibraryVisualEvidence()->build($tool, $input, $output)
-            : null;
+        $visual_output = is_array($output) ? ArrayKey::string_map($output) : [];
+        $visual_message =
+            'success' === $status && [] !== $visual_output
+                ? (
+                    'awpt/inspect-rendered-element' === $tool
+                        ? new RenderedInspectionVisualEvidence()->build($visual_output)
+                        : new MediaLibraryVisualEvidence()->build($tool, $input, $visual_output)
+                )
+                : null;
         $tool_call = [
             'tool' => $tool,
-            'input' => $input,
+            'input' => $execution_input,
             'output' => $storage_output,
             'status' => $status,
             'provider_call_id' => $provider_call_id,
@@ -270,7 +352,7 @@ final class ProviderToolCallExecutor {
             'message' => [
                 'role' => 'tool',
                 'tool_call_id' => $provider_call_id,
-                'content' => wp_json_encode($provider_output),
+                'content' => $this->encoded_tool_output($provider_output),
             ],
             'visual_message' => $visual_message,
         ];
@@ -281,17 +363,23 @@ final class ProviderToolCallExecutor {
      *
      * @param string|null          $tool_name Ability name.
      * @param string               $function_name Provider function name.
-     * @param array<string, mixed> $input Tool input.
+     * @param mixed                $input Tool input.
      * @param ToolRegistry         $tool_registry Tool registry.
-     * @return array{0: string, 1: array<string, mixed>}
+     * @param list<string>|null    $offered_tools Tools declared to the provider for this request.
+     * @return array{0: string, 1: mixed}
      */
     private function run_safe_tool(
         ?string $tool_name,
         string $function_name,
-        array $input,
+        mixed $input,
         ToolRegistry $tool_registry,
+        ?array $offered_tools = null,
     ): array {
-        if (null === $tool_name || !$tool_registry->can_auto_execute($tool_name)) {
+        if (
+            null === $tool_name
+            || !$tool_registry->can_auto_execute($tool_name)
+            || null !== $offered_tools && !in_array($tool_name, $offered_tools, true)
+        ) {
             return [
                 'rejected',
                 [
@@ -306,36 +394,37 @@ final class ProviderToolCallExecutor {
 
         $result = $tool_registry->is_ability($tool_name)
             ? new ToolExecutor()->execute($tool_name, $input)
-            : new Adapter()->execute_tool($tool_name, $input);
+            : (
+                is_array($input)
+                    ? new Adapter()->execute_tool($tool_name, $input)
+                    : new \WP_Error('awpt_invalid_mcp_input', __(
+                        'MCP tool input must be an object.',
+                        'agent-wordpress-terminal',
+                    ))
+            );
 
         if (is_wp_error($result)) {
             $attribution = new \AWPT\Support\Diagnostics\ErrorPathAttributor()->from_text($result->get_error_message());
-            $error_data = $result->get_error_data();
-
-            return [
-                'failed',
-                array_filter(
-                    [
-                        'error' => $result->get_error_message(),
-                        'error_code' => $result->get_error_code(),
-                        'error_data' => is_array($error_data) ? $error_data : null,
-                        'attribution' => $attribution,
-                    ],
-                    static fn(mixed $value): bool => null !== $value,
-                ),
+            $failed = [
+                'error' => $result->get_error_message(),
+                'error_code' => $result->get_error_code(),
+                'attribution' => $attribution,
             ];
+            $error_data = ArrayKey::as_map_or_null($result->get_error_data());
+
+            if (null !== $error_data) {
+                $failed['error_data'] = $error_data;
+            }
+
+            return ['failed', $failed];
         }
 
-        return ['success', \AWPT\Support\ArrayKey::string_map($result)];
+        return ['success', $result];
     }
 
     /**
      * Decode provider tool call arguments.
      *
-     * @param string $arguments Raw JSON arguments.
-     * @return array<array-key, mixed>
-     */
-    /**
      * @return array<string, mixed>
      */
     private function decode_tool_arguments(string $arguments): array {
@@ -343,6 +432,29 @@ final class ProviderToolCallExecutor {
     }
 
     /**
-     * @param array<array-key, mixed> $value Raw array.
+     * Convert provider-object arguments to the Ability's native JSON input.
+     *
+     * @param array<string, mixed> $provider_input
      */
+    private function ability_input(?string $tool_name, array $provider_input, ToolRegistry $registry): mixed {
+        if (null === $tool_name || !$registry->is_ability($tool_name) || !function_exists('wp_get_ability')) {
+            return $provider_input;
+        }
+
+        $ability = wp_get_ability($tool_name);
+
+        if (null === $ability || !method_exists($ability, 'get_input_schema')) {
+            return $provider_input;
+        }
+
+        $schema = $ability->get_input_schema();
+
+        return new AbilityTransportCodec()->ability_input(is_array($schema) ? $schema : [], $provider_input);
+    }
+
+    private function encoded_tool_output(mixed $output): string {
+        $encoded = wp_json_encode($output);
+
+        return is_string($encoded) ? $encoded : 'null';
+    }
 }

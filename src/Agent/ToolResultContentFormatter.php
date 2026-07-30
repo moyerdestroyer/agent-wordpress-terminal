@@ -38,7 +38,7 @@ final class ToolResultContentFormatter {
         }
 
         return match ($tool) {
-            'awpt/read-content' => $this->format_read_content($output),
+            'awpt/read-content', 'core/read-content' => $this->format_read_content($output),
             'awpt/read-block-tree' => $this->format_read_block_tree($output),
             'awpt/read-pattern' => $this->format_read_pattern($output),
             'awpt/list-patterns' => $this->format_patterns($output),
@@ -138,9 +138,11 @@ final class ToolResultContentFormatter {
         $labels = [];
 
         foreach (array_slice($samples, 0, 8) as $sample) {
-            if (is_array($sample) && '' !== (string) ($sample['label'] ?? '')) {
-                $labels[] = (string) $sample['label'];
+            if (!(is_array($sample) && '' !== (string) ($sample['label'] ?? ''))) {
+                continue;
             }
+
+            $labels[] = (string) $sample['label'];
         }
 
         $line = sprintf(
@@ -237,13 +239,14 @@ final class ToolResultContentFormatter {
     }
 
     private function format_read_content(array $output): string {
-        $plain = trim((string) ($output['plain_text'] ?? ''));
+        $plain = trim((string) ($output['plain_text'] ?? $output['content_raw'] ?? $output['content_rendered'] ?? ''));
+        $plain = wp_strip_all_tags($plain);
         $lines = [sprintf(
             /* translators: 1: post ID, 2: title, 3: post type, 4: status */
             __('Read #%1$d %2$s (%3$s, %4$s).', 'agent-wordpress-terminal'),
             (int) ($output['id'] ?? 0),
-            (string) ($output['title'] ?? ''),
-            (string) ($output['type'] ?? ''),
+            (string) ($output['title'] ?? $output['title_rendered'] ?? $output['title_raw'] ?? ''),
+            (string) ($output['type'] ?? $output['post_type'] ?? ''),
             (string) ($output['status'] ?? ''),
         )];
 

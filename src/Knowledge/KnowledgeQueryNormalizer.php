@@ -53,9 +53,11 @@ final class KnowledgeQueryNormalizer {
         ];
 
         foreach ($map as $needle => $terms) {
-            if (str_contains($lower, $needle)) {
-                $boost = [...$boost, ...$terms];
+            if (!str_contains($lower, $needle)) {
+                continue;
             }
+
+            $boost = [...$boost, ...$terms];
         }
 
         if ([] === $boost) {

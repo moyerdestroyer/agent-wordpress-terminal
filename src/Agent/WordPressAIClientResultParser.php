@@ -141,9 +141,11 @@ final class WordPressAIClientResultParser {
                 $typed_arguments = [];
 
                 foreach ($arguments as $key => $value) {
-                    if (is_string($key)) {
-                        $typed_arguments[$key] = $value;
+                    if (!is_string($key)) {
+                        continue;
                     }
+
+                    $typed_arguments[$key] = $value;
                 }
 
                 $call = $this->normalize_embedded_call((string) ($decoded['name'] ?? ''), $typed_arguments);

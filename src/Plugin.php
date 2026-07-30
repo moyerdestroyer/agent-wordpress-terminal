@@ -12,6 +12,7 @@ namespace AWPT;
 
 use AWPT\Database\Installer;
 use AWPT\Knowledge\KnowledgeIndexer;
+use AWPT\Support\Diagnostics\RenderedPreviewAuthenticator;
 use AWPT\Support\Environment;
 use AWPT\Support\ServiceProvider;
 
@@ -48,6 +49,7 @@ final class Plugin {
      */
     public function boot(): void {
         $this->services = new ServiceProvider();
+        RenderedPreviewAuthenticator::register();
         add_action('admin_notices', [Environment::class, 'render_admin_notices']);
         add_action('init', [$this, 'init']);
         add_action('rest_api_init', [$this, 'register_rest_routes']);

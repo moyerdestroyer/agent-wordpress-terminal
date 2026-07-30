@@ -224,9 +224,11 @@ final class PostCompositionValidator {
         $detected = [];
 
         foreach ($placeholder_phrases as $phrase) {
-            if (false !== stripos($visible_text, $phrase)) {
-                $detected[] = $phrase;
+            if (false === stripos($visible_text, $phrase)) {
+                continue;
             }
+
+            $detected[] = $phrase;
         }
 
         if (preg_match(

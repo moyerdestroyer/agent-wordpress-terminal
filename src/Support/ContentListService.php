@@ -69,7 +69,7 @@ final class ContentListService {
 
         $query = new \WP_Query($this->query_args($filters, $post_types, $statuses));
         /** @var list<\WP_Post|int|string> $query_posts */
-        $query_posts = array_values($query->posts);
+        $query_posts = array_values(is_array($query->posts) ? $query->posts : []);
         $post_ids = $this->post_ids_from_query($query_posts);
 
         foreach ($post_ids as $post_id) {

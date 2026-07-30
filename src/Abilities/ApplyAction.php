@@ -18,6 +18,7 @@ use AWPT\Abilities\ActionAppliers\PluginDeactivateActionApplier;
 use AWPT\Abilities\ActionAppliers\SiteSettingsActionApplier;
 use AWPT\Abilities\ActionAppliers\ThemeSwitchActionApplier;
 use AWPT\Database\ActionRepository;
+use AWPT\Support\ResourceChangeManager;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -102,6 +103,7 @@ final class ApplyAction implements AbilityInterface {
             'theme_switch' => current_user_can('switch_themes'),
             'plugin_deactivate' => current_user_can('activate_plugins'),
             'custom_css_update' => current_user_can('edit_css') || current_user_can('edit_theme_options'),
+            'resource_change' => new ResourceChangeManager()->can_apply($payload),
             default => false,
         };
     }
@@ -147,6 +149,7 @@ final class ApplyAction implements AbilityInterface {
             'theme_switch' => $this->theme_switches->apply($payload),
             'plugin_deactivate' => new PluginDeactivateActionApplier()->apply($payload),
             'custom_css_update' => new CustomCssActionApplier()->apply($payload),
+            'resource_change' => new ResourceChangeManager()->apply($payload),
             default => new \WP_Error(
                 code: 'awpt_unsupported_action',
                 message: __('Unsupported action operation.', 'agent-wordpress-terminal'),

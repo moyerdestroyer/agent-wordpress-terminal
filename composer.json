@@ -5,11 +5,12 @@
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.4",
-		"kucrut/vite-for-wp": "^0.12.0"
+		"kucrut/vite-for-wp": "^0.12.0",
+		"smalot/pdfparser": "^2.12"
 	},
 	"require-dev": {
 		"carthage-software/mago": "^1.42",
-		"php-stubs/wordpress-stubs": "^6.8"
+		"php-stubs/wordpress-stubs": "^6.9 || ^7.0"
 	},
 	"autoload": {
 		"psr-4": {

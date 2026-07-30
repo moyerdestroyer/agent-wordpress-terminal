@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AbilityReplacementRegistry;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -23,7 +25,10 @@ final class RegisterAbilities {
      */
     public function init(): void {
         add_action('wp_abilities_api_categories_init', [$this, 'register_category']);
-        add_action('wp_abilities_api_init', [$this, 'register_abilities']);
+        // Core and the AI feature plugin register/refresh core/* abilities by
+        // priority 11. Run afterward so schema-verified replacements are based
+        // on the final live Core contract.
+        add_action('wp_abilities_api_init', [$this, 'register_abilities'], 20);
     }
 
     /**
@@ -48,7 +53,20 @@ final class RegisterAbilities {
             return;
         }
 
-        new ReadContent()->register();
+        if ('awpt/read-content' === new AbilityReplacementRegistry()->preferred('awpt/read-content')) {
+            new ReadContent()->register();
+        } elseif (
+            function_exists('wp_has_ability')
+            && function_exists('wp_unregister_ability')
+            && wp_has_ability('awpt/read-content')
+        ) {
+            wp_unregister_ability('awpt/read-content');
+        }
+        new FindAbilities()->register();
+        new ReadProposal()->register();
+        new ReadAttachmentDocument()->register();
+        new ListWordPressResources()->register();
+        new ReadWordPressResource()->register();
         new ReadThemes()->register();
         new ReadThemeJson()->register();
         new ReadThemeFile()->register();
@@ -80,6 +98,7 @@ final class RegisterAbilities {
         new ProposeThemeSwitch()->register();
         new ProposePluginDeactivate()->register();
         new ProposeCustomCssUpdate()->register();
+        new ProposeResourceChange()->register();
         new ApplyAction()->register();
         new SideloadMedia()->register();
         new ReadErrorLog()->register();
@@ -87,6 +106,7 @@ final class RegisterAbilities {
         new ReadSiteHealth()->register();
         new ProbeUrl()->register();
         new InspectFrontend()->register();
+        new InspectRenderedElement()->register();
         new DiagnoseError()->register();
     }
 }

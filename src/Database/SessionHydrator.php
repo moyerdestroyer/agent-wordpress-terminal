@@ -28,8 +28,8 @@ final class SessionHydrator {
         $hydrated = [];
 
         foreach ($rows as $tool_call) {
-            $input = Json::decode_array((string) ($tool_call['input_json'] ?? ''));
-            $output = Json::decode_array((string) ($tool_call['output_json'] ?? ''));
+            $input = Json::decode_value((string) ($tool_call['input_json'] ?? ''));
+            $output = Json::decode_value((string) ($tool_call['output_json'] ?? ''));
             $item = [
                 'id' => $tool_call['id'] ?? 0,
                 'tool' => (string) ($tool_call['tool_name'] ?? ''),
@@ -39,7 +39,7 @@ final class SessionHydrator {
             ];
 
             if ($include_outputs) {
-                $item['output'] = [] !== $output ? $output : null;
+                $item['output'] = $output;
             } else {
                 $item['output'] = null;
                 $item['output_summary'] = $this->tool_output_summary((string) ($tool_call['tool_name'] ?? ''), $output);
@@ -52,11 +52,16 @@ final class SessionHydrator {
     }
 
     /**
-     * @param array<array-key, mixed> $output
      */
-    private function tool_output_summary(string $tool, array $output): string {
-        if ([] === $output) {
+    private function tool_output_summary(string $tool, mixed $output): string {
+        if (null === $output || [] === $output || '' === $output) {
             return '';
+        }
+
+        if (!is_array($output)) {
+            $encoded = wp_json_encode($output);
+
+            return sprintf('%s: %s', $tool, is_string($encoded) ? mb_substr($encoded, 0, 160) : '');
         }
 
         if (array_key_exists('error', $output)) {

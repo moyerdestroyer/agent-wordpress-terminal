@@ -35,9 +35,11 @@ final class ToolResultFormatter {
         $successful_tools = [];
 
         foreach ($tool_calls as $tool_call) {
-            if ('success' === (string) ($tool_call['status'] ?? '')) {
-                $successful_tools[(string) ($tool_call['tool'] ?? '')] = true;
+            if ('success' !== (string) ($tool_call['status'] ?? '')) {
+                continue;
             }
+
+            $successful_tools[(string) ($tool_call['tool'] ?? '')] = true;
         }
 
         foreach ($tool_calls as $tool_call) {
@@ -79,11 +81,141 @@ final class ToolResultFormatter {
     }
 
     /**
+     * Summarize verified evidence without replaying raw tool output when the
+     * provider cannot finish the turn.
+     *
+     * @param array<int, array<string, mixed>> $tool_calls Executed tool calls.
+     */
+    public function format_incomplete_turn(array $tool_calls, string $provider_error = ''): string {
+        $content = null;
+        $block_count = null;
+        $patterns = [];
+        $successful = 0;
+        $staged_action = null;
+
+        foreach ($tool_calls as $tool_call) {
+            if ('success' !== (string) ($tool_call['status'] ?? '')) {
+                continue;
+            }
+
+            ++$successful;
+            $tool = (string) ($tool_call['tool'] ?? '');
+            $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
+
+            if (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
+                $content = [
+                    'id' => (int) ($output['id'] ?? 0),
+                    'title' => trim(
+                        (string) ($output['title'] ?? $output['title_rendered'] ?? $output['title_raw'] ?? ''),
+                    ),
+                    'type' => trim((string) ($output['type'] ?? $output['post_type'] ?? '')),
+                ];
+            } elseif ('awpt/read-block-tree' === $tool) {
+                $block_count = (int) ($output['count'] ?? 0);
+            } elseif ('awpt/read-pattern' === $tool && count($patterns) < 4) {
+                $pattern = trim((string) ($output['title'] ?? $output['name'] ?? ''));
+
+                if ('' !== $pattern) {
+                    $patterns[] = $pattern;
+                }
+            } elseif (ToolRegistry::is_proposal_ability($tool)) {
+                $staged_action = $output;
+            }
+        }
+
+        $lines = [];
+
+        if (is_array($staged_action)) {
+            $action_id = (int) ($staged_action['id'] ?? 0);
+            $action_title = trim((string) ($staged_action['title'] ?? ''));
+            $lines[] = sprintf(
+                /* translators: 1: action ID, 2: action title. */
+                __('I staged proposed action #%1$d%2$s.', 'agent-wordpress-terminal'),
+                $action_id,
+                '' !== $action_title ? ': ' . $action_title : '',
+            );
+            $lines[] = __(
+                'The original content has not been changed. Review the proposal and its diff, then choose Apply only if it preserves what you want.',
+                'agent-wordpress-terminal',
+            );
+        } elseif (is_array($content)) {
+            $identity = sprintf(
+                '#%1$d %2$s%3$s',
+                $content['id'],
+                '' !== $content['title'] ? $content['title'] : __('(untitled)', 'agent-wordpress-terminal'),
+                '' !== $content['type'] ? sprintf(' (%s)', $content['type']) : '',
+            );
+            $details = [];
+
+            if (null !== $block_count) {
+                $details[] = sprintf(
+                    /* translators: %d: Gutenberg block count. */
+                    1 === $block_count
+                        ? __('%d block', 'agent-wordpress-terminal')
+                        : __('%d blocks', 'agent-wordpress-terminal'),
+                    $block_count,
+                );
+            }
+
+            if ([] !== $patterns) {
+                $details[] = sprintf(
+                    /* translators: %s: comma-separated pattern titles. */
+                    __('compared with %s', 'agent-wordpress-terminal'),
+                    implode(', ', array_unique($patterns)),
+                );
+            }
+
+            $lines[] = sprintf(
+                /* translators: 1: content identity, 2: evidence details. */
+                __('I found %1$s%2$s.', 'agent-wordpress-terminal'),
+                $identity,
+                [] !== $details ? ' — ' . implode('; ', $details) : '',
+            );
+        } elseif ($successful > 0) {
+            $lines[] = sprintf(
+                /* translators: %d: completed tool call count. */
+                1 === $successful
+                    ? __('I gathered %d verified evidence result.', 'agent-wordpress-terminal')
+                    : __('I gathered %d verified evidence results.', 'agent-wordpress-terminal'),
+                $successful,
+            );
+        }
+
+        if (!is_array($staged_action)) {
+            $lines[] = '' !== trim($provider_error)
+                ? __(
+                    'The AI provider timed out before it could finish the answer, so no change was staged. Please retry; the completed evidence remains available in the Evidence details.',
+                    'agent-wordpress-terminal',
+                )
+                : __(
+                    'This turn ran out of time before a final answer could be completed, so no change was staged. Please retry; the completed evidence remains available in the Evidence details.',
+                    'agent-wordpress-terminal',
+                );
+        }
+
+        if ('' !== trim($provider_error) && current_user_can('manage_options')) {
+            $lines[] = sprintf(
+                /* translators: %s: provider error message. */
+                __('Provider detail: %s', 'agent-wordpress-terminal'),
+                $provider_error,
+            );
+        }
+
+        return implode("\n\n", $lines);
+    }
+
+    /**
      * @param array<string, mixed> $tool_call Tool call record.
      */
     private function format_tool_call(array $tool_call): string {
         $tool = (string) ($tool_call['tool'] ?? '');
-        $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
+        $raw_output = $tool_call['output'] ?? null;
+
+        if (!is_array($raw_output)) {
+            return $this->format_generic_value($tool, $raw_output);
+        }
+
+        $output = $raw_output;
 
         $content_section = $this->content->format($tool, $output);
 
@@ -100,6 +232,18 @@ final class ToolResultFormatter {
         }
 
         return $this->format_generic_tool($tool, $output);
+    }
+
+    private function format_generic_value(string $tool, mixed $output): string {
+        $encoded = wp_json_encode($this->preview_scalar($output));
+        $encoded = is_string($encoded) ? $encoded : 'null';
+
+        return sprintf(
+            /* translators: 1: tool name, 2: compact JSON value */
+            __('Tool %1$s returned: %2$s', 'agent-wordpress-terminal'),
+            $tool,
+            $encoded,
+        );
     }
 
     /**

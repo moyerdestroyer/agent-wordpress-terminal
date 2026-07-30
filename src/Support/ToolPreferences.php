@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
+use AWPT\Agent\AbilityReplacementRegistry;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -58,7 +60,15 @@ final class ToolPreferences {
             return false;
         }
 
-        return !in_array($tool_name, $this->disabled_names(), true);
+        $disabled = $this->disabled_names();
+
+        foreach (new AbilityReplacementRegistry()->aliases($tool_name) as $alias) {
+            if (in_array($alias, $disabled, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -130,9 +140,10 @@ final class ToolPreferences {
      */
     public function enable_tool(string $tool_name): array {
         $tool_name = sanitize_text_field($tool_name);
+        $aliases = new AbilityReplacementRegistry()->aliases($tool_name);
         $disabled = array_values(array_filter(
             $this->disabled_names(),
-            static fn(string $name): bool => $name !== $tool_name,
+            static fn(string $name): bool => !in_array($name, $aliases, true),
         ));
 
         return $this->set_disabled($disabled);
@@ -149,7 +160,7 @@ final class ToolPreferences {
             return $this->set_disabled($disabled);
         }
 
-        $disabled[] = $tool_name;
+        $disabled = [...$disabled, ...new AbilityReplacementRegistry()->aliases($tool_name)];
 
         return $this->set_disabled($disabled);
     }

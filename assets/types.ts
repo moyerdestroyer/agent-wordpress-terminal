@@ -48,7 +48,8 @@ export type ActionOperation =
 	| 'site_settings_update'
 	| 'theme_switch'
 	| 'plugin_deactivate'
-	| 'custom_css_update';
+	| 'custom_css_update'
+	| 'resource_change';
 
 export interface ActionPayload {
 	operation?: ActionOperation;
@@ -93,6 +94,7 @@ export interface ActionPayload {
 		fallback_reason?: string;
 	};
 	required_attachment_ids?: number[];
+	required_document_ids?: number[];
 	required_minimum_library_images?: number;
 	required_minimum_visuals?: number;
 	required_links?: string[];
@@ -124,6 +126,12 @@ export interface ActionPayload {
 	was_active?: boolean;
 	css?: string;
 	original_css?: string;
+	resource_type?: string;
+	resource_operation?: string;
+	resource_id?: string;
+	resource_data?: Record<string, unknown>;
+	resource_original?: Record<string, unknown>;
+	resource_fingerprint?: string;
 }
 
 export interface PreviewDetails {
@@ -138,11 +146,14 @@ export interface PreviewDetails {
 	};
 }
 
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
 export interface ToolCall {
 	id?: number;
 	tool: string;
-	input: Record<string, unknown>;
-	output?: Record<string, unknown> | null;
+	input: JsonValue;
+	output?: JsonValue;
 	output_summary?: string;
 	status?: string;
 	created_at?: string;
@@ -154,7 +165,7 @@ export interface ProposedAction {
 	title: string;
 	description: string;
 	payload?: ActionPayload;
-	status: 'proposed' | 'approved' | 'rejected' | 'applied';
+	status: 'proposed' | 'approved' | 'rejected' | 'applied' | 'superseded';
 	created_at?: string;
 	updated_at?: string;
 	revision_kind?: 'created' | 'revised' | string;
@@ -179,6 +190,13 @@ export interface ToolInfo {
 	requires_trust?: boolean;
 	trusted?: boolean;
 	policy_reason?: string;
+	replaces?: string;
+}
+
+export interface AbilityReplacement {
+	fallback: string;
+	replacement: string;
+	status: 'active' | string;
 }
 
 export interface ToolsResponse {
@@ -190,6 +208,8 @@ export interface ToolsResponse {
 	disabled?: string[];
 	never_auto?: string[];
 	agent_enabled_count?: number;
+	exposure_policy?: 'contextual' | string;
+	replacements?: AbilityReplacement[];
 	environment?: EnvironmentStatus;
 }
 
@@ -286,6 +306,26 @@ export interface EnvironmentStatus {
 	warnings: string[];
 }
 
+/** OpenRouter key usage / optional account balance for the terminal header. */
+export interface ProviderBilling {
+	available: boolean;
+	reason?: string;
+	provider?: string;
+	label?: string | null;
+	usage?: number;
+	usage_daily?: number;
+	usage_weekly?: number;
+	usage_monthly?: number;
+	limit?: number | null;
+	limit_remaining?: number | null;
+	limit_reset?: string | null;
+	is_free_tier?: boolean;
+	balance?: number | null;
+	total_credits?: number | null;
+	total_usage?: number | null;
+	fetched_at?: string;
+}
+
 export interface ChatResponse {
 	content: string;
 	tool_calls?: ToolCall[];
@@ -315,9 +355,23 @@ export interface ChatProgress {
 		provider?: string;
 		mode?: string;
 		tool_count?: number;
+		tools_offered?: number;
 		completion_budget?: number;
 		request_timeout_seconds?: number;
 		proposal_only?: boolean;
+		tool_profile?: string;
+		design_level?: string;
+		content_turn?: boolean;
+		content_edit_turn?: boolean;
+		auto_retrieve_knowledge?: boolean;
+		history_limit?: number;
+		tool_allowlist_count?: number;
+		turn_phase?: string;
+		explore_hops?: number;
+		compose_compacted?: boolean;
+		evidence_pack_chars?: number;
+		parallel_batch_size?: number;
+		tool_batch_total?: number;
 		last_completed_call?: {
 			provider?: string;
 			model?: string;

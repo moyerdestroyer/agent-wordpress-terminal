@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { actionMetadata, canPreviewAction } from '../actionDisplay';
 import { formatElapsed, formatTimingStrip, type PhaseTimings } from '../lib/turnTiming';
-import type { ChatProgress, Message, ProposedAction, ToolCall } from '../types';
+import type { ChatProgress, JsonValue, Message, ProposedAction, ToolCall } from '../types';
 import { ActionDiffView } from './ActionDiffView';
 
 export interface TurnSummary {
@@ -24,8 +24,12 @@ interface TranscriptProps {
 
 type TranscriptItem =
 	| { kind: 'message'; message: Message }
-	| { kind: 'tool'; call: ToolCall }
+	| { kind: 'tool-group'; calls: ToolCall[]; key: string }
 	| { kind: 'action-record'; action: ProposedAction };
+
+function jsonObject(value: JsonValue | undefined): { [key: string]: JsonValue } | null {
+	return null !== value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
 
 function useTurnTiming(
 	active: boolean,
@@ -214,11 +218,13 @@ function toolsForAssistant(
 }
 
 function actionIdFromToolCall(call: ToolCall): number | null {
-	return normalizedActionId(call.output?.id);
+	return normalizedActionId(jsonObject(call.output)?.id);
 }
 
 function isResolvedAction(action: ProposedAction): boolean {
-	return action.status === 'applied' || action.status === 'rejected';
+	return (
+		action.status === 'applied' || action.status === 'rejected' || action.status === 'superseded'
+	);
 }
 
 function buildTranscriptItems(
@@ -240,6 +246,25 @@ function buildTranscriptItems(
 	).length;
 	let liveAssistantCursor = 0;
 
+	const appendTools = (calls: ToolCall[], key: string): void => {
+		if (calls.length === 0) {
+			return;
+		}
+
+		items.push({ kind: 'tool-group', calls, key });
+
+		for (const call of calls) {
+			assignedTools.add(toolCallKey(call));
+			const actionId = actionIdFromToolCall(call);
+			const action = actionId ? resolvedActionsById.get(actionId) : null;
+
+			if (action?.id) {
+				assignedActions.add(action.id);
+				items.push({ kind: 'action-record', action });
+			}
+		}
+	};
+
 	for (const message of messages) {
 		items.push({ kind: 'message', message });
 
@@ -257,34 +282,13 @@ function buildTranscriptItems(
 			liveAssistantCursor += 1;
 		}
 
-		for (const call of turnTools) {
-			assignedTools.add(toolCallKey(call));
-			items.push({ kind: 'tool', call });
-			const actionId = actionIdFromToolCall(call);
-			const action = actionId ? resolvedActionsById.get(actionId) : null;
-
-			if (action?.id) {
-				assignedActions.add(action.id);
-				items.push({ kind: 'action-record', action });
-			}
-		}
+		appendTools(turnTools, `message-${message.id ?? message.created_at ?? liveAssistantCursor}`);
 	}
 
-	for (const call of toolCalls) {
-		const key = toolCallKey(call);
-
-		if (!assignedTools.has(key)) {
-			items.push({ kind: 'tool', call });
-			assignedTools.add(key);
-			const actionId = actionIdFromToolCall(call);
-			const action = actionId ? resolvedActionsById.get(actionId) : null;
-
-			if (action?.id) {
-				assignedActions.add(action.id);
-				items.push({ kind: 'action-record', action });
-			}
-		}
-	}
+	appendTools(
+		toolCalls.filter((call) => !assignedTools.has(toolCallKey(call))),
+		'unassigned',
+	);
 
 	for (const action of actions) {
 		if (action.id && isResolvedAction(action) && !assignedActions.has(action.id)) {
@@ -305,8 +309,10 @@ function toolFailureMessage(call: ToolCall): string | null {
 
 	const output = call.output;
 
-	if (output && typeof output.error === 'string' && output.error.trim() !== '') {
-		return output.error;
+	const object = jsonObject(output);
+
+	if (object && typeof object.error === 'string' && object.error.trim() !== '') {
+		return object.error;
 	}
 
 	return statusLabel(status);
@@ -327,7 +333,8 @@ function statusLabel(status: string): string {
 
 function toolNoteLabel(call: ToolCall): string {
 	if (call.tool === 'awpt/knowledge-auto-retrieval') {
-		const count = typeof call.output?.count === 'number' ? call.output.count : null;
+		const output = jsonObject(call.output);
+		const count = typeof output?.count === 'number' ? output.count : null;
 
 		return count
 			? sprintf(
@@ -365,6 +372,35 @@ function InlineToolNote({ call }: { call: ToolCall }): JSX.Element {
 				</span>
 			) : null}
 		</div>
+	);
+}
+
+function ToolEvidenceGroup({ calls }: { calls: ToolCall[] }): JSX.Element {
+	const failed = calls.filter((call) => (call.status ?? 'success') !== 'success').length;
+	const label = sprintf(
+		/* translators: %d: number of tool calls represented by this evidence group. */
+		__('Evidence · %d tool calls', 'agent-wordpress-terminal'),
+		calls.length,
+	);
+
+	return (
+		<details className="awpt-evidence-group" open={failed > 0}>
+			<summary>
+				{label}
+				{failed > 0
+					? sprintf(
+							/* translators: %d: number of failed tool calls. */
+							__(' · %d failed', 'agent-wordpress-terminal'),
+							failed,
+						)
+					: null}
+			</summary>
+			<div className="awpt-evidence-group__content">
+				{calls.map((call) => (
+					<InlineToolNote call={call} key={toolCallKey(call)} />
+				))}
+			</div>
+		</details>
 	);
 }
 
@@ -538,8 +574,8 @@ export function Transcript({
 				</p>
 			) : (
 				transcriptItems.map((item) => {
-					if (item.kind === 'tool') {
-						return <InlineToolNote call={item.call} key={`tool-${toolCallKey(item.call)}`} />;
+					if (item.kind === 'tool-group') {
+						return <ToolEvidenceGroup calls={item.calls} key={`tools-${item.key}`} />;
 					}
 
 					if (item.kind === 'action-record') {

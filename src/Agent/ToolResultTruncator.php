@@ -23,11 +23,9 @@ final class ToolResultTruncator {
     private const META_VALUE_MAX_CHARS = 4_096;
 
     /**
-     * @param array<string, mixed> $output
-     * @return array<string, mixed>
      */
-    public function for_provider(string $tool, array $output): array {
-        if ('awpt/read-pattern' === $tool) {
+    public function for_provider(string $tool, mixed $output): mixed {
+        if ('awpt/read-pattern' === $tool && is_array($output)) {
             // Raw content is what the model adapts. The normalized tree repeats
             // the same composition and can more than double prompt size.
             unset($output['blocks']);
@@ -37,19 +35,21 @@ final class ToolResultTruncator {
     }
 
     /**
-     * @param array<string, mixed> $output
-     * @return array<string, mixed>
      */
-    public function for_storage(string $tool, array $output): array {
+    public function for_storage(string $tool, mixed $output): mixed {
         return $this->truncate($tool, $output, self::STORAGE_MAX_CHARS);
     }
 
-    /**
-     * @param array<string, mixed> $output
-     * @return array<string, mixed>
-     */
-    private function truncate(string $tool, array $output, int $max_chars): array {
-        if (ToolRegistry::is_proposal_ability($tool)) {
+    private function truncate(string $tool, mixed $output, int $max_chars): mixed {
+        if (ToolRegistry::is_proposal_ability($tool) && is_array($output)) {
+            return $output;
+        }
+
+        if (is_string($output)) {
+            return $this->clip_string($output, $max_chars);
+        }
+
+        if (!is_array($output)) {
             return $output;
         }
 
@@ -64,14 +64,20 @@ final class ToolResultTruncator {
     }
 
     /**
-     * @param array<string, mixed> $output
-     * @return array<string, mixed>
+     * @param array<array-key, mixed> $output
+     * @return array<array-key, mixed>
      */
     private function shrink(string $tool, array $output): array {
-        if ('awpt/read-content' === $tool) {
+        if (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
             $output['content'] = $this->clip_string((string) ($output['content'] ?? ''), 6_000);
+            $output['content_raw'] = $this->clip_string((string) ($output['content_raw'] ?? ''), 6_000);
+            $output['content_rendered'] = $this->clip_string((string) ($output['content_rendered'] ?? ''), 6_000);
             $output['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 4_000);
             $output['meta'] = $this->shrink_meta_map($output['meta'] ?? []);
+        }
+
+        if ('awpt/read-attachment-document' === $tool) {
+            $output['content'] = $this->clip_string((string) ($output['content'] ?? ''), 10_000);
         }
 
         if ('awpt/read-block-tree' === $tool) {
@@ -116,6 +122,14 @@ final class ToolResultTruncator {
             $output['stylesheets'] = $this->clip_array_items($output['stylesheets'] ?? [], 12);
         }
 
+        if ('awpt/inspect-rendered-element' === $tool) {
+            // The screenshot is delivered as a separate multimodal evidence
+            // message; never duplicate its base64 payload in JSON tool output.
+            unset($output['screenshot_data']);
+            $output['elements'] = $this->clip_array_items($output['elements'] ?? [], 24);
+            $output['html_snippet'] = $this->clip_string((string) ($output['html_snippet'] ?? ''), 2_000);
+        }
+
         if ('awpt/list-knowledge-sources' === $tool) {
             $output['samples'] = $this->clip_array_items($output['samples'] ?? [], 16);
         }
@@ -124,7 +138,7 @@ final class ToolResultTruncator {
     }
 
     /**
-     * @param array<string, mixed> $output
+     * @param array<array-key, mixed> $output
      * @return array<string, mixed>
      */
     private function build_summary(string $tool, array $output, int $original_bytes): array {
@@ -143,8 +157,11 @@ final class ToolResultTruncator {
             $summary[$key] = $output[$key];
         }
 
-        if ('awpt/read-content' === $tool) {
-            $summary['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 1_500);
+        if (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
+            $summary['plain_text'] = $this->clip_string(
+                (string) ($output['plain_text'] ?? $output['content_raw'] ?? $output['content_rendered'] ?? ''),
+                1_500,
+            );
         }
 
         if ('awpt/list-content' === $tool) {

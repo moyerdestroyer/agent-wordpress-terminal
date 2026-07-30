@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Database;
 
 use AWPT\Support\ActionOperations;
+use AWPT\Support\ResourceValueSanitizer;
 use AWPT\Support\SiteSettingsWhitelist;
 
 if (!defined('ABSPATH')) {
@@ -55,6 +56,18 @@ final class ActionPayloadSanitizer {
 
         $clean = $this->sanitize_settings($clean, $payload);
         $clean = $this->sanitize_theme($clean, $payload);
+
+        if (ActionOperations::RESOURCE_CHANGE === $operation) {
+            $resource_data = is_array($payload['resource_data'] ?? null) ? $payload['resource_data'] : [];
+            $resource_original = is_array($payload['resource_original'] ?? null) ? $payload['resource_original'] : [];
+            $clean['resource_type'] = sanitize_key((string) ($payload['resource_type'] ?? ''));
+            $clean['resource_operation'] = sanitize_key((string) ($payload['resource_operation'] ?? ''));
+            $clean['resource_id'] = sanitize_text_field((string) ($payload['resource_id'] ?? ''));
+            $clean['resource_data'] = new ResourceValueSanitizer()->sanitize_object($resource_data);
+            $clean['resource_original'] = new ResourceValueSanitizer()->sanitize_object($resource_original);
+            $clean['resource_fingerprint'] = sanitize_text_field((string) ($payload['resource_fingerprint'] ?? ''));
+            $clean['affected'] = sanitize_text_field((string) ($payload['affected'] ?? ''));
+        }
 
         return $this->sanitize_plugin($clean, $payload);
     }

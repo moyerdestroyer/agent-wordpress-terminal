@@ -41,6 +41,10 @@ final class ContentUpdatePreviewAutosave {
             require_once ABSPATH . 'wp-admin/includes/post.php';
         }
 
+        // Drop any previous staged autosave for this action so re-preview always
+        // reflects the current payload (avoids stale published-looking previews).
+        $this->discard($payload);
+
         $autosave_id = wp_create_post_autosave(wp_slash($autosave));
 
         if (is_wp_error($autosave_id)) {

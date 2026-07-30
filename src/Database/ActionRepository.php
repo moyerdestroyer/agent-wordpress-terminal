@@ -13,6 +13,7 @@ namespace AWPT\Database;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\CompositionActionContext;
 use AWPT\Support\Json;
+use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -22,6 +23,11 @@ if (!defined('ABSPATH')) {
  * Reads and writes awpt_actions.
  */
 final class ActionRepository {
+    /** @var list<int> */
+    private array $last_superseded_ids = [];
+
+    private int $last_mutated_action_id = 0;
+
     /**
      * @param array<string, mixed> $payload
      * @return int|null Inserted action ID.
@@ -33,6 +39,8 @@ final class ActionRepository {
         array $payload,
         array $options = [],
     ): ?int {
+        // One open proposal per session: a new stage replaces prior review cards.
+        $this->last_superseded_ids = $this->supersede_open_for_session($session_id);
         $wpdb = WpDb::get();
 
         $now = current_time('mysql');
@@ -60,7 +68,9 @@ final class ActionRepository {
             return null;
         }
 
-        return (int) $wpdb->insert_id;
+        $this->last_mutated_action_id = (int) $wpdb->insert_id;
+
+        return $this->last_mutated_action_id;
     }
 
     public function update_status(int $action_id, string $status): void {
@@ -106,6 +116,11 @@ final class ActionRepository {
      * @param array<string, mixed> $payload
      */
     public function revise(int $action_id, string $title, string $description, array $payload): bool {
+        $row = $this->get_accessible_row($action_id);
+        $session_id = (int) ($row['session_id'] ?? 0);
+
+        // Keep this card; supersede any other open proposals in the session.
+        $this->last_superseded_ids = $session_id > 0 ? $this->supersede_open_for_session($session_id, $action_id) : [];
         $wpdb = WpDb::get();
 
         $updated = $wpdb->update(
@@ -122,7 +137,41 @@ final class ActionRepository {
             where_format: ['%d'],
         );
 
-        return false !== $updated;
+        if (false === $updated) {
+            return false;
+        }
+
+        $this->last_mutated_action_id = $action_id;
+
+        return true;
+    }
+
+    /**
+     * Close other open proposals in the session so only one remains active.
+     *
+     * @return list<int> Superseded action IDs.
+     */
+    public function supersede_open_for_session(int $session_id, int $except_action_id = 0): array {
+        if ($session_id <= 0) {
+            return [];
+        }
+
+        $preview = new StagedPostPreview();
+        $removed = [];
+
+        foreach ($this->list_open_for_session($session_id, 25) as $action) {
+            $action_id = (int) ($action['id'] ?? 0);
+
+            if ($action_id <= 0 || $action_id === $except_action_id) {
+                continue;
+            }
+
+            $preview->discard_preview_resources($this->decode_payload($action));
+            $this->update_status($action_id, 'superseded');
+            $removed[] = $action_id;
+        }
+
+        return $removed;
     }
 
     /**
@@ -299,7 +348,7 @@ final class ActionRepository {
             return null;
         }
 
-        return [
+        $action = [
             'id' => (int) $row['id'],
             'session_id' => (int) $row['session_id'],
             'title' => (string) $row['title'],
@@ -311,6 +360,13 @@ final class ActionRepository {
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
         ];
+
+        // Surface superseded peers so the transcript can drop replaced cards.
+        if ($action_id === $this->last_mutated_action_id && [] !== $this->last_superseded_ids) {
+            $action['removed_action_ids'] = $this->last_superseded_ids;
+        }
+
+        return $action;
     }
 
     /**

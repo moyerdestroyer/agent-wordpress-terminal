@@ -231,18 +231,84 @@ function test_provider_runtime_formats_discovery_only_once_after_follow_up_failu
         ['tool_registry' => new ToolRegistry()],
     );
 
-    Assert::same(
-        1,
-        substr_count((string) $result['content'], 'Tool demo/read returned'),
-        'timeout finalization should not duplicate completed discovery output',
-    );
     Assert::true(
         str_contains((string) $result['content'], 'Request timed out'),
-        'the actual provider failure should be clear',
+        'admins should retain the provider detail for troubleshooting',
+    );
+    Assert::true(
+        str_contains((string) $result['content'], 'no change was staged'),
+        'the timeout fallback should state the outcome clearly',
+    );
+    Assert::false(
+        str_contains((string) $result['content'], 'Tool demo/read returned'),
+        'the timeout fallback should not replay raw tool output',
     );
 }
 
 test_provider_runtime_formats_discovery_only_once_after_follow_up_failure();
+
+final class AwptNoFollowUpAfterProposalProvider implements ProviderInterface {
+    public int $completions = 0;
+
+    public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
+        unset($messages, $tools, $options);
+        ++$this->completions;
+
+        return new WP_Error('unexpected_follow_up', 'A successful proposal must end the loop.');
+    }
+
+    public function get_name(): string {
+        return 'Proposal terminal-state test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
+}
+
+function test_provider_runtime_stops_after_successful_content_update_proposal(): void {
+    awpt_test_reset_state();
+    add_filter('awpt_mcp_tools', static fn(): array => [[
+        'name' => 'awpt/propose-content-update',
+        'description' => 'Stage a content update.',
+        'readonly' => false,
+        'destructive' => false,
+        'requires_approval' => true,
+    ]]);
+    add_filter('awpt_mcp_execute_tool', static fn(): array => [
+        'id' => 42,
+        'title' => 'Format Stamping Fee as documentation',
+        'status' => 'proposed',
+        'payload' => ['operation' => 'content_update', 'post_id' => 408],
+    ]);
+    $calls = [[
+        'id' => 'call-content-update',
+        'function' => [
+            'name' => 'awpt__propose_content_update',
+            'arguments' => '{"post_id":408}',
+        ],
+    ]];
+    $provider = new AwptNoFollowUpAfterProposalProvider();
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Make page 408 a documentation page.']],
+        [
+            'content' => '',
+            'raw_tool_calls' => $calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+            'model' => 'fake',
+            'usage' => [],
+        ],
+        ['tool_registry' => new ToolRegistry()],
+    );
+
+    Assert::same(0, $provider->completions, 'a successful content-update proposal should not trigger follow-up');
+    Assert::same(1, count($result['actions']), 'the staged content update should be returned as an action');
+    Assert::true(str_contains($result['content'], 'staged action #42'), 'the reply should confirm the staged action');
+}
+
+test_provider_runtime_stops_after_successful_content_update_proposal();
 
 final class AwptCompositionGateProvider implements ProviderInterface {
     public int $completions = 0;
@@ -251,10 +317,11 @@ final class AwptCompositionGateProvider implements ProviderInterface {
 
     public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
         ++$this->completions;
-        Assert::same(1, count($tools), 'composition phase should expose only the proposal tool');
-        Assert::true(
-            is_array($options['tool_choice'] ?? null),
-            'direct providers should receive a forced proposal function choice',
+        Assert::true([] !== $tools, 'composition phase should expose available proposal tools');
+        Assert::same(
+            'required',
+            $options['tool_choice'] ?? null,
+            'direct providers should require a proposal while leaving the operation choice to the agent',
         );
         Assert::same(
             16_000,
@@ -449,17 +516,50 @@ function test_provider_runtime_explains_failed_finalization_with_turn_diagnostic
     );
 
     Assert::same(2, $provider->completions, 'failed finalization should make only one compact retry');
-    Assert::true(str_contains($result['content'], 'proposal retry'), 'failure should identify the orchestration phase');
     Assert::true(
-        str_contains($result['content'], '7 verified tool results'),
-        'failure should report the evidence count',
+        str_contains($result['content'], 'no change was staged'),
+        'failure should state that the requested mutation did not occur',
     );
     Assert::true(
-        str_contains($result['content'], '16000-token completion budget'),
-        'failure should report the bounded budget',
+        str_contains($result['content'], 'Operation timed out'),
+        'admins should still receive the provider detail',
     );
 }
 
 test_provider_runtime_forces_proposal_after_sufficient_discovery();
 test_provider_runtime_retries_timed_out_finalization_once_with_compact_evidence();
 test_provider_runtime_explains_failed_finalization_with_turn_diagnostics();
+
+function test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone(): void {
+    awpt_test_reset_state();
+    $provider = new AwptCompositionGateProvider();
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Create a page using images from my media library.']],
+        awpt_discovery_result_for_runtime(),
+        [
+            'tool_registry' => awpt_register_composition_gate_tools(),
+            'is_content_turn' => true,
+            // Leave less than MIN_USEFUL_REQUEST_SECONDS on a 240s wall.
+            'turn_started_at' => microtime(true) - 230,
+            'turn_wall_seconds' => 240,
+        ],
+    );
+
+    Assert::same(0, $provider->completions, 'must not schedule a follow-up with unusable remaining time');
+    Assert::true(
+        str_contains($result['content'], 'no change was staged'),
+        'wall exhaustion should state that nothing was staged',
+    );
+    Assert::true(
+        str_contains($result['content'], 'ran out of time'),
+        'wall exhaustion should not blame a provider timeout that never ran',
+    );
+    Assert::false(
+        str_contains($result['content'], 'Provider detail:'),
+        'skipped calls should not invent provider error detail',
+    );
+}
+
+test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone();

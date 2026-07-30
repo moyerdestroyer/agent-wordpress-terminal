@@ -47,11 +47,13 @@ final class ErrorLogReader {
         $found_label = null;
 
         foreach ($candidates as $path) {
-            if (is_string($path) && file_exists($path) && is_readable($path)) {
-                $found_path = $path;
-                $found_label = $path === $wp_log ? 'wp-content/debug.log' : $path;
-                break;
+            if (!(is_string($path) && file_exists($path) && is_readable($path))) {
+                continue;
             }
+
+            $found_path = $path;
+            $found_label = $path === $wp_log ? 'wp-content/debug.log' : $path;
+            break;
         }
 
         if (null === $found_path) {

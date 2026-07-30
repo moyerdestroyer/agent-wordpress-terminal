@@ -24,9 +24,31 @@ export function normalizeDiffText(value: string): string {
 	return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n+$/, '');
 }
 
+/**
+ * Pretty-print Gutenberg delimiters so minified model output and multi-line
+ * stored post_content share a stable line structure for line-level diffs.
+ */
+export function normalizeBlockMarkupForDiff(value: string): string {
+	let text = normalizeDiffText(value);
+
+	if (text === '') {
+		return '';
+	}
+
+	// Put every block open/close comment on its own line.
+	text = text.replace(/([^\n])(<!--\s*\/?wp:)/g, '$1\n$2');
+	text = text.replace(/(-->)(?!\n|$)/g, '$1\n');
+	// Model output is often minified (single newlines); stored content often has
+	// blank lines between top-level blocks. Normalize so they compare cleanly.
+	text = text.replace(/(-->)\n+(<!--)/g, '$1\n$2');
+	text = text.replace(/\n{3,}/g, '\n\n');
+
+	return text.replace(/\n+$/, '');
+}
+
 function buildDiffLinesRaw(before: string, after: string): DiffLine[] {
-	const left = normalizeDiffText(before);
-	const right = normalizeDiffText(after);
+	const left = normalizeBlockMarkupForDiff(before);
+	const right = normalizeBlockMarkupForDiff(after);
 
 	if (left === '' && right === '') {
 		return [];

@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
+use AWPT\Agent\AbilityReplacementRegistry;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -23,6 +25,8 @@ final class AbilitiesHealth {
      */
     private const EXPECTED_ABILITIES = [
         'awpt/read-content',
+        'awpt/find-abilities',
+        'awpt/read-proposal',
         'awpt/read-themes',
         'awpt/read-theme-json',
         'awpt/read-block-tree',
@@ -89,14 +93,27 @@ final class AbilitiesHealth {
      */
     public static function registration_status(): array {
         $registered = self::registered_awpt_abilities();
+        $expected = self::expected_abilities();
 
         return [
             'healthy' => self::is_awpt_registry_healthy(),
             'registered_count' => count($registered),
-            'expected_count' => count(self::EXPECTED_ABILITIES),
+            'expected_count' => count($expected),
             'registered' => $registered,
-            'missing' => array_values(array_diff(self::EXPECTED_ABILITIES, $registered)),
+            'missing' => array_values(array_diff($expected, $registered)),
         ];
+    }
+
+    /** @return list<string> */
+    private static function expected_abilities(): array {
+        $expected = self::EXPECTED_ABILITIES;
+
+        foreach (new AbilityReplacementRegistry()->active() as $fallback => $replacement) {
+            unset($replacement);
+            $expected = array_values(array_filter($expected, static fn(string $name): bool => $name !== $fallback));
+        }
+
+        return $expected;
     }
 
     /**

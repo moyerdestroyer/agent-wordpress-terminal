@@ -6,6 +6,7 @@ import type {
 	KnowledgeStatus,
 	PreviewDetails,
 	ProposedAction,
+	ProviderBilling,
 	SessionSummary,
 	ToolCall,
 	ToolsResponse,
@@ -103,6 +104,7 @@ export interface ComposerAttachment {
 	url: string;
 	filename: string;
 	mime_type?: string;
+	kind?: 'image' | 'document';
 }
 
 export async function sendMessage(
@@ -125,9 +127,13 @@ export async function getChatProgress(sessionId: number, turnId: string): Promis
 	});
 }
 
-export async function uploadAttachment(
-	file: File,
-): Promise<{ id: number; url: string; mime_type: string; filename: string }> {
+export async function uploadAttachment(file: File): Promise<{
+	id: number;
+	url: string;
+	mime_type: string;
+	filename: string;
+	kind: 'image' | 'document';
+}> {
 	const body = new FormData();
 	body.append('file', file);
 	return apiFetch({ path: path('/attachments'), method: 'POST', body } as never);
@@ -277,4 +283,10 @@ export async function diagnoseSession(
 		method: 'POST',
 		data: incidentId ? { incident_id: incidentId } : {},
 	});
+}
+
+/** OpenRouter usage/billing for the active provider (no-op payload when not OpenRouter). */
+export async function getProviderBilling(refresh = false): Promise<ProviderBilling> {
+	const query = refresh ? '?refresh=1' : '';
+	return apiFetch<ProviderBilling>({ path: path(`/provider/billing${query}`) });
 }

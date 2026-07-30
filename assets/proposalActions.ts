@@ -1,4 +1,4 @@
-import type { ProposedAction, ToolCall } from './types';
+import type { JsonValue, ProposedAction, ToolCall } from './types';
 
 const DEFAULT_PROPOSAL_TOOLS = [
 	'awpt/propose-content-update',
@@ -22,6 +22,7 @@ const ACTION_STATUS_RANK: Record<ProposedAction['status'], number> = {
 	proposed: 1,
 	approved: 2,
 	rejected: 3,
+	superseded: 3,
 	applied: 4,
 };
 
@@ -45,8 +46,16 @@ function mergeActionRecord(existing: ProposedAction, incoming: ProposedAction): 
 
 function isProposedActionStatus(value: unknown): value is ProposedAction['status'] {
 	return (
-		value === 'proposed' || value === 'approved' || value === 'rejected' || value === 'applied'
+		value === 'proposed' ||
+		value === 'approved' ||
+		value === 'rejected' ||
+		value === 'applied' ||
+		value === 'superseded'
 	);
+}
+
+function isJsonObject(value: JsonValue | undefined): value is { [key: string]: JsonValue } {
+	return null !== value && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function proposalActionFromToolCall(call: ToolCall): ProposedAction | null {
@@ -56,7 +65,7 @@ export function proposalActionFromToolCall(call: ToolCall): ProposedAction | nul
 
 	const output = call.output;
 
-	if (!output || typeof output !== 'object') {
+	if (!isJsonObject(output)) {
 		return null;
 	}
 
@@ -72,10 +81,9 @@ export function proposalActionFromToolCall(call: ToolCall): ProposedAction | nul
 		session_id: typeof output.session_id === 'number' ? output.session_id : undefined,
 		title: typeof output.title === 'string' ? output.title : '',
 		description: typeof output.description === 'string' ? output.description : '',
-		payload:
-			output.payload && typeof output.payload === 'object'
-				? (output.payload as ProposedAction['payload'])
-				: undefined,
+		payload: isJsonObject(output.payload)
+			? (output.payload as ProposedAction['payload'])
+			: undefined,
 		status: isProposedActionStatus(output.status) ? output.status : 'proposed',
 		created_at: typeof output.created_at === 'string' ? output.created_at : undefined,
 		updated_at: typeof output.updated_at === 'string' ? output.updated_at : undefined,
@@ -90,13 +98,26 @@ export function proposalActionFromToolCall(call: ToolCall): ProposedAction | nul
 
 export function proposalActionsFromToolCalls(toolCalls: ToolCall[]): ProposedAction[] {
 	const actions: ProposedAction[] = [];
+	const removed = new Set<number>();
 
 	for (const call of toolCalls) {
 		const action = proposalActionFromToolCall(call);
 
-		if (action) {
-			actions.push(action);
+		if (!action) {
+			continue;
 		}
+
+		for (const id of action.removed_action_ids ?? []) {
+			if (typeof id === 'number' && id > 0) {
+				removed.add(id);
+			}
+		}
+
+		actions.push(action);
+	}
+
+	if (removed.size > 0) {
+		return actions.filter((action) => !action.id || !removed.has(action.id));
 	}
 
 	return actions;
@@ -106,16 +127,26 @@ export function mergeProposalActions(
 	current: ProposedAction[],
 	incoming: ProposedAction[],
 ): ProposedAction[] {
+	const removed = new Set<number>();
+
+	for (const action of incoming) {
+		for (const id of action.removed_action_ids ?? []) {
+			if (typeof id === 'number' && id > 0) {
+				removed.add(id);
+			}
+		}
+	}
+
 	const merged = new Map<number, ProposedAction>();
 
 	for (const action of current) {
-		if (action.id) {
+		if (action.id && !removed.has(action.id)) {
 			merged.set(action.id, action);
 		}
 	}
 
 	for (const action of incoming) {
-		if (!action.id) {
+		if (!action.id || removed.has(action.id)) {
 			continue;
 		}
 

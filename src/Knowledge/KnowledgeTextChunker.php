@@ -228,10 +228,12 @@ final class KnowledgeTextChunker {
         $numeric_position = null;
 
         foreach ($segments as $index => $segment) {
-            if (ctype_digit($segment)) {
-                $numeric_position = $index;
-                break;
+            if (!ctype_digit($segment)) {
+                continue;
             }
+
+            $numeric_position = $index;
+            break;
         }
 
         if (null !== $numeric_position) {

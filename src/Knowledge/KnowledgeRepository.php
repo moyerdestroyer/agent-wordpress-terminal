@@ -248,8 +248,11 @@ final class KnowledgeRepository {
 
     /**
      * Format applicable guidelines for provider prompt injection.
+     *
+     * @param int $max_sources Maximum guideline sources to include.
+     * @param int $max_chars_per_source Per-source character cap (post strip tags).
      */
-    public function format_guidelines_for_prompt(): string {
+    public function format_guidelines_for_prompt(int $max_sources = 2, int $max_chars_per_source = 2_000): string {
         $sources = array_values(array_filter(
             $this->list_sources(),
             static fn(array $source): bool => (
@@ -262,9 +265,11 @@ final class KnowledgeRepository {
             return '';
         }
 
+        $max_sources = max(1, min(5, $max_sources));
+        $max_chars_per_source = max(400, min(5_000, $max_chars_per_source));
         $parts = [];
 
-        foreach (array_slice($sources, 0, 5) as $source) {
+        foreach (array_slice($sources, 0, $max_sources) as $source) {
             $content = wp_strip_all_tags((string) ($source['content'] ?? ''));
 
             if ('' === $content) {
@@ -274,7 +279,7 @@ final class KnowledgeRepository {
             $parts[] = sprintf(
                 '<guideline source="%s">%s</guideline>',
                 esc_attr((string) ($source['label'] ?? 'Knowledge guideline')),
-                esc_html(mb_substr($content, 0, 5000, 'UTF-8')),
+                esc_html(mb_substr($content, 0, $max_chars_per_source, 'UTF-8')),
             );
         }
 
@@ -313,8 +318,9 @@ final class KnowledgeRepository {
                 'update_post_meta_cache' => false,
                 'update_post_term_cache' => '' !== $taxonomy,
             ]);
+            $posts = is_array($query->posts) ? $query->posts : [];
 
-            foreach ($query->posts as $post) {
+            foreach ($posts as $post) {
                 if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
                     continue;
                 }
@@ -322,8 +328,8 @@ final class KnowledgeRepository {
                 $sources[] = $this->mapper->from_post($post, $kind, $taxonomy);
             }
 
-            $offset += count($query->posts);
-        } while (count($query->posts) === $page_size);
+            $offset += count($posts);
+        } while (count($posts) === $page_size);
 
         if ('wp_content' === $kind) {
             usort($sources, static fn(array $left, array $right): int => strcmp(
@@ -362,8 +368,9 @@ final class KnowledgeRepository {
                 'update_post_meta_cache' => false,
                 'update_post_term_cache' => false,
             ]);
+            $posts = is_array($query->posts) ? $query->posts : [];
 
-            foreach ($query->posts as $post) {
+            foreach ($posts as $post) {
                 if (!$post instanceof \WP_Post || !current_user_can('read_post', $post->ID)) {
                     continue;
                 }
@@ -399,8 +406,8 @@ final class KnowledgeRepository {
                 ];
             }
 
-            $offset += count($query->posts);
-        } while (count($query->posts) === $page_size);
+            $offset += count($posts);
+        } while (count($posts) === $page_size);
 
         return $descriptors;
     }

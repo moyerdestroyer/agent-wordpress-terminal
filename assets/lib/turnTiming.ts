@@ -21,10 +21,14 @@ export function phaseTimingLabel(phase: string): string {
 			return 'start';
 		case 'planning':
 			return 'planning';
+		case 'exploring':
+			return 'exploring';
 		case 'tools':
 			return 'tools';
 		case 'composing':
 			return 'composing';
+		case 'finalizing':
+			return 'staging';
 		case 'preview':
 			return 'preview';
 		case 'complete':
@@ -49,7 +53,16 @@ export function formatTimingStrip(
 	totalMs: number,
 ): string {
 	const parts: string[] = [];
-	const order = ['starting', 'pending', 'planning', 'tools', 'composing', 'preview'];
+	const order = [
+		'starting',
+		'pending',
+		'planning',
+		'exploring',
+		'tools',
+		'composing',
+		'finalizing',
+		'preview',
+	];
 	const seen = new Set<string>();
 
 	for (const phase of order) {

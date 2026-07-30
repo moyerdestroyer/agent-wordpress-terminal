@@ -99,6 +99,14 @@ final class ProposeNewPost implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    'available_document_ids' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'integer'],
+                        'description' => __(
+                            'Composer document attachments available as textual evidence. Supplied automatically.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                     'proposal_manifest' => [
                         'type' => 'object',
                         'properties' => [
@@ -205,6 +213,14 @@ final class ProposeNewPost implements AbilityInterface {
                         'items' => ['type' => 'integer'],
                         'description' => __(
                             'Optional attachment requirements declared in the agent rationale; AWPT verifies them when supplied.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'required_document_ids' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'integer'],
+                        'description' => __(
+                            'Document attachment IDs used as source evidence. Documents are not forced into image blocks.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -417,6 +433,18 @@ final class ProposeNewPost implements AbilityInterface {
             $existing_attachment_ids,
             $input_attachment_ids,
             $available_attachment_ids,
+        ));
+        $existing_document_ids = is_array($existing_payload['required_document_ids'] ?? null)
+            ? $existing_payload['required_document_ids']
+            : [];
+        $input_document_ids = is_array($input['required_document_ids'] ?? null) ? $input['required_document_ids'] : [];
+        $available_document_ids = is_array($input['available_document_ids'] ?? null)
+            ? $input['available_document_ids']
+            : [];
+        $required_document_ids = $this->integer_list(array_merge(
+            $existing_document_ids,
+            $input_document_ids,
+            $available_document_ids,
         ));
         $existing_links = is_array($existing_payload['required_links'] ?? null)
             ? $existing_payload['required_links']
@@ -659,6 +687,10 @@ final class ProposeNewPost implements AbilityInterface {
             $payload['required_attachment_ids'] = $required_attachment_ids;
         }
 
+        if ([] !== $required_document_ids) {
+            $payload['required_document_ids'] = $required_document_ids;
+        }
+
         if ($required_minimum_library_images > 0) {
             $payload['required_minimum_library_images'] = $required_minimum_library_images;
         }
@@ -881,7 +913,10 @@ final class ProposeNewPost implements AbilityInterface {
 
         $action['revision_kind'] = $revision_kind;
         $action['revised_action_id'] = $action_id;
-        $action['removed_action_ids'] = [];
+        // Keep removed_action_ids from format_action (other open cards superseded this turn).
+        if (!isset($action['removed_action_ids']) || !is_array($action['removed_action_ids'])) {
+            $action['removed_action_ids'] = [];
+        }
 
         return $action;
     }

@@ -129,9 +129,11 @@ final class SiteHealthAsyncRunner {
         $normalized = [];
 
         foreach ($data as $key => $value) {
-            if (is_string($key)) {
-                $normalized[$key] = $value;
+            if (!is_string($key)) {
+                continue;
             }
+
+            $normalized[$key] = $value;
         }
 
         return $normalized;

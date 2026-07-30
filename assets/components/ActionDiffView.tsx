@@ -2,7 +2,13 @@ import { Button } from '@wordpress/components';
 import { useMemo, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { type ActionDiffModel, buildActionDiffModel, titleCase } from '../actionDisplay';
-import { buildDiffHunks, countDiffStats, type DiffHunk, type DiffLine } from '../lib/textDiff';
+import {
+	buildDiffHunks,
+	countDiffStats,
+	type DiffHunk,
+	type DiffLine,
+	normalizeBlockMarkupForDiff,
+} from '../lib/textDiff';
 import type { ActionPayload } from '../types';
 
 type DiffLayout = 'unified' | 'split';
@@ -45,30 +51,43 @@ function TextHunksView({
 	layout,
 	emptyBeforeLabel,
 	emptyAfterLabel,
+	note,
 }: {
 	before: string;
 	after: string;
 	layout: DiffLayout;
 	emptyBeforeLabel?: string;
 	emptyAfterLabel?: string;
+	note?: string;
 }): JSX.Element {
 	const hunks = useMemo(() => buildDiffHunks(before, after), [before, after]);
 	const stats = useMemo(() => countDiffStats(hunks), [hunks]);
+	const normalizedEqual =
+		normalizeBlockMarkupForDiff(before) === normalizeBlockMarkupForDiff(after);
 
 	if (before === '' && after === '') {
-		return <p className="awpt-empty">{__('Nothing to compare.', 'agent-wordpress-terminal')}</p>;
+		return (
+			<>
+				{note ? <p className="awpt-diff-stats__note">{note}</p> : null}
+				<p className="awpt-empty">{__('Nothing to compare.', 'agent-wordpress-terminal')}</p>
+			</>
+		);
 	}
 
-	if (before === after) {
+	if (normalizedEqual || (stats.added === 0 && stats.removed === 0)) {
 		return (
-			<p className="awpt-empty">
-				{__('No textual differences between before and after.', 'agent-wordpress-terminal')}
-			</p>
+			<>
+				{note ? <p className="awpt-diff-stats__note">{note}</p> : null}
+				<p className="awpt-empty">
+					{__('No textual differences between before and after.', 'agent-wordpress-terminal')}
+				</p>
+			</>
 		);
 	}
 
 	return (
 		<div className="awpt-diff-hunks">
+			{note ? <p className="awpt-diff-stats__note">{note}</p> : null}
 			<div className="awpt-diff-stats">
 				<span className="awpt-diff-stats__added">{`+${stats.added}`}</span>
 				<span className="awpt-diff-stats__removed">{`−${stats.removed}`}</span>
@@ -256,6 +275,7 @@ function ModelBody({ model, layout }: { model: ActionDiffModel; layout: DiffLayo
 					layout={layout}
 					emptyBeforeLabel={model.emptyBeforeLabel}
 					emptyAfterLabel={model.emptyAfterLabel}
+					note={model.note}
 				/>
 			);
 		case 'create':

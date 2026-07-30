@@ -55,3 +55,93 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  wordpress:
+    name: WordPress ${{ matrix.wordpress }} compatibility
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress:
+          - '6.9'
+          - nightly
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: wordpress
+          MARIADB_USER: wordpress
+          MARIADB_PASSWORD: wordpress
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer, wp-cli
+          coverage: none
+
+      - name: Install plugin dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install WordPress
+        env:
+          WP_VERSION: ${{ matrix.wordpress }}
+        run: |
+          set -euo pipefail
+          WP_ROOT="${RUNNER_TEMP}/wordpress-${WP_VERSION}"
+          wp core download --path="${WP_ROOT}" --version="${WP_VERSION}" --force
+          wp config create \
+            --path="${WP_ROOT}" \
+            --dbname=wordpress \
+            --dbuser=wordpress \
+            --dbpass=wordpress \
+            --dbhost=127.0.0.1:3306
+          wp core install \
+            --path="${WP_ROOT}" \
+            --url=http://awpt.test \
+            --title=AWPT \
+            --admin_user=admin \
+            --admin_password=password \
+            --admin_email=admin@example.test
+          ln -s "${GITHUB_WORKSPACE}" "${WP_ROOT}/wp-content/plugins/agent-wordpress-terminal"
+          wp plugin activate agent-wordpress-terminal --path="${WP_ROOT}"
+
+      - name: Verify Abilities compatibility contracts
+        env:
+          WP_VERSION: ${{ matrix.wordpress }}
+        run: |
+          set -euo pipefail
+          WP_ROOT="${RUNNER_TEMP}/wordpress-${WP_VERSION}"
+          wp eval '
+            $replacement = new AWPT\Agent\AbilityReplacementRegistry();
+            $preferred = $replacement->preferred("awpt/read-content");
+
+            if (!wp_get_ability("awpt/find-abilities") || !wp_get_ability("awpt/read-proposal")) {
+                throw new RuntimeException("AWPT discovery or proposal abilities did not register.");
+            }
+
+            if ("core/read-content" === $preferred) {
+                if (wp_get_ability("awpt/read-content")) {
+                    throw new RuntimeException("Verified Core replacement left duplicate AWPT ability registered.");
+                }
+            } elseif (!wp_get_ability("awpt/read-content")) {
+                throw new RuntimeException("AWPT read-content fallback is missing.");
+            }
+
+            $payload = (new AWPT\REST\ToolsPayloadBuilder())->full();
+            if ("contextual" !== ($payload["exposure_policy"] ?? "")) {
+                throw new RuntimeException("Contextual exposure policy is missing.");
+            }
+          ' --path="${WP_ROOT}" --user=admin

@@ -7,6 +7,7 @@ import {
 	deleteSession,
 	fetchActionPreview,
 	getChatProgress,
+	getProviderBilling,
 	getSession,
 	listAwptTools,
 	listSessions,
@@ -25,6 +26,7 @@ import type {
 	Message,
 	PreviewDetails,
 	ProposedAction,
+	ProviderBilling,
 	SessionSummary,
 	ToolCall,
 	ToolsResponse,
@@ -110,6 +112,37 @@ function progressDiagnostic(progress: ChatProgress): string {
 		);
 	}
 
+	if (diagnostics?.tool_profile || diagnostics?.design_level || diagnostics?.turn_phase) {
+		lines.push(
+			sprintf(
+				/* translators: 1: turn tool profile, 2: design policy level, 3: tools offered count, 4: turn phase */
+				__(
+					'Profile: %1$s · design: %2$s · tools offered: %3$d · phase: %4$s',
+					'agent-wordpress-terminal',
+				),
+				diagnostics.tool_profile || __('unknown', 'agent-wordpress-terminal'),
+				diagnostics.design_level || __('none', 'agent-wordpress-terminal'),
+				diagnostics.tools_offered ?? diagnostics.tool_allowlist_count ?? 0,
+				diagnostics.turn_phase || diagnostics.mode || __('unknown', 'agent-wordpress-terminal'),
+			),
+		);
+	}
+
+	if (diagnostics?.explore_hops !== undefined || diagnostics?.parallel_batch_size !== undefined) {
+		lines.push(
+			sprintf(
+				/* translators: 1: explore hop count, 2: parallel-safe tools in last batch, 3: evidence pack size */
+				__(
+					'Explore hops: %1$d · parallel batch: %2$d · evidence pack: %3$d chars',
+					'agent-wordpress-terminal',
+				),
+				diagnostics.explore_hops ?? 0,
+				diagnostics.parallel_batch_size ?? 0,
+				diagnostics.evidence_pack_chars ?? 0,
+			),
+		);
+	}
+
 	if (diagnostics?.tool_count !== undefined || diagnostics?.completion_budget !== undefined) {
 		lines.push(
 			sprintf(
@@ -157,6 +190,149 @@ function cacheBustPreview(preview: PreviewDetails, revision: string): PreviewDet
 	};
 }
 
+/** Format OpenRouter credits (USD-equivalent) for the compact header meter. */
+function formatCredits(amount: number): string {
+	const absolute = Math.abs(amount);
+	const digits = absolute > 0 && absolute < 0.01 ? 4 : 2;
+	const formatted = absolute.toLocaleString(undefined, {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: digits,
+	});
+
+	return amount < 0 ? `-$${formatted}` : `$${formatted}`;
+}
+
+function openRouterBillingLabel(billing: ProviderBilling): string {
+	const parts: string[] = [];
+
+	if (typeof billing.balance === 'number') {
+		parts.push(
+			sprintf(
+				/* translators: %s: remaining account credit balance */
+				__('bal %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.balance),
+			),
+		);
+	}
+
+	if (typeof billing.usage_daily === 'number') {
+		parts.push(
+			sprintf(
+				/* translators: %s: credits spent today */
+				__('%s today', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage_daily),
+			),
+		);
+	}
+
+	if (typeof billing.usage_monthly === 'number') {
+		parts.push(
+			sprintf(
+				/* translators: %s: credits spent this month */
+				__('%s mo', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage_monthly),
+			),
+		);
+	}
+
+	if (typeof billing.limit_remaining === 'number') {
+		parts.push(
+			sprintf(
+				/* translators: %s: remaining per-key credit limit */
+				__('%s left', 'agent-wordpress-terminal'),
+				formatCredits(billing.limit_remaining),
+			),
+		);
+	} else if (billing.is_free_tier) {
+		parts.push(__('free tier', 'agent-wordpress-terminal'));
+	}
+
+	return parts.join(' · ');
+}
+
+function openRouterBillingTitle(billing: ProviderBilling): string {
+	const lines = [
+		billing.label
+			? sprintf(
+					/* translators: %s: OpenRouter API key label */
+					__('Key: %s', 'agent-wordpress-terminal'),
+					billing.label,
+				)
+			: __('OpenRouter usage', 'agent-wordpress-terminal'),
+	];
+
+	if (typeof billing.balance === 'number') {
+		lines.push(
+			sprintf(
+				/* translators: %s: remaining account credit balance */
+				__('Account balance: %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.balance),
+			),
+		);
+	}
+
+	if (typeof billing.usage_daily === 'number') {
+		lines.push(
+			sprintf(
+				/* translators: %s: credits spent today */
+				__('Today: %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage_daily),
+			),
+		);
+	}
+
+	if (typeof billing.usage_weekly === 'number') {
+		lines.push(
+			sprintf(
+				/* translators: %s: credits spent this week */
+				__('This week: %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage_weekly),
+			),
+		);
+	}
+
+	if (typeof billing.usage_monthly === 'number') {
+		lines.push(
+			sprintf(
+				/* translators: %s: credits spent this month */
+				__('This month: %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage_monthly),
+			),
+		);
+	}
+
+	if (typeof billing.usage === 'number') {
+		lines.push(
+			sprintf(
+				/* translators: %s: all-time credits spent on this key */
+				__('All-time key usage: %s', 'agent-wordpress-terminal'),
+				formatCredits(billing.usage),
+			),
+		);
+	}
+
+	if (typeof billing.limit === 'number') {
+		const remaining =
+			typeof billing.limit_remaining === 'number'
+				? formatCredits(billing.limit_remaining)
+				: __('n/a', 'agent-wordpress-terminal');
+		const reset = billing.limit_reset ? ` · ${billing.limit_reset}` : '';
+		lines.push(
+			sprintf(
+				/* translators: 1: key credit limit, 2: remaining amount, 3: optional reset period */
+				__('Key limit: %1$s (%2$s remaining%3$s)', 'agent-wordpress-terminal'),
+				formatCredits(billing.limit),
+				remaining,
+				reset,
+			),
+		);
+	}
+
+	lines.push(__('Credits are USD-equivalent OpenRouter units.', 'agent-wordpress-terminal'));
+
+	return lines.join('\n');
+}
+
 export function Terminal(): JSX.Element {
 	const [sessions, setSessions] = useState<SessionSummary[]>([]);
 	const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -169,7 +345,13 @@ export function Terminal(): JSX.Element {
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 	const [input, setInput] = useState('');
 	const [attachments, setAttachments] = useState<
-		Array<{ id: number; url: string; filename: string }>
+		Array<{
+			id: number;
+			url: string;
+			filename: string;
+			mime_type?: string;
+			kind?: 'image' | 'document';
+		}>
 	>([]);
 	const [isUploading, setIsUploading] = useState(false);
 	const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -189,11 +371,23 @@ export function Terminal(): JSX.Element {
 	const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 	const [editingSessionTitle, setEditingSessionTitle] = useState('');
 	const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<number | null>(null);
+	const [providerBilling, setProviderBilling] = useState<ProviderBilling | null>(null);
 	const previewDrawerRef = useRef<HTMLElement | null>(null);
 	const previewReturnFocusRef = useRef<HTMLElement | null>(null);
 	const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
 	const connection = window.awptSettings?.connection;
 	const abilitiesStatus = tools?.environment?.abilities;
+	const isOpenRouter =
+		connection?.id === 'openrouter' ||
+		(activeSession?.provider ?? '').toLowerCase().includes('openrouter');
+	const openRouterUsageLabel =
+		providerBilling?.available === true ? openRouterBillingLabel(providerBilling) : '';
+	const openRouterUsageTitle =
+		providerBilling?.available === true ? openRouterBillingTitle(providerBilling) : '';
+	const openRouterLimitLow =
+		typeof providerBilling?.limit_remaining === 'number' && providerBilling.limit_remaining <= 1;
+	const openRouterBalanceLow =
+		typeof providerBilling?.balance === 'number' && providerBilling.balance <= 1;
 
 	useEffect(() => {
 		const boot = async (): Promise<void> => {
@@ -240,6 +434,40 @@ export function Terminal(): JSX.Element {
 
 		void loadFullTools();
 	}, [sidebarTab, toolsLoadedFully]);
+
+	useEffect(() => {
+		if (!isOpenRouter || !connection?.ready) {
+			setProviderBilling(null);
+			return;
+		}
+
+		let cancelled = false;
+
+		const loadBilling = async (refresh = false): Promise<void> => {
+			try {
+				const billing = await getProviderBilling(refresh);
+				if (!cancelled) {
+					setProviderBilling(billing);
+				}
+			} catch {
+				if (!cancelled) {
+					setProviderBilling(null);
+				}
+			}
+		};
+
+		void loadBilling(false);
+
+		// Soft refresh every few minutes; OpenRouter values can lag ~60s.
+		const timer = window.setInterval(() => {
+			void loadBilling(true);
+		}, 180_000);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(timer);
+		};
+	}, [isOpenRouter, connection?.ready]);
 
 	useEffect(() => {
 		if (!isPreviewOpen) {
@@ -375,7 +603,10 @@ export function Terminal(): JSX.Element {
 
 		const submittedAttachments = attachments;
 		const attachmentContext = submittedAttachments
-			.map((item) => `Attached image: ${item.url} (Media Library attachment #${item.id})`)
+			.map(
+				(item) =>
+					`Attached ${item.kind === 'document' ? 'document' : 'image'}: ${item.url} (Media Library attachment #${item.id}, ${item.mime_type ?? 'unknown MIME'})`,
+			)
 			.join('\n');
 		const inputMessage = input.trim();
 		const message = [inputMessage, attachmentContext].filter(Boolean).join('\n\n');
@@ -535,6 +766,14 @@ export function Terminal(): JSX.Element {
 					),
 				);
 			}
+
+			if (isOpenRouter && connection?.ready) {
+				try {
+					setProviderBilling(await getProviderBilling(true));
+				} catch {
+					// Keep the previous meter if refresh fails.
+				}
+			}
 		} catch (error: unknown) {
 			let messageText = __('The agent request failed. Try again.', 'agent-wordpress-terminal');
 
@@ -575,7 +814,6 @@ export function Terminal(): JSX.Element {
 	};
 
 	const handleAttachment = async (file: File): Promise<void> => {
-		if (!file.type.startsWith('image/')) return;
 		setIsUploading(true);
 		try {
 			const uploaded = await uploadAttachment(file);
@@ -823,6 +1061,18 @@ export function Terminal(): JSX.Element {
 							__('Not configured', 'agent-wordpress-terminal')}
 						{connection?.status_label ? ` (${connection.status_label})` : ''}
 					</span>
+					{isOpenRouter && openRouterUsageLabel ? (
+						<span
+							className={`awpt-header__status awpt-header__billing ${
+								openRouterLimitLow || openRouterBalanceLow
+									? 'awpt-header__status--warning'
+									: 'awpt-header__status--connected'
+							}`}
+							title={openRouterUsageTitle}
+						>
+							{__('OpenRouter', 'agent-wordpress-terminal')}: {openRouterUsageLabel}
+						</span>
+					) : null}
 					<span
 						className={`awpt-header__status ${
 							abilitiesStatus?.available
@@ -970,9 +1220,7 @@ export function Terminal(): JSX.Element {
 								}
 							}}
 							onPaste={(event) => {
-								const file = Array.from(event.clipboardData.files).find((item) =>
-									item.type.startsWith('image/'),
-								);
+								const file = Array.from(event.clipboardData.files)[0];
 								if (file) {
 									event.preventDefault();
 									void handleAttachment(file);
@@ -980,9 +1228,7 @@ export function Terminal(): JSX.Element {
 							}}
 							onDrop={(event) => {
 								event.preventDefault();
-								const file = Array.from(event.dataTransfer.files).find((item) =>
-									item.type.startsWith('image/'),
-								);
+								const file = Array.from(event.dataTransfer.files)[0];
 								if (file) void handleAttachment(file);
 							}}
 							onDragOver={(event) => event.preventDefault()}

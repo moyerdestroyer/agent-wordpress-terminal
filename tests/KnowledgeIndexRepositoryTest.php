@@ -10,39 +10,39 @@ declare(strict_types=1);
 
 use AWPT\Database\KnowledgeIndexRepository;
 
-if (!class_exists('wpdb')) {
-    class wpdb {
-        public string $prefix = 'wp_';
-        public int $next_get_var = 0;
-        /** @var list<mixed> */
-        public array $last_prepare_args = [];
-        public string $last_query = '';
+/**
+ * wpdb subclass with controllable get_var for embedding backfill tests.
+ */
+final class AwptKnowledgeIndexWpdb extends wpdb {
+    public int $next_get_var = 0;
+    /** @var list<mixed> */
+    public array $last_prepare_args = [];
+    public string $last_query = '';
 
-        public function prepare(string $query, mixed ...$args): string {
-            $this->last_prepare_args = $args;
+    public function prepare(string $query, mixed ...$args): string {
+        $this->last_prepare_args = $args;
 
-            return $query;
-        }
+        return $query;
+    }
 
-        public function get_var(string $query): int {
-            unset($query);
+    public function get_var(string $query): string|int|null {
+        unset($query);
 
-            return $this->next_get_var;
-        }
+        return $this->next_get_var;
+    }
 
-        /** @return list<array<string, mixed>> */
-        public function get_results(string $query, string $output): array {
-            unset($output);
-            $this->last_query = $query;
+    /** @return list<array<string, mixed>> */
+    public function get_results(string $query, string $output = ARRAY_A): array {
+        unset($output);
+        $this->last_query = $query;
 
-            return [];
-        }
+        return [];
     }
 }
 
 function test_source_needs_embeddings_detects_missing_vectors(): void {
     awpt_test_reset_state();
-    $wpdb = new wpdb();
+    $wpdb = new AwptKnowledgeIndexWpdb();
     $GLOBALS['wpdb'] = $wpdb;
     $repository = new KnowledgeIndexRepository();
 
@@ -61,7 +61,7 @@ function test_source_needs_embeddings_detects_missing_vectors(): void {
 
 function test_embedding_chunks_are_loaded_in_cursor_batches(): void {
     awpt_test_reset_state();
-    $wpdb = new wpdb();
+    $wpdb = new AwptKnowledgeIndexWpdb();
     $GLOBALS['wpdb'] = $wpdb;
     $repository = new KnowledgeIndexRepository();
 

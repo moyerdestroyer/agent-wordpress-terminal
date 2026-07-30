@@ -89,10 +89,12 @@ final class GetBlock implements AbilityInterface {
         $summary = null;
 
         foreach ($tree->flat_list(null, 500) as $item) {
-            if (($item['path'] ?? '') === $path) {
-                $summary = $item;
-                break;
+            if (($item['path'] ?? '') !== $path) {
+                continue;
             }
+
+            $summary = $item;
+            break;
         }
 
         $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];

@@ -71,6 +71,24 @@ function test_design_context_uses_proportional_policy_levels(): void {
     );
 }
 
+function test_design_context_prompt_summary_skips_tokens_when_requested(): void {
+    awpt_test_reset_state();
+    $context = new SiteDesignContext();
+    $without = $context->prompt_summary('Hello', false);
+    $with = $context->prompt_summary('Adjust the heading color and spacing.', true);
+
+    Assert::true(str_contains($without, 'Active design authority'), 'summary should always name the theme');
+    Assert::false(
+        str_contains($without, 'Resolved WordPress design tokens:'),
+        'tokens should be omitable for light turns',
+    );
+    Assert::true(
+        str_contains($with, 'Resolved WordPress design tokens:'),
+        'token-level design requests should still include tokens',
+    );
+}
+
 test_design_context_enriches_composition_queries_without_touching_unrelated_questions();
 test_design_context_resolves_parent_and_merged_tokens();
 test_design_context_uses_proportional_policy_levels();
+test_design_context_prompt_summary_skips_tokens_when_requested();

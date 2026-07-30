@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Agent\ToolNameMapper;
 use AWPT\Agent\ToolRegistry;
+use AWPT\Agent\TurnProfile;
 use AWPT\Support\ToolPreferences;
 
 function test_tool_registry_proposal_abilities(): void {
@@ -51,6 +52,21 @@ function test_tool_name_mapper_roundtrip(): void {
         'ai/get-post-details',
         $mapper->to_tool_name('ai__get_post_details'),
         'third-party function names reverse correctly',
+    );
+    Assert::same(
+        'core__posts__find',
+        $mapper->to_function_name('core/posts/find'),
+        'nested ability names map every slash-delimited segment',
+    );
+    Assert::same(
+        'core/posts/find',
+        $mapper->to_tool_name('core__posts__find'),
+        'nested function names map back to every ability segment',
+    );
+    Assert::same(
+        'my-plugin/resource/sub/action',
+        $mapper->to_tool_name('my_plugin__resource__sub__action'),
+        'four-segment ability names reverse correctly',
     );
 }
 
@@ -94,8 +110,32 @@ function test_tool_registry_uses_annotations_and_explicit_mutation_trust(): void
     );
 }
 
+function test_turn_profiles_do_not_append_unrelated_discovered_tools(): void {
+    awpt_test_reset_state();
+    wp_register_ability('awpt/find-abilities', [
+        'description' => 'Find abilities',
+        'input_schema' => ['type' => 'object'],
+        'meta' => ['annotations' => ['readonly' => true]],
+    ]);
+    wp_register_ability('demo/unrelated-read', [
+        'description' => 'Unrelated third-party read',
+        'input_schema' => ['type' => 'object'],
+        'meta' => ['annotations' => ['readonly' => true]],
+    ]);
+    $profile = TurnProfile::from_message('Hello there');
+    $tools = new ToolRegistry()->get_chat_completion_tools_for_profile($profile);
+    $names = array_map(static fn(array $tool): string => (string) ($tool['function']['name'] ?? ''), $tools);
+
+    Assert::true(in_array('awpt__find_abilities', $names, true), 'ability search should be offered on every turn');
+    Assert::false(
+        in_array('demo__unrelated_read', $names, true),
+        'contextual profiles should not append every discovered read tool',
+    );
+}
+
 test_tool_registry_proposal_abilities();
 test_tool_name_mapper_roundtrip();
 test_tool_preferences_deny_list();
 test_tool_registry_respects_never_auto();
 test_tool_registry_uses_annotations_and_explicit_mutation_trust();
+test_turn_profiles_do_not_append_unrelated_discovered_tools();

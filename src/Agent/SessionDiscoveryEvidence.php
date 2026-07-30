@@ -34,15 +34,19 @@ final class SessionDiscoveryEvidence {
             }
 
             if (null === $pattern && 'awpt/read-pattern' === $call['tool']) {
-                $pattern = $this->validated_pattern($call['output']);
+                $output = is_array($call['output']) ? $call['output'] : [];
+                $pattern = $this->validated_pattern($output);
             }
 
             if ([] === $media && 'awpt/list-content' === $call['tool']) {
-                if ('attachment' !== (string) ($call['input']['post_type'] ?? '')) {
+                $input = is_array($call['input']) ? $call['input'] : [];
+                $output = is_array($call['output']) ? $call['output'] : [];
+
+                if ('attachment' !== (string) ($input['post_type'] ?? '')) {
                     continue;
                 }
 
-                $items = is_array($call['output']['items'] ?? null) ? $call['output']['items'] : [];
+                $items = is_array($output['items'] ?? null) ? $output['items'] : [];
                 $media = array_slice($items, 0, 8);
             }
 

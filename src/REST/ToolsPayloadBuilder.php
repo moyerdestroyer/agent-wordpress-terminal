@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\REST;
 
+use AWPT\Agent\AbilityReplacementRegistry;
+use AWPT\Agent\CoreAbilityCatalog;
 use AWPT\Agent\ToolRegistry;
 use AWPT\MCP\Adapter;
 use AWPT\Support\Environment;
@@ -36,24 +38,22 @@ final class ToolsPayloadBuilder {
         $mcp = [];
         $ability_names = [];
 
-        if (function_exists('wp_get_abilities')) {
-            foreach (wp_get_abilities() as $ability) {
-                $name = $ability->get_name();
-                $item = $this->decorate($this->ability_item_with_schemas($ability), $name, $prefs, 'ability');
-                $ability_names[$name] = true;
+        foreach (new CoreAbilityCatalog()->all() as $ability) {
+            $name = (string) $ability->get_name();
+            $item = $this->decorate($this->ability_item_with_schemas($ability), $name, $prefs, 'ability');
+            $ability_names[$name] = true;
 
-                if (str_starts_with($name, 'core/')) {
-                    $core[] = $item;
-                    continue;
-                }
-
-                if (str_starts_with($name, 'awpt/')) {
-                    $plugin[] = $item;
-                    continue;
-                }
-
-                $other[] = $item;
+            if (str_starts_with($name, 'core/')) {
+                $core[] = $item;
+                continue;
             }
+
+            if (str_starts_with($name, 'awpt/')) {
+                $plugin[] = $item;
+                continue;
+            }
+
+            $other[] = $item;
         }
 
         foreach (new Adapter()->list_tools() as $tool) {
@@ -78,16 +78,14 @@ final class ToolsPayloadBuilder {
         $prefs = new ToolPreferences();
         $plugin = [];
 
-        if (function_exists('wp_get_abilities')) {
-            foreach (wp_get_abilities() as $ability) {
-                $name = $ability->get_name();
+        foreach (new CoreAbilityCatalog()->all() as $ability) {
+            $name = (string) $ability->get_name();
 
-                if (!str_starts_with($name, 'awpt/')) {
-                    continue;
-                }
-
-                $plugin[] = $this->decorate($this->ability_item_without_schemas($ability), $name, $prefs, 'ability');
+            if (!str_starts_with($name, 'awpt/')) {
+                continue;
             }
+
+            $plugin[] = $this->decorate($this->ability_item_without_schemas($ability), $name, $prefs, 'ability');
         }
 
         return $this->wrap($prefs, [], $plugin, [], []);
@@ -101,6 +99,16 @@ final class ToolsPayloadBuilder {
      * @return array<string, mixed>
      */
     private function wrap(ToolPreferences $prefs, array $core, array $plugin, array $other, array $mcp): array {
+        $replacements = [];
+
+        foreach (new AbilityReplacementRegistry()->active() as $fallback => $replacement) {
+            $replacements[] = [
+                'fallback' => $fallback,
+                'replacement' => $replacement,
+                'status' => 'active',
+            ];
+        }
+
         return [
             'core' => $core,
             'plugin' => $plugin,
@@ -109,6 +117,8 @@ final class ToolsPayloadBuilder {
             'disabled' => $prefs->disabled_names(),
             'never_auto' => ToolPreferences::NEVER_AUTO_EXECUTE,
             'agent_enabled_count' => count(new ToolRegistry($prefs)->get_auto_executable_ability_names()),
+            'exposure_policy' => 'contextual',
+            'replacements' => $replacements,
             'environment' => Environment::status(),
         ];
     }
@@ -134,8 +144,17 @@ final class ToolsPayloadBuilder {
                         'Mutation or unknown effect; explicitly enable to trust it for agent execution.',
                         'agent-wordpress-terminal',
                     )
-                    : __('Available to the agent under its declared safety annotations.', 'agent-wordpress-terminal')
+                    : __(
+                        'Eligible for contextual use. AWPT offers it when the turn profile or ability search selects it.',
+                        'agent-wordpress-terminal',
+                    )
             );
+
+        foreach (new AbilityReplacementRegistry()->active() as $fallback => $replacement) {
+            if ($name === $replacement) {
+                $item['replaces'] = $fallback;
+            }
+        }
 
         return $item;
     }

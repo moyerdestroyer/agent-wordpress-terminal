@@ -136,10 +136,14 @@ final class AgentRuntime {
                 continue;
             }
 
+            $mime = (string) ($attachment['mime_type'] ?? '');
+            $kind = str_starts_with($mime, 'image/') ? 'image' : 'document';
             $lines[] = sprintf(
-                'Attached image: %s (Media Library attachment #%d)',
+                'Attached %s: %s (Media Library attachment #%d, MIME %s)',
+                $kind,
                 (string) ($attachment['url'] ?? ''),
                 (int) ($attachment['id'] ?? 0),
+                '' !== $mime ? $mime : 'unknown',
             );
         }
 

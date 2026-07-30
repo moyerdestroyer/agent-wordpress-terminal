@@ -77,7 +77,30 @@ function test_tool_result_truncator_clips_theme_file_content(): void {
     );
 }
 
+function test_tool_result_truncator_removes_rendered_screenshot_bytes_but_keeps_geometry(): void {
+    $provider = new ToolResultTruncator()->for_provider('awpt/inspect-rendered-element', [
+        'rendered' => true,
+        'screenshot_data' => 'data:image/png;base64,' . str_repeat('a', 20_000),
+        'elements' => [[
+            'tag' => 'svg',
+            'rect' => ['width' => 32, 'height' => 32],
+            'computed' => ['width' => '32px', 'height' => '32px'],
+        ]],
+    ]);
+
+    Assert::true(
+        !array_key_exists('screenshot_data', $provider),
+        'screenshot bytes should travel as vision evidence only',
+    );
+    Assert::same(
+        32,
+        $provider['elements'][0]['rect']['width'] ?? null,
+        'computed rendered geometry should remain in provider evidence',
+    );
+}
+
 test_tool_result_truncator_clips_large_read_content_output();
 test_tool_result_truncator_keeps_proposal_outputs();
 test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider();
 test_tool_result_truncator_clips_theme_file_content();
+test_tool_result_truncator_removes_rendered_screenshot_bytes_but_keeps_geometry();

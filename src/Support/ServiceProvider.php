@@ -20,6 +20,7 @@ use AWPT\REST\CapturesController;
 use AWPT\REST\ChatController;
 use AWPT\REST\IncidentsController;
 use AWPT\REST\KnowledgeController;
+use AWPT\REST\ProviderController;
 use AWPT\REST\RestController;
 use AWPT\REST\SessionsController;
 use AWPT\REST\ToolsController;
@@ -81,6 +82,7 @@ final class ServiceProvider {
             new ActionsController(),
             new IncidentsController(),
             new ToolsController(),
+            new ProviderController(),
         ];
     }
 }

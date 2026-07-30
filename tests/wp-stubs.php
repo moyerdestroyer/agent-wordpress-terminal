@@ -49,6 +49,7 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_trashed_posts'] = [];
     $GLOBALS['awpt_test_users'] = [];
     $GLOBALS['awpt_test_filters'] = [];
+    $GLOBALS['awpt_test_abilities'] = [];
     $GLOBALS['awpt_test_post_types'] = [
         'post',
         'page',
@@ -78,6 +79,179 @@ function awpt_test_reset_state(): void {
 
 awpt_test_reset_state();
 
+if (!class_exists('WP_Ability', false)) {
+    class WP_Ability {
+        public int $execute_count = 0;
+
+        /** @param array<string, mixed> $config */
+        public function __construct(
+            private string $name,
+            private array $config,
+        ) {}
+
+        public function get_name(): string {
+            return $this->name;
+        }
+
+        public function get_label(): string {
+            return (string) ($this->config['label'] ?? $this->name);
+        }
+
+        public function get_description(): string {
+            return (string) ($this->config['description'] ?? $this->name);
+        }
+
+        public function get_category(): string {
+            return (string) ($this->config['category'] ?? '');
+        }
+
+        public function get_input_schema(): mixed {
+            return $this->config['input_schema'] ?? [];
+        }
+
+        public function get_output_schema(): mixed {
+            return $this->config['output_schema'] ?? [];
+        }
+
+        /** @return array<string, mixed> */
+        public function get_meta(): array {
+            return is_array($this->config['meta'] ?? null) ? $this->config['meta'] : [];
+        }
+
+        public function execute(mixed $input): mixed {
+            ++$this->execute_count;
+            $callback = $this->config['execute_callback'] ?? null;
+
+            return is_callable($callback) ? $callback($input) : $input;
+        }
+    }
+}
+
+if (!function_exists('wp_register_ability')) {
+    /** @param array<string, mixed> $config */
+    function wp_register_ability(string $name, array $config): WP_Ability {
+        $ability = new WP_Ability($name, $config);
+        $GLOBALS['awpt_test_abilities'][$name] = $ability;
+
+        return $ability;
+    }
+}
+
+if (!function_exists('wp_get_ability')) {
+    function wp_get_ability(string $name): ?WP_Ability {
+        $ability = $GLOBALS['awpt_test_abilities'][$name] ?? null;
+
+        return $ability instanceof WP_Ability ? $ability : null;
+    }
+}
+
+if (!function_exists('wp_get_abilities')) {
+    /** @return array<string, WP_Ability> */
+    function wp_get_abilities(array $args = []): array {
+        unset($args);
+
+        return $GLOBALS['awpt_test_abilities'];
+    }
+}
+
+if (!function_exists('wp_has_ability')) {
+    function wp_has_ability(string $name): bool {
+        return null !== wp_get_ability($name);
+    }
+}
+
+if (!function_exists('wp_unregister_ability')) {
+    function wp_unregister_ability(string $name): bool {
+        $exists = array_key_exists($name, $GLOBALS['awpt_test_abilities']);
+        unset($GLOBALS['awpt_test_abilities'][$name]);
+
+        return $exists;
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash(mixed $value): mixed {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
+if (!class_exists('wpdb', false)) {
+    /**
+     * Minimal in-memory wpdb stand-in for repository unit tests.
+     */
+    class wpdb {
+        public string $prefix = 'wp_';
+
+        public function prepare(string $query, mixed ...$args): string {
+            unset($args);
+
+            return $query;
+        }
+
+        public function get_var(string $query): string|int|null {
+            unset($query);
+
+            return null;
+        }
+
+        public function get_row(string $query, string $output = ARRAY_A): ?array {
+            unset($query, $output);
+
+            return null;
+        }
+
+        /** @return list<array<string, mixed>>|list<string> */
+        public function get_results(string $query, string $output = ARRAY_A): array {
+            unset($query, $output);
+
+            return [];
+        }
+
+        /** @return list<string> */
+        public function get_col(string $query): array {
+            unset($query);
+
+            return [];
+        }
+
+        /**
+         * @param array<string, mixed> $data
+         * @param array<int, string>|string|null $format
+         */
+        public function insert(string $table, array $data, array|string|null $format = null): int|false {
+            unset($table, $data, $format);
+
+            return 1;
+        }
+
+        /**
+         * @param array<string, mixed> $data
+         * @param array<string, mixed> $where
+         */
+        public function update(
+            string $table,
+            array $data,
+            array $where,
+            array|string|null $format = null,
+            array|string|null $where_format = null,
+        ): int|false {
+            unset($table, $data, $where, $format, $where_format);
+
+            return 1;
+        }
+
+        public function query(string $query): int|false {
+            unset($query);
+
+            return 0;
+        }
+    }
+}
+
+if (!isset($GLOBALS['wpdb']) || !$GLOBALS['wpdb'] instanceof wpdb) {
+    $GLOBALS['wpdb'] = new wpdb();
+}
+
 if (!function_exists('get_transient')) {
     function get_transient(string $key): mixed {
         return $GLOBALS['awpt_test_transients'][$key] ?? false;
@@ -88,6 +262,14 @@ if (!function_exists('set_transient')) {
     function set_transient(string $key, mixed $value, int $expiration = 0): bool {
         unset($expiration);
         $GLOBALS['awpt_test_transients'][$key] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('delete_transient')) {
+    function delete_transient(string $key): bool {
+        unset($GLOBALS['awpt_test_transients'][$key]);
 
         return true;
     }
@@ -277,6 +459,32 @@ if (!function_exists('home_url')) {
     }
 }
 
+if (!function_exists('add_query_arg')) {
+    function add_query_arg(string $key, string $value, string $url): string {
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separator . rawurlencode($key) . '=' . rawurlencode($value);
+    }
+}
+
+if (!function_exists('wp_generate_password')) {
+    function wp_generate_password(
+        int $length = 12,
+        bool $special_chars = true,
+        bool $extra_special_chars = false,
+    ): string {
+        unset($special_chars, $extra_special_chars);
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $password = '';
+
+        for ($index = 0; $index < $length; ++$index) {
+            $password .= $alphabet[$index % strlen($alphabet)];
+        }
+
+        return $password;
+    }
+}
+
 if (!function_exists('is_multisite')) {
     function is_multisite(): bool {
         return false;
@@ -462,6 +670,12 @@ if (!function_exists('wp_parse_url')) {
     }
 }
 
+if (!function_exists('wp_http_validate_url')) {
+    function wp_http_validate_url(string $url): string|false {
+        return filter_var($url, FILTER_VALIDATE_URL) ? $url : false;
+    }
+}
+
 if (!function_exists('url_to_postid')) {
     function url_to_postid(string $url): int {
         return (int) ($GLOBALS['awpt_test_url_to_postid'][$url] ?? 0);
@@ -495,6 +709,10 @@ if (!function_exists('wp_remote_get')) {
     function wp_remote_get(string $url, array $args = []): array|WP_Error {
         $GLOBALS['awpt_test_http_requests'][] = ['url' => $url, 'args' => $args, 'method' => 'GET'];
         $response = $GLOBALS['awpt_test_http_get_response'];
+
+        if (is_callable($response)) {
+            $response = $response($url, $args);
+        }
 
         return is_array($response) || $response instanceof WP_Error
             ? $response

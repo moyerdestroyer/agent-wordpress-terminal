@@ -14,8 +14,11 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-/** Uploads explicit composer attachments into the WordPress Media Library. */
+/** Uploads explicit composer evidence into the WordPress Media Library. */
 final class AttachmentsController extends RestController {
+    /** @var list<string> */
+    private const DOCUMENT_EXTENSIONS = ['pdf', 'txt', 'md', 'markdown', 'csv', 'json', 'xml', 'docx'];
+
     public function register_routes(): void {
         register_rest_route(AWPT_REST_NAMESPACE, '/attachments', [[
             'methods' => \WP_REST_Server::CREATABLE,
@@ -38,50 +41,45 @@ final class AttachmentsController extends RestController {
         if (!is_array($file) || UPLOAD_ERR_OK !== (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE)) {
             return new \WP_Error(
                 'awpt_attachment_required',
-                __('Choose an image to upload.', 'agent-wordpress-terminal'),
+                __('Choose an image or document to upload.', 'agent-wordpress-terminal'),
                 ['status' => 400],
             );
         }
         /** @var array{error?: int, name?: string, size?: int, tmp_name?: string, type?: string} $file */
-        if (!str_starts_with($file['type'] ?? '', 'image/')) {
+        $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $declared_mime = strtolower((string) ($file['type'] ?? ''));
+        $supported = str_starts_with($declared_mime, 'image/') || in_array($extension, self::DOCUMENT_EXTENSIONS, true);
+
+        if (!$supported) {
             return new \WP_Error(
                 'awpt_attachment_type',
-                __('Only image attachments are supported.', 'agent-wordpress-terminal'),
+                __(
+                    'Supported composer files are images, PDF, plain text, Markdown, CSV, JSON, XML, and DOCX.',
+                    'agent-wordpress-terminal',
+                ),
                 ['status' => 400],
             );
         }
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
-        $upload = wp_handle_upload($file, ['test_form' => false]);
-        if ('' !== (string) ($upload['error'] ?? '')) {
-            return new \WP_Error(
-                'awpt_attachment_upload',
-                (string) ($upload['error'] ?? __('Upload failed.', 'agent-wordpress-terminal')),
-                ['status' => 500],
-            );
-        }
-        $attachment_id = wp_insert_attachment(
-            [
-                'post_mime_type' => (string) $upload['type'],
-                'post_title' => sanitize_file_name($file['name'] ?? 'Attachment'),
-                'post_status' => 'inherit',
-            ],
-            (string) $upload['file'],
-            0,
-            true,
-        );
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        // media_handle_upload performs WordPress's extension/MIME validation and
+        // creates metadata using the site's configured upload policy.
+        $attachment_id = media_handle_upload('file', 0, [], ['test_form' => false]);
+
         if (is_wp_error($attachment_id)) {
             return $attachment_id;
         }
-        wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata(
-            $attachment_id,
-            (string) $upload['file'],
-        ));
+
+        $path = get_attached_file($attachment_id);
+        $is_image = wp_attachment_is_image($attachment_id);
+
         return new \WP_REST_Response([
             'id' => $attachment_id,
             'url' => wp_get_attachment_url($attachment_id),
             'mime_type' => get_post_mime_type($attachment_id),
-            'filename' => basename((string) $upload['file']),
+            'filename' => is_string($path) ? basename($path) : sanitize_file_name((string) ($file['name'] ?? '')),
+            'kind' => $is_image ? 'image' : 'document',
         ], 201);
     }
 }

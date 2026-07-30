@@ -23,7 +23,7 @@ function statusText(items: ToolInfo[]): string {
 
 	return sprintf(
 		/* translators: 1: enabled tool count, 2: total tool count */
-		__('%1$d of %2$d enabled', 'agent-wordpress-terminal'),
+		__('%1$d of %2$d eligible', 'agent-wordpress-terminal'),
 		enabled,
 		items.length,
 	);
@@ -267,6 +267,15 @@ function ToolItem({
 			{tool.policy_reason ? (
 				<p className="awpt-tool-item__description">{tool.policy_reason}</p>
 			) : null}
+			{tool.replaces ? (
+				<p className="awpt-tool-item__description">
+					{sprintf(
+						/* translators: %s: replaced fallback ability name */
+						__('Core replacement for %s', 'agent-wordpress-terminal'),
+						tool.replaces,
+					)}
+				</p>
+			) : null}
 			<div className="awpt-tool-item__meta">
 				{tool.requires_approval ? (
 					<span>{__('Stages approval', 'agent-wordpress-terminal')}</span>
@@ -287,8 +296,8 @@ function ToolItem({
 							{tool.enabled === false
 								? tool.requires_trust
 									? __('Trust and enable', 'agent-wordpress-terminal')
-									: __('Enable for agent', 'agent-wordpress-terminal')
-								: __('Enabled for agent', 'agent-wordpress-terminal')}
+									: __('Make eligible', 'agent-wordpress-terminal')
+								: __('Eligible for agent', 'agent-wordpress-terminal')}
 						</span>
 					</label>
 				) : (
@@ -501,7 +510,7 @@ export function ToolsSidebar({ tools, onToolsChange }: ToolsSidebarProps): JSX.E
 				<span>
 					{sprintf(
 						/* translators: 1: enabled count, 2: total discovered */
-						__('%1$d enabled · %2$d discovered', 'agent-wordpress-terminal'),
+						__('%1$d eligible · %2$d discovered', 'agent-wordpress-terminal'),
 						enabled,
 						total,
 					)}
@@ -510,10 +519,24 @@ export function ToolsSidebar({ tools, onToolsChange }: ToolsSidebarProps): JSX.E
 			</div>
 			<p className="awpt-tool-summary__hint">
 				{__(
-					'WordPress Abilities from core, this plugin, and other plugins or themes are available to the agent. Uncheck tools to hide them from chat.',
+					'AWPT offers a focused tool set for each turn. Eligible abilities can also be found contextually; uncheck one to prevent the agent from using it.',
 					'agent-wordpress-terminal',
 				)}
 			</p>
+			{(tools?.replacements?.length ?? 0) > 0 ? (
+				<p className="awpt-tool-summary__hint">
+					{tools?.replacements
+						?.map((replacement) =>
+							sprintf(
+								/* translators: 1: Core ability, 2: AWPT fallback ability */
+								__('%1$s replaces %2$s after schema verification.', 'agent-wordpress-terminal'),
+								replacement.replacement,
+								replacement.fallback,
+							),
+						)
+						.join(' ')}
+				</p>
+			) : null}
 			{error ? <p className="awpt-error">{error}</p> : null}
 			<EnvironmentGroup environment={tools?.environment} />
 

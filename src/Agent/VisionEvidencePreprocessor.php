@@ -59,9 +59,11 @@ final class VisionEvidencePreprocessor {
         $new_images = [];
 
         foreach ($images as $image) {
-            if (!array_key_exists($image['fingerprint'], $this->analyses)) {
-                $new_images[$image['fingerprint']] = $image;
+            if (array_key_exists($image['fingerprint'], $this->analyses)) {
+                continue;
             }
+
+            $new_images[$image['fingerprint']] = $image;
         }
 
         $new_images = array_slice(array_values($new_images), 0, self::MAX_IMAGES_PER_BATCH);
@@ -84,10 +86,12 @@ final class VisionEvidencePreprocessor {
 
         // Never let an unanalyzed image leak to a text-only primary provider.
         foreach ($images as $image) {
-            if (!array_key_exists($image['fingerprint'], $this->analyses)) {
-                $this->analyses[$image['fingerprint']] = null;
-                $this->degraded = true;
+            if (array_key_exists($image['fingerprint'], $this->analyses)) {
+                continue;
             }
+
+            $this->analyses[$image['fingerprint']] = null;
+            $this->degraded = true;
         }
 
         return [
@@ -302,9 +306,11 @@ final class VisionEvidencePreprocessor {
         $normalized = [];
 
         foreach ($decoded as $key => $value) {
-            if (is_string($key)) {
-                $normalized[$key] = $value;
+            if (!is_string($key)) {
+                continue;
             }
+
+            $normalized[$key] = $value;
         }
 
         return $normalized;
@@ -388,9 +394,11 @@ final class VisionEvidencePreprocessor {
             $texts = [];
 
             foreach ($content as $part) {
-                if (is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null)) {
-                    $texts[] = $part['text'];
+                if (!(is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null))) {
+                    continue;
                 }
+
+                $texts[] = $part['text'];
             }
 
             if ([] !== $texts) {

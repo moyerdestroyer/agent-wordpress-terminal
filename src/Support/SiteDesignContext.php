@@ -159,9 +159,32 @@ final class SiteDesignContext {
         return trim($message . ' ' . implode(' ', array_unique($append)));
     }
 
-    public function prompt_summary(string $message): string {
+    /**
+     * @param bool $include_tokens When false, emit only the active-theme one-liner
+     *                             (ordinary chat / non-design turns).
+     */
+    public function prompt_summary(string $message, bool $include_tokens = true): string {
         $context = $this->resolve();
         $level = $this->request_level($message);
+        $parent = '' !== $context['parent_theme_name']
+            ? sprintf(' Parent theme: %s (%s).', $context['parent_theme_name'], $context['template'])
+            : '';
+        $header = sprintf(
+            'Active design authority: %s (%s).%s Composition policy level for this request: %s.'
+            . ' Prefer active/parent-theme patterns, then site-owned reusable patterns; Core or custom composition'
+            . ' is an allowed fallback when it better fits the request and the reason is recorded.',
+            $context['theme_name'],
+            $context['stylesheet'],
+            $parent,
+            $level,
+        );
+
+        // Callers (TurnProfile) decide when tokens are worth the payload; do not
+        // re-impose LEVEL_NONE here so composition turns still get tokens when asked.
+        if (!$include_tokens) {
+            return $header;
+        }
+
         $encoded = wp_json_encode($context['design_tokens'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $tokens = is_string($encoded) ? $encoded : '{}';
 
@@ -169,21 +192,7 @@ final class SiteDesignContext {
             $tokens = mb_substr($tokens, 0, 3500, 'UTF-8') . '…';
         }
 
-        $parent = '' !== $context['parent_theme_name']
-            ? sprintf(' Parent theme: %s (%s).', $context['parent_theme_name'], $context['template'])
-            : '';
-
-        return sprintf(
-            'Active design authority: %s (%s).%s Composition policy level for this request: %s.'
-            . ' Prefer active/parent-theme patterns, then site-owned reusable patterns; Core or custom composition'
-            . ' is an allowed fallback when it better fits the request and the reason is recorded.'
-            . "\nResolved WordPress design tokens:\n%s",
-            $context['theme_name'],
-            $context['stylesheet'],
-            $parent,
-            $level,
-            $tokens,
-        );
+        return $header . "\nResolved WordPress design tokens:\n" . $tokens;
     }
 
     public function pattern_owner(string $name, string $source = 'registered'): string {

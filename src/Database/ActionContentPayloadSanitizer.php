@@ -156,6 +156,13 @@ final class ActionContentPayloadSanitizer {
             $clean['required_attachment_ids'] = array_values(array_unique(array_filter($ids)));
         }
 
+        if (array_key_exists('required_document_ids', $payload) && is_array($payload['required_document_ids'])) {
+            $ids = array_map(static fn(mixed $value): int => absint(
+                is_scalar($value) ? $value : 0,
+            ), $payload['required_document_ids']);
+            $clean['required_document_ids'] = array_values(array_unique(array_filter($ids)));
+        }
+
         if (array_key_exists('required_minimum_library_images', $payload)) {
             $clean['required_minimum_library_images'] = min(
                 20,

@@ -22,6 +22,8 @@ export type ActionDiffModel =
 			after: string;
 			emptyBeforeLabel?: string;
 			emptyAfterLabel?: string;
+			/** Shown above the hunk list (status changes, empty payload hints, etc.). */
+			note?: string;
 	  }
 	| {
 			kind: 'create';
@@ -120,6 +122,31 @@ export function actionMetadata(payload?: ActionPayload): Array<{ label: string; 
 			{
 				label: __('File', 'agent-wordpress-terminal'),
 				value: payload.plugin_file ?? '',
+			},
+		].filter((item) => item.value !== '');
+	}
+
+	if (payload.operation === 'resource_change') {
+		return [
+			{
+				label: __('Target', 'agent-wordpress-terminal'),
+				value: [payload.resource_type, payload.resource_id ? `#${payload.resource_id}` : '']
+					.filter(Boolean)
+					.join(' '),
+			},
+			{
+				label: __('Operation', 'agent-wordpress-terminal'),
+				value: titleCase(payload.resource_operation ?? ''),
+			},
+			{
+				label: __('Affected', 'agent-wordpress-terminal'),
+				value: payload.affected ?? '',
+			},
+			{
+				label: __('Fingerprint', 'agent-wordpress-terminal'),
+				value: payload.resource_fingerprint
+					? `${payload.resource_fingerprint.slice(0, 12)}...`
+					: '',
 			},
 		].filter((item) => item.value !== '');
 	}
@@ -267,6 +294,27 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 		};
 	}
 
+	if (payload.operation === 'resource_change') {
+		const original = payload.resource_original ?? {};
+		const desired = payload.resource_data ?? {};
+		const keys = Array.from(new Set([...Object.keys(original), ...Object.keys(desired)])).sort();
+
+		return {
+			kind: 'settings',
+			label: [
+				titleCase(payload.resource_operation ?? __('Change', 'agent-wordpress-terminal')),
+				titleCase(payload.resource_type ?? __('Resource', 'agent-wordpress-terminal')),
+			]
+				.filter(Boolean)
+				.join(' · '),
+			rows: keys.map((key) => ({
+				key,
+				before: formatValue(original[key]),
+				after: Object.hasOwn(desired, key) ? formatValue(desired[key]) : formatValue(original[key]),
+			})),
+		};
+	}
+
 	if (payload.operation === 'new_post') {
 		const content = payload.post_content ?? '';
 		return {
@@ -365,14 +413,32 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 		};
 	}
 
-	// content_update, template_update, and any other document-shaped ops
+	// content_update, template_update, and any other document-shaped ops.
+	// Do not bake status into the text streams: asymmetric headers
+	// ("Publish → Publish" vs "Publish") destroy line alignment, and minified
+	// Gutenberg from the model already needs structural normalization in textDiff.
 	const before = payload.original_post_content ?? '';
 	const after = payload.post_content ?? '';
-	const statusBits = [
-		payload.original_post_status && payload.post_status
-			? `${__('Status', 'agent-wordpress-terminal')}: ${titleCase(payload.original_post_status)} → ${titleCase(payload.post_status)}`
-			: '',
-	].filter(Boolean);
+	const notes: string[] = [];
+
+	if (
+		payload.original_post_status &&
+		payload.post_status &&
+		payload.original_post_status !== payload.post_status
+	) {
+		notes.push(
+			`${__('Status', 'agent-wordpress-terminal')}: ${titleCase(payload.original_post_status)} → ${titleCase(payload.post_status)}`,
+		);
+	}
+
+	if (after === '' && before !== '' && payload.operation === 'content_update') {
+		notes.push(
+			__(
+				'No proposed post_content was stored on this action — the diff only shows the baseline document. Ask the agent to restage a full content update.',
+				'agent-wordpress-terminal',
+			),
+		);
+	}
 
 	return {
 		kind: 'text',
@@ -380,16 +446,12 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 			payload.operation === 'template_update'
 				? __('Template', 'agent-wordpress-terminal')
 				: __('Content', 'agent-wordpress-terminal'),
-		before: [statusBits.join('\n'), before].filter(Boolean).join('\n\n'),
-		after: [
-			payload.post_status
-				? `${__('Status', 'agent-wordpress-terminal')}: ${titleCase(payload.post_status)}`
-				: '',
-			after,
-		]
-			.filter(Boolean)
-			.join('\n\n'),
+		before,
+		after,
 		emptyBeforeLabel: __('(no previous content)', 'agent-wordpress-terminal'),
+		emptyAfterLabel:
+			after === '' ? __('(no proposed content)', 'agent-wordpress-terminal') : undefined,
+		note: notes.length > 0 ? notes.join(' ') : undefined,
 	};
 }
 

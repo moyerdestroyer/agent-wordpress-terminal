@@ -29,3 +29,69 @@ function test_proposal_context_adds_identity_and_attachment_evidence_without_ove
 }
 
 test_proposal_context_adds_identity_and_attachment_evidence_without_overriding_agent_input();
+
+function test_proposal_context_keeps_documents_as_sources_instead_of_inline_images(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        [],
+        [
+            'attachments' => [[
+                'id' => 22,
+                'url' => 'https://example.test/manual.pdf',
+                'mime_type' => 'application/pdf',
+            ]],
+        ],
+    );
+
+    Assert::same([22], $input['available_document_ids'] ?? null, 'documents should be exposed as exact sources');
+    Assert::same([22], $input['required_document_ids'] ?? null, 'attached documents should remain required evidence');
+    Assert::true(
+        !array_key_exists('required_attachment_ids', $input),
+        'document sources should not be forced into image blocks',
+    );
+}
+
+test_proposal_context_keeps_documents_as_sources_instead_of_inline_images();
+
+function test_proposal_context_fills_content_update_defaults_from_user_message(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        ['post_content' => '<!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph -->'],
+        [
+            'user_message' => 'Not quite. I just want the paragraph breaks in q3 to be restored on page 410.',
+        ],
+    );
+
+    Assert::same(410, (int) ($input['post_id'] ?? 0), 'page ID from the user message should fill post_id');
+    Assert::true('' !== trim((string) ($input['title'] ?? '')), 'action card title should default when omitted');
+    Assert::true(
+        str_contains((string) ($input['description'] ?? ''), 'paragraph breaks'),
+        'description should default from the user request',
+    );
+    Assert::true(
+        str_contains((string) ($input['post_content'] ?? ''), 'Hi'),
+        'agent post_content must not be overwritten',
+    );
+}
+
+test_proposal_context_fills_content_update_defaults_from_user_message();
+
+function test_proposal_context_does_not_override_explicit_content_edit_fields(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        [
+            'post_id' => 99,
+            'title' => 'Explicit title',
+            'description' => 'Explicit description',
+        ],
+        [
+            'user_message' => 'Fix page 410 paragraph breaks.',
+        ],
+    );
+
+    Assert::same(99, (int) ($input['post_id'] ?? 0), 'explicit post_id wins over message parsing');
+    Assert::same('Explicit title', $input['title'] ?? null, 'explicit title wins');
+    Assert::same('Explicit description', $input['description'] ?? null, 'explicit description wins');
+}
+
+test_proposal_context_does_not_override_explicit_content_edit_fields();

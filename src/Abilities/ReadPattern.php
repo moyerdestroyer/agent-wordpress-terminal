@@ -50,18 +50,39 @@ final class ReadPattern implements AbilityInterface {
 
     /** @param array<string, mixed> $input @return array<string, mixed>|\WP_Error */
     public function execute(array $input): array|\WP_Error {
-        $pattern = new PatternCatalog()->find((string) ($input['name'] ?? ''));
+        $name = sanitize_text_field((string) ($input['name'] ?? ''));
+        $catalog = new PatternCatalog();
+        $pattern = $catalog->find($name);
 
         if (null === $pattern) {
-            return new \WP_Error('awpt_pattern_not_found', __('Pattern not found.', 'agent-wordpress-terminal'), [
-                'status' => 404,
-            ]);
+            $suggestions = $catalog->suggestions($name, 8);
+
+            return new \WP_Error(
+                'awpt_pattern_not_found',
+                __(
+                    'Pattern not found. Use an exact name from awpt/list-patterns (do not invent slugs).',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 404,
+                    'requested_name' => $name,
+                    'suggested_patterns' => array_map(static fn(array $item): array => [
+                        'name' => (string) ($item['name'] ?? ''),
+                        'title' => (string) ($item['title'] ?? ''),
+                        'owner' => (string) ($item['owner'] ?? ''),
+                    ], $suggestions),
+                    'recommended_next_tools' => [
+                        [
+                            'tool' => 'awpt/list-patterns',
+                            'input' => ['search' => '', 'max' => 24],
+                        ],
+                    ],
+                ],
+            );
         }
 
         $content = (string) ($pattern['content'] ?? '');
         $tree = BlockTree::from_content($content);
-
-        $catalog = new PatternCatalog();
 
         return array_merge($catalog->summary($pattern), [
             'content' => $content,

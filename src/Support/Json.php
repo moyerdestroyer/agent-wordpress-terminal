@@ -18,6 +18,16 @@ if (!defined('ABSPATH')) {
  * Safe JSON decoding at mixed boundaries.
  */
 final class Json {
+    public static function decode_value(string $json): mixed {
+        if ('' === $json) {
+            return null;
+        }
+
+        $decoded = json_decode($json, true);
+
+        return JSON_ERROR_NONE === json_last_error() ? $decoded : null;
+    }
+
     /**
      * Decode JSON into an associative array.
      *
@@ -28,6 +38,6 @@ final class Json {
             return [];
         }
 
-        return ArrayKey::as_map(json_decode($json, true));
+        return ArrayKey::as_map(self::decode_value($json));
     }
 }

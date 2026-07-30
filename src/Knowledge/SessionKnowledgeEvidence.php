@@ -36,7 +36,9 @@ final class SessionKnowledgeEvidence {
                 continue;
             }
 
-            $this->collect($call['output'], $ids);
+            if (is_array($call['output'])) {
+                $this->collect($call['output'], $ids);
+            }
         }
 
         return array_values(array_keys($ids));
@@ -58,7 +60,8 @@ final class SessionKnowledgeEvidence {
                 continue;
             }
 
-            $fingerprint = (string) ($call['output']['query_fingerprint'] ?? '');
+            $output = is_array($call['output']) ? $call['output'] : [];
+            $fingerprint = (string) ($output['query_fingerprint'] ?? '');
 
             if ('' !== $fingerprint) {
                 $fingerprints[$fingerprint] = true;
@@ -84,7 +87,8 @@ final class SessionKnowledgeEvidence {
                 continue;
             }
 
-            $query = trim((string) ($call['input']['query'] ?? ''));
+            $input = is_array($call['input']) ? $call['input'] : [];
+            $query = trim((string) ($input['query'] ?? ''));
 
             if ('' !== $query) {
                 $queries[mb_strtolower($query)] = $query;
@@ -106,9 +110,11 @@ final class SessionKnowledgeEvidence {
         }
 
         foreach ($value as $child) {
-            if (is_array($child)) {
-                $this->collect($child, $ids);
+            if (!is_array($child)) {
+                continue;
             }
+
+            $this->collect($child, $ids);
         }
     }
 }

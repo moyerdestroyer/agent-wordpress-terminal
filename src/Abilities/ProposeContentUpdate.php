@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AbilityReplacementRegistry;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
@@ -63,16 +64,22 @@ final class ProposeContentUpdate implements AbilityInterface {
                     ],
                     'post_id' => [
                         'type' => 'integer',
-                        'description' => __('Post ID to update.', 'agent-wordpress-terminal'),
+                        'description' => __(
+                            'Post ID to update. Prefer an explicit ID from read/search tools; session focus or an open content proposal may be used when omitted.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                     'title' => [
                         'type' => 'string',
-                        'description' => __('Action card title.', 'agent-wordpress-terminal'),
+                        'description' => __(
+                            'Action card title. Optional: AWPT defaults from the user request when omitted.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                     'description' => [
                         'type' => 'string',
                         'description' => __(
-                            'Human-readable description of the proposed update.',
+                            'Human-readable description of the proposed update. Optional: defaults from the user request.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -119,7 +126,10 @@ final class ProposeContentUpdate implements AbilityInterface {
                     ],
                     'pattern_read_verified' => ['type' => 'boolean'],
                 ],
-                'required' => ['session_id', 'post_id', 'title', 'description'],
+                // session_id is injected by the runtime. title/description are filled when omitted.
+                // post_id remains required for schema honesty, but the runtime also tries focus /
+                // open proposals / "page 410" phrasing before validation fails.
+                'required' => ['session_id'],
             ],
             'output_schema' => ['type' => 'object'],
             'permission_callback' => [$this, 'can_propose'],
@@ -148,6 +158,32 @@ final class ProposeContentUpdate implements AbilityInterface {
     public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
         $post_id = (int) ($input['post_id'] ?? 0);
+
+        if ($post_id <= 0) {
+            $reader = new AbilityReplacementRegistry()->preferred('awpt/read-content');
+
+            return new \WP_Error(
+                code: 'awpt_missing_post_id',
+                message: __(
+                    sprintf(
+                        'post_id is required. Pass the target page/post ID from %s or awpt/search-content.',
+                        $reader,
+                    ),
+                    'agent-wordpress-terminal',
+                ),
+                data: [
+                    'status' => 400,
+                    'recommended_next_tools' => [
+                        ['tool' => 'awpt/search-content', 'input' => ['query' => '']],
+                        [
+                            'tool' => $reader,
+                            'input' => 'core/read-content' === $reader ? ['id' => 0, 'fields' => ['id']] : ['id' => 0],
+                        ],
+                    ],
+                ],
+            );
+        }
+
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -311,10 +347,25 @@ final class ProposeContentUpdate implements AbilityInterface {
             $payload['preview_autosave_id'] = (int) $preview['autosave_id'];
         }
 
+        $title = trim((string) ($input['title'] ?? ''));
+        $description = trim((string) ($input['description'] ?? ''));
+
+        if ('' === $title) {
+            $title = sprintf(
+                /* translators: %s: post title. */
+                __('Update “%s”', 'agent-wordpress-terminal'),
+                get_the_title($post),
+            );
+        }
+
+        if ('' === $description) {
+            $description = $title;
+        }
+
         $action_id = $this->actions->create(
             session_id: $session_id,
-            title: sanitize_text_field((string) $input['title']),
-            description: sanitize_textarea_field((string) $input['description']),
+            title: sanitize_text_field($title),
+            description: sanitize_textarea_field($description),
             payload: $payload,
         );
 

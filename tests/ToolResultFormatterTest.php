@@ -105,3 +105,49 @@ function test_read_pattern_formatter_uses_compact_summary(): void {
 }
 
 test_read_pattern_formatter_uses_compact_summary();
+
+function test_incomplete_turn_formatter_summarizes_evidence_without_dumping_it(): void {
+    $content = new ToolResultFormatter()->format_incomplete_turn([
+        [
+            'tool' => 'awpt/read-content',
+            'status' => 'success',
+            'output' => ['id' => 408, 'title' => 'Stamping Fee', 'type' => 'page'],
+        ],
+        [
+            'tool' => 'awpt/read-block-tree',
+            'status' => 'success',
+            'output' => ['count' => 39, 'blocks' => []],
+        ],
+        [
+            'tool' => 'awpt/read-pattern',
+            'status' => 'success',
+            'output' => ['title' => 'Documentation Page', 'content' => str_repeat('markup', 1000)],
+        ],
+    ], 'Operation timed out.');
+
+    Assert::true(str_contains($content, '#408 Stamping Fee (page)'), 'content identity should be preserved');
+    Assert::true(str_contains($content, '39 blocks'), 'structural evidence should be summarized');
+    Assert::true(str_contains($content, 'Documentation Page'), 'comparison evidence should be summarized');
+    Assert::true(str_contains($content, 'no change was staged'), 'the operational outcome should be explicit');
+    Assert::false(str_contains($content, 'markupmarkup'), 'raw evidence must not leak into the fallback');
+}
+
+test_incomplete_turn_formatter_summarizes_evidence_without_dumping_it();
+
+function test_incomplete_turn_formatter_does_not_deny_successful_staging(): void {
+    $content = new ToolResultFormatter()->format_incomplete_turn([[
+        'tool' => 'awpt/propose-content-update',
+        'status' => 'success',
+        'output' => [
+            'id' => 43,
+            'title' => 'Preserve Stamping Fee copy',
+            'status' => 'proposed',
+        ],
+    ]], 'Operation timed out.');
+
+    Assert::true(str_contains($content, 'staged proposed action #43'), 'successful staging should be reported');
+    Assert::true(str_contains($content, 'original content has not been changed'), 'staging semantics should be clear');
+    Assert::false(str_contains($content, 'no change was staged'), 'the fallback must not contradict tool evidence');
+}
+
+test_incomplete_turn_formatter_does_not_deny_successful_staging();

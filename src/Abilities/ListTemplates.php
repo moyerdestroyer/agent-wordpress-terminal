@@ -91,7 +91,7 @@ final class ListTemplates implements AbilityInterface {
         $query = new \WP_Query($args);
         $items = [];
 
-        foreach ($query->posts as $post) {
+        foreach (is_array($query->posts) ? $query->posts : [] as $post) {
             if (!$post instanceof \WP_Post) {
                 continue;
             }

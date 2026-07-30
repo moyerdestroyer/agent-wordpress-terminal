@@ -15,8 +15,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * OpenAI-compatible function names cannot include `/`, so `namespace/tool`
- * becomes `namespace__tool` with hyphens flattened to underscores.
+ * OpenAI-compatible function names cannot include `/`, so each Ability name
+ * segment is separated with `__` and hyphens are flattened to underscores.
  */
 final class ToolNameMapper {
     /**
@@ -35,7 +35,8 @@ final class ToolNameMapper {
     /**
      * Provider function name → ability / MCP tool name.
      *
-     * Reversible for the standard `namespace/rest-of-name` shape used by Abilities.
+     * Reversible for the two-to-four-segment Ability names supported by
+     * WordPress 7.1.
      */
     public function to_tool_name(string $function_name): string {
         $function_name = trim($function_name);
@@ -44,15 +45,13 @@ final class ToolNameMapper {
             return '';
         }
 
-        $separator = strpos($function_name, '__');
-
-        if (false === $separator) {
+        if (!str_contains($function_name, '__')) {
             return $function_name;
         }
 
-        $namespace = substr($function_name, 0, $separator);
-        $rest = substr($function_name, $separator + 2);
+        $segments = explode('__', $function_name);
+        $segments = array_map(static fn(string $segment): string => str_replace('_', '-', $segment), $segments);
 
-        return $namespace . '/' . str_replace('_', '-', $rest);
+        return implode('/', $segments);
     }
 }

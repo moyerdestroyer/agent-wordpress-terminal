@@ -165,7 +165,13 @@ final class WordPressMcpCatalog {
             return null;
         }
 
-        return new ToolExecutor()->execute($ability_name, $this->string_keyed($input));
+        $result = new ToolExecutor()->execute($ability_name, $this->string_keyed($input));
+
+        if (is_wp_error($result) || is_array($result)) {
+            return $result;
+        }
+
+        return ['value' => $result];
     }
 
     private function is_adapter_namespace(string $ability_name): bool {

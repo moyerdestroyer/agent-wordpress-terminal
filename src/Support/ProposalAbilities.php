@@ -34,6 +34,7 @@ final class ProposalAbilities {
         'awpt/propose-theme-switch',
         'awpt/propose-plugin-deactivate',
         'awpt/propose-custom-css-update',
+        'awpt/propose-resource-change',
     ];
 
     /**

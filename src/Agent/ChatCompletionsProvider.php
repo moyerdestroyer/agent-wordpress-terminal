@@ -207,9 +207,11 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             $text = [];
 
             foreach ($message['content'] as $part) {
-                if (is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null)) {
-                    $text[] = $part['text'];
+                if (!(is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null))) {
+                    continue;
                 }
+
+                $text[] = $part['text'];
             }
 
             $messages[$index]['content'] = implode("\n", $text);

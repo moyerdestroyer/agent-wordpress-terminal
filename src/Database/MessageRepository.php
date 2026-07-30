@@ -64,7 +64,7 @@ final class MessageRepository {
     /**
      * Fetch recent persisted tool evidence for session-level reuse.
      *
-     * @return list<array{tool: string, input: array<array-key, mixed>, output: array<array-key, mixed>, status: string}>
+     * @return list<array{tool: string, input: mixed, output: mixed, status: string}>
      */
     public function recent_tool_calls(int $session_id, int $limit = 160): array {
         $wpdb = WpDb::get();
@@ -93,8 +93,8 @@ final class MessageRepository {
             $output = json_decode((string) ($row['output_json'] ?? ''), true);
             $calls[] = [
                 'tool' => (string) ($row['tool_name'] ?? ''),
-                'input' => is_array($input) ? $input : [],
-                'output' => is_array($output) ? $output : [],
+                'input' => $input,
+                'output' => $output,
                 'status' => (string) ($row['status'] ?? ''),
             ];
         }

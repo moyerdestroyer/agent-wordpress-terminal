@@ -31,6 +31,7 @@ final class ActionOperations {
     public const THEME_SWITCH = 'theme_switch';
     public const PLUGIN_DEACTIVATE = 'plugin_deactivate';
     public const CUSTOM_CSS_UPDATE = 'custom_css_update';
+    public const RESOURCE_CHANGE = 'resource_change';
 
     /**
      * @var list<string>
@@ -49,6 +50,7 @@ final class ActionOperations {
         self::THEME_SWITCH,
         self::PLUGIN_DEACTIVATE,
         self::CUSTOM_CSS_UPDATE,
+        self::RESOURCE_CHANGE,
     ];
 
     /**

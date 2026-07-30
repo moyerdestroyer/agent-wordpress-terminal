@@ -239,9 +239,11 @@ final class FrontendInspector {
         }
 
         foreach ($layout_signals['interesting_classes'] as $class) {
-            if ('' !== $class) {
-                $terms[] = $class;
+            if ('' === $class) {
+                continue;
             }
+
+            $terms[] = $class;
         }
 
         $terms = array_values(array_unique(array_slice($terms, 0, 6)));
