@@ -79,6 +79,7 @@ if (!file_exists($awpt_autoloader)) {
 }
 
 require_once $awpt_autoloader;
+require_once __DIR__ . '/src/domain-functions.php';
 
 /**
  * Plugin activation hook.

@@ -31,11 +31,14 @@ final class AttachmentBlockUrlNormalizer {
             return 0;
         }
 
-        $attachment_id = (int) ($attrs['id'] ?? $attrs['mediaId'] ?? 0);
+        $attachment_id = $this->attachment_id($block, $attrs);
 
         if ($attachment_id <= 0 || !wp_attachment_is_image($attachment_id)) {
             return 0;
         }
+
+        $attrs = $this->with_attachment_id($attrs, $attachment_id, $name);
+        $block['attrs'] = $attrs;
 
         $canonical_url = $this->canonical_url($attachment_id, $attrs, $name);
 
@@ -54,17 +57,80 @@ final class AttachmentBlockUrlNormalizer {
         return $changed ? $attachment_id : 0;
     }
 
+    /** @param array<string, mixed> $block @param array<array-key, mixed> $attrs */
+    private function attachment_id(array $block, array $attrs): int {
+        $from_attrs = (int) ($attrs['id'] ?? $attrs['mediaId'] ?? 0);
+
+        if ($from_attrs > 0 && wp_attachment_is_image($from_attrs)) {
+            return $from_attrs;
+        }
+
+        $html = $this->static_html($block);
+        $matches = [];
+
+        if (preg_match('/\bwp-image-(\d+)\b/', $html, $matches)) {
+            $from_class = (int) ($matches[1] ?? 0);
+
+            if ($from_class > 0 && wp_attachment_is_image($from_class)) {
+                return $from_class;
+            }
+        }
+
+        if (!function_exists('attachment_url_to_postid')) {
+            return 0;
+        }
+
+        if (preg_match('/<img\b[^>]*\bsrc=(["\'])(.*?)\1/is', $html, $matches)) {
+            $from_url = absint(attachment_url_to_postid(html_entity_decode($matches[2] ?? '', ENT_QUOTES | ENT_HTML5)));
+
+            if ($from_url > 0 && wp_attachment_is_image($from_url)) {
+                return $from_url;
+            }
+        }
+
+        return 0;
+    }
+
+    /** @param array<array-key, mixed> $attrs @return array<array-key, mixed> */
+    private function with_attachment_id(array $attrs, int $attachment_id, string $name): array {
+        if ('core/media-text' === $name) {
+            $attrs['mediaId'] = $attachment_id;
+            $attrs['mediaType'] = 'image';
+
+            return $attrs;
+        }
+
+        $attrs['id'] = $attachment_id;
+
+        return $attrs;
+    }
+
+    /** @param array<string, mixed> $block */
+    private function static_html(array $block): string {
+        $html = (string) ($block['innerHTML'] ?? '');
+
+        if (!is_array($block['innerContent'] ?? null)) {
+            return $html;
+        }
+
+        foreach (array_keys($block['innerContent']) as $key) {
+            $part = ArrayKey::as_string(ArrayKey::passthrough($block['innerContent'][$key] ?? null));
+
+            if (null !== $part) {
+                $html .= "\n" . $part;
+            }
+        }
+
+        return $html;
+    }
+
     /** @param array<array-key, mixed> $attrs */
     private function canonical_url(int $attachment_id, array $attrs, string $name): string {
-        $size = match ($name) {
-            'core/image' => sanitize_key((string) ($attrs['sizeSlug'] ?? 'large')),
-            'core/media-text' => sanitize_key((string) ($attrs['mediaSizeSlug'] ?? 'full')),
-            default => 'full',
-        };
-        $url = wp_get_attachment_image_url($attachment_id, '' !== $size ? $size : 'full');
+        unset($attrs, $name);
+        $url = wp_get_attachment_url($attachment_id);
 
         if (!is_string($url) || '' === $url) {
-            $url = wp_get_attachment_url($attachment_id);
+            $url = wp_get_attachment_image_url($attachment_id, 'full');
         }
 
         return is_string($url) ? $url : '';

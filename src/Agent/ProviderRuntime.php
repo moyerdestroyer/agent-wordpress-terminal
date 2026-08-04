@@ -34,7 +34,10 @@ final class ProviderRuntime {
     private const MAX_PROVIDER_COMPLETIONS = 6;
 
     /** Extra headroom for pattern-led page composition turns. */
-    private const CONTENT_MAX_PROVIDER_COMPLETIONS = 8;
+    private const CONTENT_MAX_PROVIDER_COMPLETIONS = 10;
+
+    /** Initial staging plus two bounded validation-informed corrections. */
+    private const MAX_PROPOSAL_FAILURES = 3;
 
     /** Explore hops before forced compose on content turns (after initial complete). */
     private const MAX_EXPLORE_HOPS = 3;
@@ -51,6 +54,9 @@ final class ProviderRuntime {
 
     private const CONTENT_TURN_WALL_SECONDS = 240;
 
+    /** Raw from-scratch Gutenberg documents need more transport time than compact pattern edits. */
+    private const RAW_COMPOSITION_TURN_WALL_SECONDS = 480;
+
     /**
      * Floor for follow-up provider HTTP calls after tools have run. Scheduling a
      * 5s completion after a long evidence loop almost always fails with cURL 28
@@ -58,7 +64,18 @@ final class ProviderRuntime {
      */
     private const MIN_USEFUL_REQUEST_SECONDS = 25;
 
-    private const COMPOSITION_MAX_COMPLETION_TOKENS = 16_000;
+    /**
+     * A complete Gutenberg proposal normally fits below this ceiling. Keeping it
+     * bounded also prevents a raw-markup finalization from monopolizing the
+     * whole content-turn wall clock after discovery has already succeeded.
+     */
+    private const COMPOSITION_MAX_COMPLETION_TOKENS = 4_800;
+
+    /** Existing pages may need to resend substantial preserved source copy in an adapted layout. */
+    private const EXISTING_CONTENT_COMPOSITION_MAX_COMPLETION_TOKENS = 20_000;
+
+    /** The raw escape hatch remains expressive; this is a provider response budget, not a stored-page limit. */
+    private const RAW_COMPOSITION_MAX_COMPLETION_TOKENS = 20_000;
 
     /**
      * Error code WordPressAIClientProvider returns when the connector has no model
@@ -114,14 +131,30 @@ final class ProviderRuntime {
         $budget_tokens = $budget->for_message($message, 0, $budget_context);
         $is_content_turn = $profile->content_turn;
         $is_content_edit_turn = $profile->content_edit_turn;
-        $is_extended_turn = $is_content_turn || $is_content_edit_turn;
+        $is_extended_turn = $is_content_turn || $is_content_edit_turn || [] !== $profile->compose_allowlist();
         $turn_wall_seconds = $is_extended_turn ? self::CONTENT_TURN_WALL_SECONDS : self::TURN_WALL_SECONDS;
         $started_at = microtime(true);
         $turn_id = (string) ($turn_context['turn_id'] ?? '');
         $uses_phases = $profile->uses_explore_compose_phases();
-        $provider_tools = $uses_phases
-            ? $this->tool_registry->get_exploration_tools($profile->explore_allowlist())
-            : $this->tool_registry->get_chat_completion_tools_for_profile($profile);
+        $has_open_new_post = (bool) ($budget_context['has_open_new_post_proposal'] ?? false);
+        // Creation language can also match the broad edit classifier (for
+        // example, "make a news page with images"). A confirmed new-content
+        // turn takes precedence unless an open staged draft makes it a revision.
+        $is_creation_profile = TurnProfile::TOOL_COMPOSE === $profile->tool_profile;
+        $compact_preparation = $uses_phases && $is_creation_profile && $is_content_turn && !$has_open_new_post;
+        $compact_revision =
+            $uses_phases && $is_creation_profile && $has_open_new_post && ($is_content_turn || $is_content_edit_turn);
+        $provider_tools = $compact_revision
+            ? $this->tool_registry->get_chat_completion_tools(['awpt/read-proposal'])
+            : (
+                $compact_preparation
+                    ? $this->tool_registry->get_chat_completion_tools(['awpt/prepare-pattern-draft'])
+                    : (
+                        $uses_phases
+                            ? $this->tool_registry->get_exploration_tools($profile->explore_allowlist())
+                            : $this->tool_registry->get_chat_completion_tools_for_profile($profile)
+                    )
+            );
         $vision = $this->vision_evidence->prepare($messages, $provider, $session_id, $turn_id);
         $messages = $vision['messages'];
         $this->record_vision_calls($session_id, $vision['calls']);
@@ -148,6 +181,9 @@ final class ProviderRuntime {
             'session_id' => $session_id,
             'max_completion_tokens' => $budget_tokens,
             'timeout' => min(120, max(5, $remaining)),
+            'tool_choice' => $compact_preparation || $compact_revision
+                ? $this->exact_tool_choice($provider_tools)
+                : 'auto',
         ]);
         $this->record_provider_call($session_id, [
             'provider' => $provider->get_name(),
@@ -186,8 +222,20 @@ final class ProviderRuntime {
             'is_content_turn' => $is_content_turn,
             'is_content_edit_turn' => $is_content_edit_turn,
             'turn_profile' => $profile,
+            'presentation_edit' => $profile->presentation_edit,
             'uses_explore_compose' => $uses_phases,
             'offered_tool_names' => $this->tool_registry->names_from_declarations($provider_tools),
+            'compose_abilities' => $compact_preparation
+                ? ['awpt/propose-patterned-post']
+                : (
+                    $compact_revision
+                        ? (
+                            $this->explicit_custom_request($message)
+                                ? ['awpt/propose-new-post']
+                                : ['awpt/propose-patterned-post']
+                        )
+                        : []
+                ),
         ]);
 
         $content = trim($loop_result['content']);
@@ -207,6 +255,7 @@ final class ProviderRuntime {
             'content' => $content,
             'tool_calls' => $tool_calls,
             'actions' => $loop_result['actions'],
+            'turn_outcome' => $this->turn_outcome($tool_calls, $loop_result['actions'], $content),
             'provider' => $provider->get_name(),
             'model' => $loop_result['model'],
         ];
@@ -300,9 +349,13 @@ final class ProviderRuntime {
         $tool_round = 0;
         $explore_hops = 0;
         $proposal_failures = 0;
+        $terminal_content_loss_recovery_sent = false;
+        $terminal_pattern_recovery_sent = false;
+        $terminal_heading_recovery_sent = false;
         $corrective_replan_sent = false;
         $recovery_stall_nudge_sent = false;
         $discovery_nudge_sent = false;
+        $pattern_read_recovery = false;
         $compose_only = false;
         $compose_compacted = false;
         $last_discovery = ['compose' => false, 'reason' => '', 'coverage' => []];
@@ -332,6 +385,10 @@ final class ProviderRuntime {
             ))
             : null;
         $activated_tool_names = [];
+        $compose_abilities = array_values(array_filter(
+            is_array($options['compose_abilities'] ?? null) ? $options['compose_abilities'] : [],
+            'is_string',
+        ));
 
         while ($provider_completions <= $max_provider_completions) {
             $turn_context['progress_phase'] = $this->phase_choice(
@@ -346,6 +403,14 @@ final class ProviderRuntime {
             } else {
                 unset($turn_context['offered_tool_names']);
             }
+            // A provider can hit its output ceiling after emitting the start of
+            // a syntactically salvageable tool call. Never execute that partial
+            // payload: validators can diagnose its incidental broken markup,
+            // but the actionable cause is provider truncation.
+            if ($compose_only && $this->completion_was_truncated($result)) {
+                break;
+            }
+
             $execution = $this->tool_executor->execute(
                 $result['raw_tool_calls'] ?? [],
                 $tool_registry,
@@ -364,9 +429,25 @@ final class ProviderRuntime {
             }
 
             $tool_calls = [...$tool_calls, ...$execution['tool_calls']];
-            $actions = [...$actions, ...$this->actions_from_tool_calls($execution['tool_calls'])];
+            if (
+                true === ($options['presentation_edit'] ?? false)
+                && $this->presentation_requires_page_h1($execution['tool_calls'])
+            ) {
+                $turn_context['presentation_requires_h1'] = true;
+            }
+            $actions = $this->merge_actions($actions, $this->actions_from_tool_calls($execution['tool_calls']));
             $messages[] = $this->tool_executor->assistant_tool_call_message($result);
             $messages = array_merge($messages, $execution['messages']);
+
+            if ($pattern_read_recovery && $this->has_successful_tool($execution['tool_calls'], 'awpt/read-pattern')) {
+                $pattern_read_recovery = false;
+                $compose_only = true;
+                $turn_phase = 'compose';
+                $messages[] = [
+                    'role' => 'system',
+                    'content' => 'The selected pattern has now been read. Stage one corrected proposal using its actual block markup and name provenance. Do not represent a pattern name as a block type.',
+                ];
+            }
 
             foreach ($execution['tool_calls'] as $call) {
                 if ('success' !== (string) ($call['status'] ?? '') || 'awpt/find-abilities' !== $call['tool']) {
@@ -385,12 +466,22 @@ final class ProviderRuntime {
                 $activated_tool_names = array_values(array_unique($activated_tool_names));
             }
 
+            $proposal_failed_this_round = false;
+
             foreach ($execution['tool_calls'] as $call) {
                 $tool_name = (string) ($call['tool'] ?? '');
 
                 if (ToolRegistry::is_proposal_ability($tool_name) && 'success' !== (string) ($call['status'] ?? '')) {
-                    ++$proposal_failures;
+                    $proposal_failed_this_round = true;
                 }
+            }
+
+            if ($proposal_failed_this_round) {
+                ++$proposal_failures;
+                // Each newly rejected proposal gets one chance to recover from
+                // an empty/explanatory follow-up. A prior failure's stall nudge
+                // must not consume the next correction cycle.
+                $recovery_stall_nudge_sent = false;
             }
 
             if ($this->has_successful_proposal($execution['tool_calls'])) {
@@ -422,10 +513,13 @@ final class ProviderRuntime {
                         (int) ($options['turn_wall_seconds'] ?? self::TURN_WALL_SECONDS)
                         - (int) ceil(microtime(true) - $turn_started_at);
 
-                    if (
-                        $remaining >= self::MIN_USEFUL_REQUEST_SECONDS
-                        && $provider_completions < $max_provider_completions
-                    ) {
+                    if ($this->should_review_visual_evidence(
+                        $verification,
+                        $remaining,
+                        $provider_completions,
+                        $max_provider_completions,
+                        true === ($options['presentation_edit'] ?? false),
+                    )) {
                         new ChatProgress()->update($session_id, (string) ($turn_context['turn_id'] ?? ''), [
                             'phase' => 'verifying',
                             'label' => __('Reviewing rendered preview', 'agent-wordpress-terminal'),
@@ -439,7 +533,9 @@ final class ProviderRuntime {
                             ],
                         ]);
                         $review_tools = $tool_registry->get_chat_completion_tools(
-                            $turn_profile?->compose_allowlist() ?? ProposalAbilities::names(),
+                            [] !== $compose_abilities
+                                ? $compose_abilities
+                                : $turn_profile?->compose_allowlist() ?? ProposalAbilities::names(),
                         );
                         $review_started_at = microtime(true);
                         $review = $provider->complete($messages, $review_tools, [
@@ -484,23 +580,90 @@ final class ProviderRuntime {
                 break;
             }
 
-            if ($proposal_failures >= 2 || $provider_completions >= $max_provider_completions) {
-                if ($proposal_failures >= 2) {
+            $latest_failure_code = $this->latest_proposal_failure_code($execution['tool_calls']);
+            $allow_terminal_content_loss_recovery = $this->should_allow_terminal_content_loss_recovery(
+                $proposal_failures,
+                $latest_failure_code,
+                $terminal_content_loss_recovery_sent,
+            );
+            $allow_terminal_pattern_recovery = $this->should_allow_terminal_pattern_recovery(
+                $proposal_failures,
+                $latest_failure_code,
+                $terminal_pattern_recovery_sent,
+            );
+            $allow_terminal_heading_recovery = $this->should_allow_terminal_heading_recovery(
+                $proposal_failures,
+                $latest_failure_code,
+                $terminal_heading_recovery_sent,
+            );
+
+            if (
+                $proposal_failures >= self::MAX_PROPOSAL_FAILURES
+                && !$allow_terminal_content_loss_recovery
+                && !$allow_terminal_pattern_recovery
+                && !$allow_terminal_heading_recovery
+                || $provider_completions >= $max_provider_completions
+            ) {
+                if ($proposal_failures >= self::MAX_PROPOSAL_FAILURES) {
                     $content = __(
-                        'I could not stage the proposal after one corrected attempt. The validation failures are preserved below so the next attempt can use verified site evidence.',
+                        'I could not stage the proposal after two corrected attempts. The validation failures are preserved below so the next attempt can use verified site evidence.',
                         'agent-wordpress-terminal',
                     );
                 }
                 break;
             }
 
-            if ($proposal_failures > 0 && !$corrective_replan_sent) {
-                $compose_only = false;
+            if ($allow_terminal_content_loss_recovery) {
+                $terminal_content_loss_recovery_sent = true;
+            }
+            if ($allow_terminal_pattern_recovery) {
+                $terminal_pattern_recovery_sent = true;
+            }
+            if ($allow_terminal_heading_recovery) {
+                $terminal_heading_recovery_sent = true;
+            }
+
+            if (
+                $proposal_failures > 0
+                && (
+                    !$corrective_replan_sent
+                    || in_array(
+                        $latest_failure_code,
+                        [
+                            'awpt_presentation_content_loss',
+                            'awpt_pattern_not_read',
+                            'awpt_pattern_not_found',
+                            'awpt_required_page_h1_missing',
+                            'awpt_heading_level_skipped',
+                        ],
+                        true,
+                    )
+                )
+            ) {
+                // A proposal validation failure still needs a proposal tool on
+                // the very next completion. Previously this reset the loop to
+                // exploration-only tools while instructing the model to submit
+                // a corrected proposal, which made that retry impossible.
+                $compose_only = 'awpt_pattern_not_read' !== $latest_failure_code;
                 $compose_compacted = false;
-                $turn_phase = $uses_explore_compose ? 'explore' : 'direct';
+                $turn_phase = $compose_only ? 'compose' : 'explore';
+                $pattern_read_recovery = 'awpt_pattern_not_read' === $latest_failure_code;
                 $messages[] = [
                     'role' => 'system',
-                    'content' => 'The staging attempt failed validation. Reconsider the approach and make at most one corrected staging attempt. Read the complete structured error_data: address every listed issue, use exact available identifiers, and call the recommended read tools when evidence is missing. Reuse pattern markup already returned in this turn instead of re-reading the same patterns. You retain recovery tools. Do not repeat unchanged arguments or ask the user to choose routine creative details you can decide.',
+                    'content' => match ($latest_failure_code) {
+                        'awpt_presentation_content_loss' => $this->presentation_content_loss_recovery(
+                            $proposal_failures,
+                        ),
+                        'awpt_pattern_not_read'
+                            => 'The proposal named a pattern that has not been read. Do not retry the proposal yet. Call awpt/read-pattern now with the exact name in error_data.recommended_next_tools; perform no unrelated discovery.',
+                        'awpt_pattern_not_found'
+                            => 'The proposal invented or mistyped an unavailable pattern name. Make one corrected proposal now. Reuse an exact pattern_name from a successful awpt/read-pattern result already in this turn; never paraphrase or reconstruct a slug. If no successfully read pattern fits, omit pattern_name and provide the required pattern_fallback_reason instead. Do not perform more discovery.',
+                        'awpt_required_page_h1_missing'
+                            => 'Rendered evidence requires exactly one content H1, and the proposal omitted it. Make one corrected proposal now using the page title already verified in this turn. In awpt/propose-block-batch-update, either promote an existing core/heading with update_attrs level 1 or insert one core/heading with attrs.level 1 and matching <h1> inner_html before the first visible content block. Include the other verified presentation changes in the same atomic proposal. Do not perform more discovery and do not submit another proposal without the H1.',
+                        'awpt_heading_level_skipped'
+                            => 'The proposal still skips a heading level. Make one corrected proposal now. Follow error_data: after an H1, top-level page sections or FAQ questions must be H2 unless a real H2 parent precedes their H3 children. Preserve the same copy and other verified changes; do not perform more discovery.',
+                        default => 'The staging attempt failed validation. Make one corrected staging attempt now. Read the complete structured error_data, address every listed issue, and use exact identifiers already verified in this turn. Reuse pattern markup already returned in this turn; do not repeat unchanged arguments or ask the user to choose routine creative details you can decide.',
+                    },
                 ];
                 $corrective_replan_sent = true;
             }
@@ -510,7 +673,10 @@ final class ProviderRuntime {
                 $tool_calls,
                 $execution['tool_calls'],
                 (int) floor(microtime(true) - $turn_started_at),
-                $is_content_turn || $is_content_edit_turn,
+                [
+                    'content_turn' => $is_content_turn || $is_content_edit_turn,
+                    'presentation_edit' => true === ($options['presentation_edit'] ?? false),
+                ],
             );
             $last_discovery = $discovery_decision;
 
@@ -518,7 +684,13 @@ final class ProviderRuntime {
                 $uses_explore_compose
                 && 0 === $proposal_failures
                 && !$compose_only
-                && ($discovery_decision['compose'] || $explore_hops >= self::MAX_EXPLORE_HOPS);
+                && (
+                    $is_content_turn || $is_content_edit_turn
+                        ? $discovery_decision['compose']
+                        || true !== ($options['presentation_edit'] ?? false)
+                        && $explore_hops >= self::MAX_EXPLORE_HOPS
+                        : [] !== ($turn_profile?->compose_allowlist() ?? [])
+                );
 
             if ($should_enter_compose) {
                 $reason = $discovery_decision['compose']
@@ -530,10 +702,19 @@ final class ProviderRuntime {
                     'reason' => $reason,
                     'mode' => 'compose',
                 ]);
+                $compose_abilities = $this->compose_abilities_for($tool_calls, $turn_profile, $compose_abilities);
+                $turn_context['pattern_preparation'] = $this->latest_pattern_preparation($tool_calls);
                 $compose_only = true;
                 $compose_compacted = true;
                 $discovery_nudge_sent = true;
                 $turn_phase = 'compose';
+
+                if ($this->has_custom_fallback($tool_calls) || true === ($options['presentation_edit'] ?? false)) {
+                    $options['turn_wall_seconds'] = max(
+                        (int) ($options['turn_wall_seconds'] ?? self::CONTENT_TURN_WALL_SECONDS),
+                        self::RAW_COMPOSITION_TURN_WALL_SECONDS,
+                    );
+                }
             } elseif (
                 !$uses_explore_compose
                 && 0 === $proposal_failures
@@ -578,6 +759,7 @@ final class ProviderRuntime {
                     )
                     : 0,
                 'activated_tool_names' => $activated_tool_names,
+                'compose_abilities' => $compose_abilities,
             ];
             new ChatProgress()->update($session_id, (string) ($turn_context['turn_id'] ?? ''), [
                 'phase' => $this->phase_choice(
@@ -613,6 +795,9 @@ final class ProviderRuntime {
             $offered_tool_names = is_array($follow_up['offered_tool_names'] ?? null)
                 ? array_values(array_filter($follow_up['offered_tool_names'], 'is_string'))
                 : [];
+            if (is_array($follow_up['failure_tool_call'] ?? null)) {
+                $tool_calls[] = $follow_up['failure_tool_call'];
+            }
 
             if ($follow_up['continue']) {
                 continue;
@@ -651,6 +836,7 @@ final class ProviderRuntime {
                     'explore_hops' => $explore_hops,
                     'compose_compacted' => false,
                     'activated_tool_names' => $activated_tool_names,
+                    'compose_abilities' => $compose_abilities,
                 ];
                 $follow_up = $this->follow_up_round($provider, $tool_registry, $state);
                 ++$provider_completions;
@@ -659,6 +845,9 @@ final class ProviderRuntime {
                 $offered_tool_names = is_array($follow_up['offered_tool_names'] ?? null)
                     ? array_values(array_filter($follow_up['offered_tool_names'], 'is_string'))
                     : [];
+                if (is_array($follow_up['failure_tool_call'] ?? null)) {
+                    $tool_calls[] = $follow_up['failure_tool_call'];
+                }
 
                 if ($follow_up['continue']) {
                     continue;
@@ -666,6 +855,32 @@ final class ProviderRuntime {
             }
 
             break;
+        }
+
+        if ([] === $actions && $compose_only && $this->completion_was_truncated($result)) {
+            $proposal_tool = 'awpt/propose-content-update';
+
+            foreach ($offered_tool_names ?? [] as $offered_tool_name) {
+                if (ToolRegistry::is_proposal_ability($offered_tool_name)) {
+                    $proposal_tool = $offered_tool_name;
+                    break;
+                }
+            }
+
+            $content = __(
+                'The proposal reached the provider output limit before a valid change could be staged. No change was applied; retry the request.',
+                'agent-wordpress-terminal',
+            );
+            $tool_calls[] = [
+                'tool' => $proposal_tool,
+                'input' => [],
+                'output' => [
+                    'error' => $content,
+                    'error_code' => 'awpt_proposal_output_truncated',
+                ],
+                'status' => 'failed',
+                'provider_call_id' => 'awpt_truncated_' . wp_generate_password(8, false),
+            ];
         }
 
         if (!$formatted_after_success && [] !== $tool_calls && '' === trim($content)) {
@@ -685,8 +900,87 @@ final class ProviderRuntime {
     }
 
     /**
+     * Genuine browser evidence earns a review round. Presentation turns may
+     * also use explicit static content-region heading evidence: it is not a
+     * visual check, but it authoritatively proves whether the proposal still
+     * lacks a page H1 or has a broken semantic outline.
+     *
+     * @param array{tool_call: array<string, mixed>, message: array<string, mixed>} $verification
+     */
+    private function should_review_visual_evidence(
+        array $verification,
+        int $remaining,
+        int $provider_completions,
+        int $max_provider_completions,
+        bool $presentation_edit = false,
+    ): bool {
+        $output = is_array($verification['tool_call']['output'] ?? null) ? $verification['tool_call']['output'] : [];
+        $has_heading_evidence =
+            $presentation_edit
+            && array_key_exists('main_h1_count', $output)
+            && is_array($output['main_heading_outline'] ?? null);
+
+        return (
+            (true === ($output['rendered'] ?? false) || $has_heading_evidence)
+            && $remaining >= self::MIN_USEFUL_REQUEST_SECONDS
+            && $provider_completions < $max_provider_completions
+        );
+    }
+
+    /** @param array<int, array<string, mixed>> $calls */
+    private function has_successful_tool(array $calls, string $tool_name): bool {
+        foreach ($calls as $call) {
+            if ('success' === (string) ($call['status'] ?? '') && $tool_name === (string) ($call['tool'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<int, array<string, mixed>> $calls */
+    private function presentation_requires_page_h1(array $calls): bool {
+        foreach ($calls as $call) {
+            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+
+            if (
+                'success' === (string) ($call['status'] ?? '')
+                && 'awpt/inspect-rendered-element' === (string) ($call['tool'] ?? '')
+                && array_key_exists('main_h1_count', $output)
+                && 0 === (int) ($output['main_h1_count'] ?? -1)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<int, array<string, mixed>> $tool_calls */
+    private function has_custom_fallback(array $tool_calls): bool {
+        foreach ($tool_calls as $call) {
+            if (
+                'success' === (string) ($call['status'] ?? '')
+                && 'awpt/prepare-pattern-draft' === (string) ($call['tool'] ?? '')
+                && 'custom_fallback' === (string) ($call['output']['mode'] ?? '')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function explicit_custom_request(string $message): bool {
+        return (bool) preg_match(
+            '/\b(from\s+scratch|bespoke|fully\s+custom|custom\s+layout|without\s+(?:a\s+)?pattern|do\s+not\s+use\s+(?:a\s+)?pattern)\b/i',
+            $message,
+        );
+    }
+
+    /**
      * @param array<string, mixed> $state
-     * @return array{content: string, result: array<string, mixed>, continue: bool, offered_tool_names: list<string>}
+     * @return array{content: string, result: array<string, mixed>, continue: bool, offered_tool_names: list<string>, failure_tool_call?: array<string, mixed>}
      */
     private function follow_up_round(ProviderInterface $provider, ToolRegistry $tool_registry, array $state): array {
         $session_id = (int) ($state['session_id'] ?? 0);
@@ -722,7 +1016,20 @@ final class ProviderRuntime {
         $budget_tokens = new GenerationBudget()->for_message($message, count($tool_calls), $budget_context);
         $started_at = microtime(true);
         $compose_only = ArrayKey::rest_bool($state['compose_only'] ?? false);
-        $completion_budget = $compose_only ? self::COMPOSITION_MAX_COMPLETION_TOKENS : $budget_tokens;
+        $raw_custom_composition = $compose_only && $this->has_custom_fallback($tool_calls);
+        $turn_profile = $state['turn_profile'] ?? null;
+        $turn_profile = $turn_profile instanceof TurnProfile ? $turn_profile : null;
+        $completion_budget = $compose_only
+            ? (
+                $raw_custom_composition
+                    ? self::RAW_COMPOSITION_MAX_COMPLETION_TOKENS
+                    : (
+                        $turn_profile?->content_edit_turn ?? false
+                            ? self::EXISTING_CONTENT_COMPOSITION_MAX_COMPLETION_TOKENS
+                            : self::COMPOSITION_MAX_COMPLETION_TOKENS
+                    )
+            )
+            : $budget_tokens;
         $vision = $this->vision_evidence->prepare($messages, $provider, $session_id, $turn_id);
         $messages = $vision['messages'];
         $this->record_vision_calls($session_id, $vision['calls']);
@@ -737,18 +1044,22 @@ final class ProviderRuntime {
             ];
         }
 
-        $turn_profile = $state['turn_profile'] ?? null;
-        $turn_profile = $turn_profile instanceof TurnProfile ? $turn_profile : null;
         $uses_phases = $turn_profile?->uses_explore_compose_phases() ?? false;
         $activated = array_values(array_filter(
             is_array($state['activated_tool_names'] ?? null) ? $state['activated_tool_names'] : [],
             'is_string',
         ));
+        $compose_abilities = array_values(array_filter(
+            is_array($state['compose_abilities'] ?? null) ? $state['compose_abilities'] : [],
+            'is_string',
+        ));
 
         if ($compose_only) {
-            $compose_abilities = $turn_profile?->compose_allowlist() ?? ['awpt/propose-new-post'];
+            if ([] === $compose_abilities) {
+                $compose_abilities = $turn_profile?->compose_allowlist() ?? ['awpt/propose-new-post'];
+            }
             $provider_tools = $tool_registry->get_chat_completion_tools($compose_abilities);
-            $proposal_function = [] !== $provider_tools ? 'required' : null;
+            $proposal_function = [] !== $provider_tools ? (1 === count($provider_tools) ? 'exact' : 'required') : null;
         } elseif ($uses_phases) {
             $provider_tools = $tool_registry->get_exploration_tools([
                 ...($turn_profile?->explore_allowlist() ?? []),
@@ -765,11 +1076,15 @@ final class ProviderRuntime {
             $proposal_function = null;
         }
 
-        // Require an approval-gated action without forcing which action. The
-        // evidence pack should drive that decision.
-        $tool_choice = 'required' === $proposal_function ? 'required' : 'auto';
+        $tool_choice = match ($proposal_function) {
+            'exact' => $this->exact_tool_choice($provider_tools),
+            'required' => 'required',
+            default => 'auto',
+        };
         $offered_tool_names = $tool_registry->names_from_declarations($provider_tools);
-        $request_timeout = min(120, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining));
+        $request_timeout = $compose_only
+            ? min($raw_custom_composition ? 450 : 210, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining))
+            : min(120, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining));
         $turn_phase = is_string($state['turn_phase'] ?? null)
             ? $state['turn_phase']
             : $this->phase_choice($compose_only, $uses_phases, 'compose', 'explore', 'direct');
@@ -813,6 +1128,7 @@ final class ProviderRuntime {
             'max_completion_tokens' => $completion_budget,
             'tool_choice' => $tool_choice,
             'timeout' => $request_timeout,
+            'reasoning_effort' => $raw_custom_composition || ($turn_profile?->content_edit_turn ?? false) ? 'low' : '',
         ]);
         $retried_finalization = false;
         $this->record_provider_call($session_id, [
@@ -846,8 +1162,11 @@ final class ProviderRuntime {
                         'provider' => $provider->get_name(),
                         'mode' => 'proposal_retry',
                         'tool_count' => count($tool_calls),
-                        'completion_budget' => self::COMPOSITION_MAX_COMPLETION_TOKENS,
-                        'request_timeout_seconds' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $retry_remaining)),
+                        'completion_budget' => $completion_budget,
+                        'request_timeout_seconds' => min(
+                            $raw_custom_composition ? 300 : 90,
+                            max(self::MIN_USEFUL_REQUEST_SECONDS, $retry_remaining),
+                        ),
                         'proposal_only' => true,
                     ],
                 ]);
@@ -856,15 +1175,21 @@ final class ProviderRuntime {
                     $provider_tools,
                     [
                         'session_id' => $session_id,
-                        'max_completion_tokens' => self::COMPOSITION_MAX_COMPLETION_TOKENS,
+                        'max_completion_tokens' => $completion_budget,
                         'tool_choice' => $tool_choice,
-                        'timeout' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $retry_remaining)),
+                        'timeout' => min(
+                            $raw_custom_composition ? 300 : 90,
+                            max(self::MIN_USEFUL_REQUEST_SECONDS, $retry_remaining),
+                        ),
+                        'reasoning_effort' => $raw_custom_composition || ($turn_profile?->content_edit_turn ?? false)
+                            ? 'low'
+                            : '',
                     ],
                 );
                 $this->record_provider_call($session_id, [
                     'provider' => $provider->get_name(),
                     'tool_round' => count($tool_calls),
-                    'budget' => self::COMPOSITION_MAX_COMPLETION_TOKENS,
+                    'budget' => $completion_budget,
                     'started_at' => $retry_started_at,
                     'result' => $follow_up,
                     'turn_id' => $turn_id,
@@ -876,6 +1201,20 @@ final class ProviderRuntime {
             $failure = is_wp_error($follow_up)
                 ? $this->result_formatter->format_incomplete_turn($tool_calls, $follow_up->get_error_message())
                 : $content;
+            $failure_message = is_wp_error($follow_up)
+                ? $follow_up->get_error_message()
+                : __('The provider could not finalize the requested proposal.', 'agent-wordpress-terminal');
+            $failure_code = is_wp_error($follow_up)
+                ? sanitize_key((string) $follow_up->get_error_code())
+                : 'awpt_provider_finalization_failed';
+            $proposal_tool = 'awpt/propose-content-update';
+
+            foreach ($offered_tool_names as $offered_tool_name) {
+                if (ToolRegistry::is_proposal_ability($offered_tool_name)) {
+                    $proposal_tool = $offered_tool_name;
+                    break;
+                }
+            }
 
             return [
                 // Finalization formats the tool results once. Returning an
@@ -884,6 +1223,18 @@ final class ProviderRuntime {
                 'result' => $prior_result,
                 'continue' => false,
                 'offered_tool_names' => $offered_tool_names,
+                'failure_tool_call' => [
+                    'tool' => $proposal_tool,
+                    'input' => [],
+                    'output' => [
+                        'error' => '' !== trim($failure_message)
+                            ? $failure_message
+                            : __('The provider could not finalize the requested proposal.', 'agent-wordpress-terminal'),
+                        'error_code' => '' !== $failure_code ? $failure_code : 'awpt_provider_finalization_failed',
+                    ],
+                    'status' => 'failed',
+                    'provider_call_id' => 'awpt_finalization_' . wp_generate_password(8, false),
+                ],
             ];
         }
 
@@ -1047,6 +1398,57 @@ final class ProviderRuntime {
         );
     }
 
+    /** @param array<string, mixed> $result */
+    private function completion_was_truncated(array $result): bool {
+        $reason = sanitize_key((string) ($result['finish_reason'] ?? ''));
+
+        return in_array($reason, ['length', 'max_tokens', 'max_completion_tokens'], true);
+    }
+
+    private function presentation_content_loss_recovery(int $proposal_failures): string {
+        if ($proposal_failures >= 2) {
+            return 'Repeated presentation attempts have failed content preservation. Use awpt/propose-block-batch-update now for a conservative structure-only recovery. Submit update_attrs changes against verified existing blocks only. Do not use replace_text, remove, or insert; do not send content or inner_html; do not rewrite links, numbers, labels, or prose. Stage the smallest meaningful hierarchy, spacing, alignment, or block-style improvement supported by the rendered evidence. If no such attribute-only improvement is possible, stop without proposing a change.';
+        }
+
+        return 'The presentation proposal was rejected for content loss. Correct it from the complete original page evidence already read in this turn. You may retry a full-document layout adaptation when that remains the best coherent solution, but it must preserve every substantive sentence, working link, number, media item, and legal reference; use awpt/propose-block-batch-update instead only when verified block changes fully solve the observed presentation problems. Address every item in error_data, and do not reduce the transformation scope merely to evade validation.';
+    }
+
+    private function should_allow_terminal_content_loss_recovery(
+        int $proposal_failures,
+        string $latest_failure_code,
+        bool $already_sent,
+    ): bool {
+        return (
+            $proposal_failures >= self::MAX_PROPOSAL_FAILURES
+            && 'awpt_presentation_content_loss' === $latest_failure_code
+            && !$already_sent
+        );
+    }
+
+    private function should_allow_terminal_pattern_recovery(
+        int $proposal_failures,
+        string $latest_failure_code,
+        bool $already_sent,
+    ): bool {
+        return (
+            $proposal_failures >= self::MAX_PROPOSAL_FAILURES
+            && 'awpt_pattern_not_found' === $latest_failure_code
+            && !$already_sent
+        );
+    }
+
+    private function should_allow_terminal_heading_recovery(
+        int $proposal_failures,
+        string $latest_failure_code,
+        bool $already_sent,
+    ): bool {
+        return (
+            $proposal_failures >= self::MAX_PROPOSAL_FAILURES
+            && in_array($latest_failure_code, ['awpt_required_page_h1_missing', 'awpt_heading_level_skipped'], true)
+            && !$already_sent
+        );
+    }
+
     /**
      * Rebuild a small, valid conversation for one proposal-only timeout retry.
      *
@@ -1058,6 +1460,85 @@ final class ProviderRuntime {
         return new EvidencePackBuilder()->provider_messages($messages, $tool_calls, $user_message, [
             'mode' => 'retry',
         ]);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $tools
+     * @return array{type: string, function: array{name: string}}|string
+     */
+    private function exact_tool_choice(array $tools): array|string {
+        $function = is_array($tools[0]['function'] ?? null) ? $tools[0]['function'] : [];
+        $name = (string) ($function['name'] ?? '');
+
+        if ('' === $name) {
+            return 'required';
+        }
+
+        return [
+            'type' => 'function',
+            'function' => ['name' => $name],
+        ];
+    }
+
+    /**
+     * Keep the compact and unrestricted authoring surfaces separate. A prepared
+     * full-document pattern can only enter the compact proposal tool; an
+     * explicit/no-match fallback retains the raw Gutenberg proposal tool.
+     *
+     * @param array<int, array<string, mixed>> $tool_calls
+     * @param list<string> $current
+     * @return list<string>
+     */
+    private function compose_abilities_for(array $tool_calls, ?TurnProfile $profile, array $current): array {
+        // Pattern preparation is a new-content optimization. It must never
+        // replace the focused edit proposal surface merely because a broad
+        // classifier also noticed the word "page" in the request.
+        if (null !== $profile && TurnProfile::TOOL_COMPOSE !== $profile->tool_profile) {
+            return $profile->compose_allowlist();
+        }
+
+        for ($index = count($tool_calls) - 1; $index >= 0; --$index) {
+            $call = $tool_calls[$index] ?? [];
+
+            if (
+                'success' !== (string) ($call['status'] ?? '')
+                || 'awpt/prepare-pattern-draft' !== (string) ($call['tool'] ?? '')
+            ) {
+                continue;
+            }
+
+            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+
+            return (
+                'pattern' === (string) ($output['mode'] ?? '')
+                    ? ['awpt/propose-patterned-post']
+                    : ['awpt/propose-new-post']
+            );
+        }
+
+        if ([] !== $current) {
+            return $current;
+        }
+
+        return $profile?->compose_allowlist() ?? ['awpt/propose-new-post'];
+    }
+
+    /** @param array<int, array<string, mixed>> $tool_calls @return array<string, mixed> */
+    private function latest_pattern_preparation(array $tool_calls): array {
+        for ($index = count($tool_calls) - 1; $index >= 0; --$index) {
+            $call = $tool_calls[$index] ?? [];
+
+            if (
+                'success' !== (string) ($call['status'] ?? '')
+                || 'awpt/prepare-pattern-draft' !== (string) ($call['tool'] ?? '')
+            ) {
+                continue;
+            }
+
+            return is_array($call['output'] ?? null) ? $call['output'] : [];
+        }
+
+        return [];
     }
 
     /**
@@ -1085,6 +1566,34 @@ final class ProviderRuntime {
         }
 
         return $actions;
+    }
+
+    /**
+     * Keep only live proposal cards when a same-turn correction supersedes a
+     * staged predecessor.
+     *
+     * @param list<array<string, mixed>> $current
+     * @param list<array<string, mixed>> $incoming
+     * @return list<array<string, mixed>>
+     */
+    private function merge_actions(array $current, array $incoming): array {
+        foreach ($incoming as $action) {
+            $removed = array_map(
+                'intval',
+                is_array($action['removed_action_ids'] ?? null) ? $action['removed_action_ids'] : [],
+            );
+            $id = (int) ($action['id'] ?? 0);
+            $current = array_values(array_filter(
+                $current,
+                static fn(array $existing): bool => (
+                    !in_array((int) ($existing['id'] ?? 0), $removed, true)
+                    && ($id <= 0 || $id !== (int) ($existing['id'] ?? 0))
+                ),
+            ));
+            $current[] = $action;
+        }
+
+        return $current;
     }
 
     /**
@@ -1134,6 +1643,66 @@ final class ProviderRuntime {
         }
 
         return array_reverse($unresolved);
+    }
+
+    /** @param array<int, array<string, mixed>> $tool_calls */
+    private function latest_proposal_failure_code(array $tool_calls): string {
+        for ($index = count($tool_calls) - 1; $index >= 0; --$index) {
+            $call = $tool_calls[$index] ?? [];
+
+            if (
+                'failed' !== (string) ($call['status'] ?? '')
+                || !ToolRegistry::is_proposal_ability((string) ($call['tool'] ?? ''))
+            ) {
+                continue;
+            }
+
+            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+
+            return sanitize_key((string) ($output['error_code'] ?? ''));
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $tool_calls
+     * @param list<array<string, mixed>>       $actions
+     * @return array{status: string, message: string, error_code?: string}
+     */
+    private function turn_outcome(array $tool_calls, array $actions, string $content): array {
+        if ([] !== $actions) {
+            return [
+                'status' => 'staged',
+                'message' => __('A validated proposal was staged.', 'agent-wordpress-terminal'),
+            ];
+        }
+
+        $failures = array_values(array_filter(
+            $this->unresolved_tool_failures($tool_calls),
+            static fn(array $call): bool => ToolRegistry::is_proposal_ability((string) ($call['tool'] ?? '')),
+        ));
+
+        if ([] !== $failures) {
+            $failure = $failures[count($failures) - 1];
+            $output = is_array($failure['output'] ?? null) ? $failure['output'] : [];
+            $message = trim((string) ($output['error'] ?? $content));
+
+            return [
+                'status' => 'failed',
+                'error_code' => sanitize_key((string) ($output['error_code'] ?? 'awpt_proposal_failed')),
+                'message' => '' !== $message
+                    ? $message
+                    : __('The requested change could not be staged.', 'agent-wordpress-terminal'),
+            ];
+        }
+
+        return [
+            'status' => 'no_change',
+            'message' => '' !== trim($content)
+                ? trim($content)
+                : __('The agent completed without proposing a change.', 'agent-wordpress-terminal'),
+        ];
     }
 
     /** @param array<string, mixed> $call */

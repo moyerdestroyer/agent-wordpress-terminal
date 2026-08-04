@@ -81,7 +81,15 @@ final class ContentUpdateActionApplier {
         $operation = (string) ($payload['operation'] ?? ActionOperations::CONTENT_UPDATE);
 
         if (
-            in_array($operation, [ActionOperations::TEMPLATE_UPDATE, ActionOperations::GLOBAL_STYLES_UPDATE], true)
+            in_array(
+                $operation,
+                [
+                    ActionOperations::TEMPLATE_UPDATE,
+                    ActionOperations::GLOBAL_STYLES_UPDATE,
+                    ActionOperations::NAVIGATION_UPDATE,
+                ],
+                true,
+            )
             && !current_user_can('edit_theme_options')
         ) {
             return new \WP_Error(
@@ -191,8 +199,8 @@ final class ContentUpdateActionApplier {
         if (
             array_key_exists('post_content', $payload)
             && array_key_exists('original_post_content', $payload)
-            && (string) $payload['original_post_content'] !== $post->post_content
-            && (string) $payload['post_content'] !== $post->post_content
+            && !$this->equivalent_content((string) $payload['original_post_content'], $post->post_content)
+            && !$this->equivalent_content((string) $payload['post_content'], $post->post_content)
         ) {
             return 'the content';
         }
@@ -228,6 +236,17 @@ final class ContentUpdateActionApplier {
         }
 
         return null;
+    }
+
+    private function equivalent_content(string $left, string $right): bool {
+        if ($left === $right) {
+            return true;
+        }
+
+        // WordPress and transport sanitizers may add or remove an otherwise
+        // meaningless final line break. Ignore only trailing ASCII whitespace;
+        // every block, byte, and internal whitespace run remains conflict-sensitive.
+        return rtrim($left, " \t\n\r\0\x0B") === rtrim($right, " \t\n\r\0\x0B");
     }
 
     private function meta_scalar(mixed $value): string {

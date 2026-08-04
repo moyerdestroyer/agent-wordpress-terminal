@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AgentFeedback;
+use AWPT\Domain\PatternTemplateExpander;
 use AWPT\Support\BlockTree;
 use AWPT\Support\PatternCatalog;
 
@@ -81,13 +83,50 @@ final class ReadPattern implements AbilityInterface {
             );
         }
 
-        $content = (string) ($pattern['content'] ?? '');
+        $source_content = (string) ($pattern['content'] ?? '');
+        $expanded = new PatternTemplateExpander($catalog)->expand($name);
+        $content = is_wp_error($expanded) ? $source_content : $expanded;
         $tree = BlockTree::from_content($content);
+        $summary = $catalog->summary($pattern);
+        $domain = is_array($summary['domain'] ?? null) ? $summary['domain'] : [];
 
-        return array_merge($catalog->summary($pattern), [
+        return array_merge($summary, [
             'content' => $content,
+            'source_content' => $source_content,
+            'content_mode' => is_wp_error($expanded) ? 'source' : 'expanded_editable',
             'blocks' => $tree->normalized(),
             'design_dependencies' => $catalog->design_dependencies($content),
+            'adaptation_contract' => [
+                'preferred_mode' => 'materialized',
+                'authoring' => __(
+                    'For ordinary pages, use exact pattern_replacements against this expanded editable content and append only genuinely new blocks. Use adapted mode when a complete custom document is warranted.',
+                    'agent-wordpress-terminal',
+                ),
+                'structural_dependencies' => is_array($domain['required_blocks'] ?? null)
+                    ? $domain['required_blocks']
+                    : [],
+                'server_behavior' => __(
+                    'If an adapted draft omits a declared structural dependency entirely, AWPT restores the exact source block before validation. A draft without pattern_name remains fully freeform.',
+                    'agent-wordpress-terminal',
+                ),
+            ],
+            'agent_feedback' => AgentFeedback::make(
+                'ready',
+                __('The exact pattern structure is available for adaptation or insertion.', 'agent-wordpress-terminal'),
+                [
+                    'next_actions' => [[
+                        'ability' => 'awpt/validate-composition',
+                        'reason' => __(
+                            'Validate the complete adapted composition before staging.',
+                            'agent-wordpress-terminal',
+                        ),
+                        'input' => [
+                            'content' => '<complete adapted block markup>',
+                            'pattern_name' => $name,
+                        ],
+                    ]],
+                ],
+            ),
         ]);
     }
 }

@@ -10,11 +10,11 @@ declare(strict_types=1);
 
 use AWPT\Support\PatternCompositionPolicy;
 
-function test_pattern_composition_policy_defaults_named_pattern_to_adapted(): void {
+function test_pattern_composition_policy_defaults_named_pattern_to_materialized(): void {
     $policy = new PatternCompositionPolicy();
 
     Assert::same(
-        PatternCompositionPolicy::MODE_ADAPTED,
+        PatternCompositionPolicy::MODE_MATERIALIZED,
         $policy->resolve_mode('', 'theme/hero'),
         'omitted mode with a pattern name must default to adapted',
     );
@@ -128,6 +128,6 @@ function test_pattern_composition_policy_detects_raw_pattern_twins(): void {
     );
 }
 
-test_pattern_composition_policy_defaults_named_pattern_to_adapted();
+test_pattern_composition_policy_defaults_named_pattern_to_materialized();
 test_pattern_composition_policy_prepends_only_for_short_tail();
 test_pattern_composition_policy_detects_raw_pattern_twins();

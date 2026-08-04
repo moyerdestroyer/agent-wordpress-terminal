@@ -1,0 +1,162 @@
+.awpt-review-bridge {
+	color: #1d2327;
+}
+.awpt-review-bridge__primary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1.5rem;
+	padding: 1rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 12px;
+	background: #f6f7f7;
+}
+.awpt-review-bridge__primary > div {
+	max-width: 70ch;
+}
+.awpt-review-bridge__primary h2 {
+	margin: 0;
+	font-size: 1.15rem;
+}
+.awpt-review-bridge__primary p {
+	margin: 0.35rem 0 0;
+	color: #50575e;
+	line-height: 1.5;
+}
+.awpt-review-bridge__primary .components-button {
+	flex: 0 0 auto;
+}
+.awpt-review-bridge__transcript {
+	max-height: 18rem;
+	overflow: auto;
+	margin-top: 0.75rem;
+	padding: 0.25rem 0;
+}
+.awpt-review-bridge__message {
+	margin-bottom: 0.75rem;
+}
+.awpt-review-bridge__message:last-child {
+	margin-bottom: 0;
+}
+.awpt-review-bridge__message strong {
+	font-size: 0.78rem;
+	color: #50575e;
+	text-transform: uppercase;
+}
+.awpt-review-bridge__message p {
+	margin: 0.2rem 0 0;
+	white-space: pre-wrap;
+}
+.awpt-review-bridge__message.is-user p {
+	color: #1d5fa3;
+}
+.awpt-review-bridge__progress {
+	--awpt-text: #1d2327;
+	--awpt-muted: #50575e;
+	--awpt-accent: #2271b1;
+	--awpt-progress-timing: #646970;
+	--awpt-progress-track: #dcdcde;
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #fff;
+}
+.awpt-review-bridge__action {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 0.75rem;
+	padding: 0.75rem;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+}
+.awpt-review-bridge > .components-notice {
+	margin: 1rem 0 0;
+}
+.awpt-review-bridge > .components-notice p {
+	margin: 0.35rem 0;
+}
+.awpt-review-bridge__error-code {
+	display: inline-block;
+	max-width: 100%;
+	overflow-wrap: anywhere;
+	margin-block-start: 0.25rem;
+}
+.awpt-review-bridge__recovery-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-block-start: 0.75rem;
+}
+.awpt-review-bridge__action p {
+	margin: 0.25rem 0 0;
+	color: #50575e;
+}
+.awpt-review-bridge__action > div:last-child {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.awpt-review-bridge__requires-terminal {
+	color: #50575e;
+	font-size: 0.8rem;
+	font-weight: 500;
+	white-space: nowrap;
+}
+.awpt-review-bridge__action .awpt-action-diff {
+	margin-top: 0.75rem;
+}
+.awpt-review-bridge__composer {
+	display: grid;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+.awpt-review-bridge__composer .components-button {
+	justify-self: end;
+}
+.awpt-review-bridge__loading {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 8rem;
+	color: #50575e;
+}
+.awpt-review-bridge__unconfigured p {
+	margin: 0.35rem 0 0;
+	color: #50575e;
+}
+.awpt-review-bridge__disclosure {
+	margin-top: 1rem;
+	border-top: 1px solid #dcdcde;
+	padding-top: 0.85rem;
+}
+.awpt-review-bridge__disclosure summary {
+	display: inline-flex;
+	align-items: center;
+	min-height: 32px;
+	color: #1d5fa3;
+	font-weight: 600;
+	cursor: pointer;
+}
+.awpt-review-bridge__disclosure summary:hover {
+	color: #135e96;
+}
+.awpt-review-bridge__disclosure summary:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+@media (max-width: 782px) {
+	.awpt-review-bridge__primary {
+		display: block;
+	}
+	.awpt-review-bridge__primary .components-button {
+		margin-top: 0.85rem;
+	}
+	.awpt-review-bridge__action {
+		display: block;
+	}
+	.awpt-review-bridge__action > div:last-child {
+		margin-top: 0.75rem;
+	}
+}

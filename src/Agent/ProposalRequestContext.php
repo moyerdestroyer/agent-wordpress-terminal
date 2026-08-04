@@ -25,7 +25,7 @@ final class ProposalRequestContext {
      * @param array<array-key, mixed> $input
      * @return array<array-key, mixed>
      */
-    public function enrich(int $session_id, array $input, array $turn_context = []): array {
+    public function enrich(int $session_id, array $input, array $turn_context = [], string $tool_name = ''): array {
         $turn_id = sanitize_key((string) ($turn_context['turn_id'] ?? ''));
 
         if ('' !== $turn_id) {
@@ -86,7 +86,128 @@ final class ProposalRequestContext {
             }
         }
 
-        return $this->enrich_content_edit_defaults($session_id, $input, $turn_context);
+        if ($this->is_existing_content_ability($tool_name)) {
+            $input = $this->enrich_content_edit_defaults($session_id, $input, $turn_context);
+
+            if (true === ($turn_context['presentation_requires_h1'] ?? false)) {
+                $input['presentation_requires_h1'] = true;
+            }
+        } else {
+            $input = $this->enrich_action_card_defaults($session_id, $input, $turn_context);
+        }
+        $user_message = trim((string) ($turn_context['user_message'] ?? ''));
+
+        if ('' === $user_message && $session_id > 0) {
+            $user_message = trim(new MessageRepository()->latest_user_message($session_id));
+        }
+
+        return $this->ground_composition_minimums($input, $user_message);
+    }
+
+    private function is_existing_content_ability(string $tool_name): bool {
+        // Keep direct callers of the context helper backward-compatible. The
+        // runtime always supplies a concrete ability name.
+        if ('' === $tool_name) {
+            return true;
+        }
+
+        return in_array(
+            $tool_name,
+            [
+                'awpt/propose-content-update',
+                'awpt/propose-block-attrs-update',
+                'awpt/propose-block-batch-update',
+                'awpt/propose-block-insert',
+                'awpt/propose-block-remove',
+                'awpt/propose-pattern-insert',
+            ],
+            true,
+        );
+    }
+
+    /**
+     * Creation abilities still benefit from reliable action-card labels, but a
+     * focused session must not silently turn their new draft into a page edit.
+     *
+     * @param array<array-key, mixed> $input
+     * @param array<array-key, mixed> $turn_context
+     * @return array<array-key, mixed>
+     */
+    private function enrich_action_card_defaults(int $session_id, array $input, array $turn_context): array {
+        $user_message = trim((string) ($turn_context['user_message'] ?? ''));
+
+        if ('' === $user_message && $session_id > 0) {
+            $user_message = trim(new MessageRepository()->latest_user_message($session_id));
+        }
+
+        $default_label = $this->default_action_label($user_message, 0);
+
+        if ('' === trim((string) ($input['title'] ?? ''))) {
+            $input['title'] = $default_label;
+        }
+
+        if ('' === trim((string) ($input['description'] ?? ''))) {
+            $input['description'] = '' !== $user_message ? $user_message : $default_label;
+        }
+
+        return $input;
+    }
+
+    /**
+     * Minimum-count fields are validation constraints, not creative wishes.
+     * Accept them only when the user supplied an exact count; otherwise a model
+     * can accidentally turn its own decorative idea into a staging blocker.
+     *
+     * @param array<array-key, mixed> $input
+     * @return array<array-key, mixed>
+     */
+    private function ground_composition_minimums(array $input, string $user_message): array {
+        $image_count = $this->explicit_count($user_message, '(?:media\s+library\s+)?(?:images?|photos?|pictures?)');
+        $visual_count = $this->explicit_count($user_message, '(?:visuals?|icons?|illustrations?)');
+
+        if (null === $image_count) {
+            unset($input['required_minimum_library_images']);
+        } else {
+            $input['required_minimum_library_images'] = $image_count;
+        }
+
+        if (null === $visual_count) {
+            unset($input['required_minimum_visuals']);
+        } else {
+            $input['required_minimum_visuals'] = $visual_count;
+        }
+
+        return $input;
+    }
+
+    private function explicit_count(string $message, string $noun_pattern): ?int {
+        $matches = [];
+
+        if (!preg_match(
+            '/\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:distinct\s+|different\s+)?'
+            . $noun_pattern
+            . '\b/i',
+            $message,
+            $matches,
+        )) {
+            return null;
+        }
+
+        $raw = strtolower((string) ($matches[1] ?? ''));
+        $words = [
+            'one' => 1,
+            'two' => 2,
+            'three' => 3,
+            'four' => 4,
+            'five' => 5,
+            'six' => 6,
+            'seven' => 7,
+            'eight' => 8,
+            'nine' => 9,
+            'ten' => 10,
+        ];
+
+        return max(1, min(100, $words[$raw] ?? (int) $raw));
     }
 
     /**

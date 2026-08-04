@@ -79,6 +79,15 @@ final class KnowledgePostSourceMapper {
                 'post_type' => $post->post_type,
                 'status' => $post->post_status,
                 'knowledge_types' => $types,
+                'awpt_pack_id' => sanitize_key((string) get_post_meta($post->ID, '_awpt_pack_id', true)),
+                'awpt_guidance_id' => sanitize_key((string) get_post_meta($post->ID, '_awpt_guidance_id', true)),
+                'awpt_override_mode' => in_array(
+                    (string) get_post_meta($post->ID, '_awpt_override_mode', true),
+                    ['replace', 'extend'],
+                    true,
+                )
+                    ? (string) get_post_meta($post->ID, '_awpt_override_mode', true)
+                    : 'extend',
             ],
         ];
     }

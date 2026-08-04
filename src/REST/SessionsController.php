@@ -40,6 +40,10 @@ final class SessionsController extends RestController {
                 'methods' => \WP_REST_Server::CREATABLE,
                 'callback' => [$this, 'create_session'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'focus_post_id' => ['type' => 'integer', 'default' => 0],
+                    'reuse_focus' => ['type' => 'boolean', 'default' => false],
+                ],
             ],
         ]);
 
@@ -91,12 +95,30 @@ final class SessionsController extends RestController {
      */
     public function create_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $title = sanitize_text_field(RequestParams::string($request, 'title'));
+        $focus_post_id = RequestParams::int($request, 'focus_post_id');
+        $reuse_focus = RequestParams::boolean($request, 'reuse_focus');
+
+        if ($focus_post_id > 0 && !current_user_can('edit_post', $focus_post_id)) {
+            return new \WP_Error(
+                code: 'awpt_session_focus_forbidden',
+                message: __('You cannot start an agent session for this content.', 'agent-wordpress-terminal'),
+                data: ['status' => 403],
+            );
+        }
 
         if ('' === $title) {
             $title = __('New session', 'agent-wordpress-terminal');
         }
 
-        $created = $this->sessions->create($title);
+        if ($reuse_focus && $focus_post_id > 0) {
+            $existing = $this->sessions->find_by_focus($focus_post_id);
+
+            if (null !== $existing) {
+                return new \WP_REST_Response($existing, status: 200);
+            }
+        }
+
+        $created = $this->sessions->create($title, $focus_post_id);
 
         if ([] === $created) {
             return new \WP_Error(

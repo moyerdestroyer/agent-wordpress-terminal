@@ -92,6 +92,68 @@ function test_provider_executor_transports_scalar_ability_input_and_output(): vo
     );
 }
 
+function test_provider_executor_rejects_multiple_proposals_before_staging_anything(): void {
+    awpt_test_reset_state();
+    $executions = 0;
+    add_filter('awpt_mcp_tools', static fn(): array => [
+        [
+            'name' => 'awpt/propose-content-update',
+            'description' => 'Stage complete content.',
+            'readonly' => false,
+            'destructive' => false,
+            'requires_approval' => true,
+        ],
+        [
+            'name' => 'awpt/propose-block-insert',
+            'description' => 'Stage a block insertion.',
+            'readonly' => false,
+            'destructive' => false,
+            'requires_approval' => true,
+        ],
+    ]);
+    add_filter('awpt_mcp_execute_tool', static function (mixed $result) use (&$executions): mixed {
+        ++$executions;
+
+        return $result;
+    });
+    $execution = new ProviderToolCallExecutor()->execute(
+        [
+            [
+                'id' => 'proposal-one',
+                'function' => [
+                    'name' => 'awpt__propose_content_update',
+                    'arguments' => '{"post_id":580}',
+                ],
+            ],
+            [
+                'id' => 'proposal-two',
+                'function' => [
+                    'name' => 'awpt__propose_block_insert',
+                    'arguments' => '{"post_id":580}',
+                ],
+            ],
+        ],
+        new ToolRegistry(),
+        1,
+    );
+
+    Assert::same(0, $executions, 'a competing proposal batch must not stage its first mutation');
+    Assert::same(2, count($execution['messages']), 'every provider call still needs a matching tool response');
+    Assert::true(
+        array_reduce(
+            $execution['tool_calls'],
+            static fn(bool $valid, array $call): bool => (
+                $valid
+                && 'failed' === ($call['status'] ?? '')
+                && 'awpt_multiple_proposals' === ($call['output']['error_code'] ?? '')
+            ),
+            true,
+        ),
+        'every competing proposal should receive the same atomicity correction',
+    );
+}
+
 test_provider_executor_rejects_tools_not_offered_on_the_request();
 test_find_abilities_returns_safe_names_for_next_round_activation();
 test_provider_executor_transports_scalar_ability_input_and_output();
+test_provider_executor_rejects_multiple_proposals_before_staging_anything();

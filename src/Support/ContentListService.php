@@ -94,7 +94,7 @@ final class ContentListService {
         $total = $include_total ? (int) $query->found_posts : $count;
         $inventory = $include_totals ? $this->inventory($post_types) : ['by_status' => [], 'by_type' => []];
 
-        return [
+        $result = [
             'post_type' => $post_type,
             'post_types' => $post_types,
             'status' => $status,
@@ -106,6 +106,21 @@ final class ContentListService {
             'totals_by_status' => $inventory['by_status'],
             'totals_by_type' => $this->should_include_type_totals($post_type, $post_types) ? $inventory['by_type'] : [],
         ];
+
+        if ($attachment_only && 0 === $count && '' !== (string) ($filters['search'] ?? '')) {
+            $fallback = $this->list(array_merge($input, [
+                'search' => '',
+                'offset' => 0,
+                'limit' => min(12, max(1, (int) ($filters['limit'] ?? 20))),
+            ]));
+            $result['fallback_items'] = $fallback['items'] ?? [];
+            $result['fallback_reason'] = __(
+                'No Media Library filename or title matched the requested name. Review these recent assets because library labels are often generic.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -175,7 +190,7 @@ final class ContentListService {
     private function item_from_post(\WP_Post $post): array {
         $author_id = (int) $post->post_author;
 
-        return [
+        $item = [
             'id' => $post->ID,
             'title' => get_the_title($post),
             'type' => $post->post_type,
@@ -189,6 +204,13 @@ final class ContentListService {
             'url' => get_permalink($post),
             'edit_url' => (string) get_edit_post_link($post->ID, 'raw'),
         ];
+
+        if ('attachment' === $post->post_type) {
+            $item['mime_type'] = (string) get_post_mime_type($post->ID);
+            $item['media_url'] = (string) wp_get_attachment_url($post->ID);
+        }
+
+        return $item;
     }
 
     private function author_display_name(int $author_id): string {

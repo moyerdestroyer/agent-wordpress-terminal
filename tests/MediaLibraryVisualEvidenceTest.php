@@ -119,7 +119,37 @@ function test_media_library_visual_evidence_skips_unreadable_private_urls(): voi
     );
 }
 
+function test_media_library_visual_evidence_supports_pattern_preparation_media(): void {
+    awpt_test_reset_state();
+    $fixture = sys_get_temp_dir() . '/awpt-prepared-media-' . getmypid() . '.png';
+    file_put_contents($fixture, 'fake-image-bytes');
+    $attachment = new WP_Post();
+    $attachment->ID = 128;
+    $attachment->post_type = 'attachment';
+    $GLOBALS['awpt_test_posts'][128] = $attachment;
+    $GLOBALS['awpt_test_attachment_is_image'][128] = true;
+    $GLOBALS['awpt_test_attached_files'][128] = $fixture;
+    $GLOBALS['awpt_test_attachment_mime_types'][128] = 'image/png';
+    $GLOBALS['awpt_test_attachment_urls'][128] = 'http://awpt-testing.totem:8080/uploads/image.png';
+
+    $message = new MediaLibraryVisualEvidence()->build(
+        'awpt/prepare-pattern-draft',
+        ['media_count' => 1],
+        ['media' => [['id' => 128, 'title' => 'image']]],
+    );
+
+    Assert::true(is_array($message), 'prepared media should produce visual evidence');
+    Assert::same(
+        'image_url',
+        $message['content'][2]['type'] ?? '',
+        'prepared media should include local image bytes for visual identification',
+    );
+
+    @unlink($fixture);
+}
+
 test_media_library_visual_evidence_rejects_private_hosts();
 test_media_library_visual_evidence_prefers_data_urls_for_composer_attachments();
 test_media_library_visual_evidence_preserves_images_for_deepseek_sidecar();
 test_media_library_visual_evidence_skips_unreadable_private_urls();
+test_media_library_visual_evidence_supports_pattern_preparation_media();

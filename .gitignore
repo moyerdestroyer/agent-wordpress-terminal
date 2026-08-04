@@ -5,4 +5,5 @@
 /.env
 /mago
 /dist/
+/ol/
 *.zip

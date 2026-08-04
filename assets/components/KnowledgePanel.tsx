@@ -1,14 +1,22 @@
-import { Button, TextareaControl, TextControl, ToggleControl } from '@wordpress/components';
-import { useEffect, useState } from '@wordpress/element';
-import { __, sprintf } from '@wordpress/i18n';
 import {
+	Button,
+	SearchControl,
+	TextareaControl,
+	TextControl,
+	ToggleControl,
+} from '@wordpress/components';
+import { useEffect, useState } from '@wordpress/element';
+import { __, _n, sprintf } from '@wordpress/i18n';
+import {
+	getDomainPacks,
 	getKnowledgeSettings,
 	getKnowledgeStatus,
 	processKnowledge,
 	rebuildKnowledge,
+	updateDomainPacks,
 	updateKnowledgeSettings,
 } from '../api';
-import type { KnowledgeSettings, KnowledgeStatus } from '../types';
+import type { DomainPacksResponse, KnowledgeSettings, KnowledgeStatus } from '../types';
 
 function formatBytes(value: number): string {
 	if (value >= 1048576) {
@@ -101,10 +109,12 @@ function knowledgeSourceRows(status: KnowledgeStatus | null): Array<{
 export function KnowledgePanel(): JSX.Element {
 	const [status, setStatus] = useState<KnowledgeStatus | null>(null);
 	const [settings, setSettings] = useState<KnowledgeSettings | null>(null);
+	const [domainPacks, setDomainPacks] = useState<DomainPacksResponse | null>(null);
 	const [rootsText, setRootsText] = useState('');
 	const [maxFileSize, setMaxFileSize] = useState('2097152');
 	const [embeddingsEnabled, setEmbeddingsEnabled] = useState(true);
 	const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small');
+	const [patternSearch, setPatternSearch] = useState('');
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [isRebuilding, setIsRebuilding] = useState(false);
@@ -114,11 +124,29 @@ export function KnowledgePanel(): JSX.Element {
 		status?.progress.state === 'discovering' ||
 		status?.progress.state === 'indexing';
 	const progress = status?.progress;
+	const activePackCount = domainPacks?.packs.filter((pack) => pack.enabled).length ?? 0;
+	const visiblePatterns = (domainPacks?.patterns ?? []).filter((pattern) => {
+		const query = patternSearch.trim().toLowerCase();
+		const pack = domainPacks?.packs.find((item) => item.id === pattern.pack_id);
+
+		if (!pack?.enabled) {
+			return false;
+		}
+
+		return (
+			query === '' ||
+			[pattern.name, pattern.title, pattern.role, pattern.summary, ...pattern.intents]
+				.join(' ')
+				.toLowerCase()
+				.includes(query)
+		);
+	});
 
 	const refresh = async (): Promise<KnowledgeStatus> => {
-		const [nextStatus, nextSettings] = await Promise.all([
+		const [nextStatus, nextSettings, nextDomainPacks] = await Promise.all([
 			getKnowledgeStatus(),
 			getKnowledgeSettings(),
+			getDomainPacks(),
 		]);
 		setStatus(nextStatus);
 		setSettings(nextSettings);
@@ -126,6 +154,7 @@ export function KnowledgePanel(): JSX.Element {
 		setMaxFileSize(String(nextSettings.max_file_size));
 		setEmbeddingsEnabled(Boolean(nextSettings.embeddings_enabled));
 		setEmbeddingModel(nextSettings.embedding_model || 'text-embedding-3-small');
+		setDomainPacks(nextDomainPacks);
 
 		return nextStatus;
 	};
@@ -216,6 +245,13 @@ export function KnowledgePanel(): JSX.Element {
 		}
 	};
 
+	const handlePackToggle = async (packId: string, enabled: boolean): Promise<void> => {
+		const disabled = (domainPacks?.packs ?? [])
+			.filter((pack) => (!pack.enabled && pack.id !== packId) || (pack.id === packId && !enabled))
+			.map((pack) => pack.id);
+		setDomainPacks(await updateDomainPacks(disabled));
+	};
+
 	if (isLoading) {
 		return <p className="awpt-empty">{__('Loading Knowledge…', 'agent-wordpress-terminal')}</p>;
 	}
@@ -282,6 +318,178 @@ export function KnowledgePanel(): JSX.Element {
 					</li>
 				))}
 			</ul>
+
+			{(domainPacks?.packs.length ?? 0) > 0 ? (
+				<details className="awpt-domain-packs">
+					<summary>
+						<span className="awpt-domain-packs__title">
+							{__('Theme expertise', 'agent-wordpress-terminal')}
+						</span>
+						<span className="awpt-domain-packs__count">
+							{sprintf(
+								/* translators: %d: number of enabled Domain Packs */
+								_n(
+									'%d active pack',
+									'%d active packs',
+									activePackCount,
+									'agent-wordpress-terminal',
+								),
+								activePackCount,
+							)}
+						</span>
+					</summary>
+					<div className="awpt-domain-packs__body">
+						<p className="awpt-empty awpt-domain-packs__intro">
+							{__(
+								'Domain Packs provide versioned pattern, design, and editorial guidance. They never bypass review or permissions.',
+								'agent-wordpress-terminal',
+							)}
+						</p>
+						{domainPacks?.packs.map((pack) => (
+							<div className="awpt-domain-pack" key={pack.id}>
+								<ToggleControl
+									label={`${pack.label} ${pack.version}`}
+									help={sprintf(
+										/* translators: 1: source, 2: guideline count, 3: rule count */
+										__(
+											'%1$s theme · %2$d guidance modules · %3$d declarative rules',
+											'agent-wordpress-terminal',
+										),
+										pack.source,
+										pack.guidance_count,
+										domainPacks.health.find((health) => health.pack_id === pack.id)?.rule_count ??
+											0,
+									)}
+									checked={pack.enabled}
+									onChange={(enabled) => void handlePackToggle(pack.id, enabled)}
+								/>
+								{domainPacks.health.find((health) => health.pack_id === pack.id) ? (
+									<p className="awpt-empty">
+										{(() => {
+											const health = domainPacks.health.find((item) => item.pack_id === pack.id);
+											if (!health) {
+												return '';
+											}
+											const coverage = health.pattern_coverage;
+											const detail = sprintf(
+												/* translators: 1: health status, 2: enriched pattern count, 3: registered pattern count */
+												__('%1$s · %2$d/%3$d patterns enriched', 'agent-wordpress-terminal'),
+												health.status,
+												coverage.enriched,
+												coverage.registered,
+											);
+											const issue = health.issues.find(
+												(item) => item.severity === 'error' || item.severity === 'warning',
+											);
+											return issue ? `${detail} · ${issue.message}` : detail;
+										})()}
+									</p>
+								) : null}
+							</div>
+						))}
+						<details className="awpt-pattern-catalog">
+							<summary>
+								<span>{__('Pattern catalog', 'agent-wordpress-terminal')}</span>
+								<strong>
+									{sprintf(
+										/* translators: %d: number of patterns in enabled Domain Packs */
+										__('%d patterns', 'agent-wordpress-terminal'),
+										(domainPacks?.patterns ?? []).filter((pattern) =>
+											domainPacks?.packs.some(
+												(pack) => pack.id === pattern.pack_id && pack.enabled,
+											),
+										).length,
+									)}
+								</strong>
+							</summary>
+							<div className="awpt-pattern-catalog__body">
+								<SearchControl
+									label={__('Search theme patterns', 'agent-wordpress-terminal')}
+									value={patternSearch}
+									onChange={setPatternSearch}
+									placeholder={__('Search by purpose, role, or name', 'agent-wordpress-terminal')}
+								/>
+								{visiblePatterns.length > 0 ? (
+									<ul className="awpt-pattern-catalog__list">
+										{visiblePatterns.map((pattern) => (
+											<li key={pattern.name} className="awpt-pattern-card">
+												{pattern.preview_url ? (
+													<a
+														className="awpt-pattern-card__preview"
+														href={pattern.preview_url}
+														target="_blank"
+														rel="noreferrer"
+														aria-label={sprintf(
+															/* translators: %s: pattern title */
+															__('Open %s preview', 'agent-wordpress-terminal'),
+															pattern.title,
+														)}
+													>
+														<img
+															src={pattern.preview_url}
+															alt={pattern.preview_alt}
+															loading="lazy"
+														/>
+													</a>
+												) : (
+													<div className="awpt-pattern-card__fallback" aria-hidden="true">
+														<span />
+														<span />
+														<span />
+													</div>
+												)}
+												<div className="awpt-pattern-card__content">
+													<div className="awpt-pattern-card__heading">
+														<strong>{pattern.title}</strong>
+														<span>{pattern.role.replaceAll('-', ' ')}</span>
+													</div>
+													<p>{pattern.summary || pattern.description}</p>
+													<code>{pattern.name}</code>
+													<div className="awpt-pattern-card__facts">
+														<span>
+															{sprintf(
+																/* translators: %d: block count */
+																__('%d blocks', 'agent-wordpress-terminal'),
+																pattern.block_count,
+															)}
+														</span>
+														<span>
+															{sprintf(
+																/* translators: %d: editable slot count */
+																__('%d slots', 'agent-wordpress-terminal'),
+																pattern.slot_count,
+															)}
+														</span>
+														{pattern.dynamic_content ? (
+															<span>{__('Dynamic', 'agent-wordpress-terminal')}</span>
+														) : null}
+													</div>
+												</div>
+											</li>
+										))}
+									</ul>
+								) : (
+									<p className="awpt-empty">
+										{__('No enabled theme patterns match this search.', 'agent-wordpress-terminal')}
+									</p>
+								)}
+							</div>
+						</details>
+						<p className="awpt-empty awpt-domain-packs__footer">
+							{domainPacks?.knowledge_backend
+								? sprintf(
+										/* translators: %s: WordPress Knowledge backend */
+										__('Site overrides can use %s.', 'agent-wordpress-terminal'),
+										domainPacks.knowledge_backend,
+									)
+								: __(
+										'Theme defaults are active. Site-level guideline overrides require WordPress Knowledge or Guidelines.',
+										'agent-wordpress-terminal',
+									)}
+						</p>
+					</div>
+				</details>
+			) : null}
 
 			<dl className="awpt-knowledge-status">
 				<div>

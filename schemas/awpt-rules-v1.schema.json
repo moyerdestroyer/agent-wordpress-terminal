@@ -1,0 +1,43 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://awpt.dev/schemas/awpt-rules-v1.json",
+	"title": "AWPT Declarative Domain Rules",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schema_version", "rules"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"schema_version": { "const": 1 },
+		"rules": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["id", "type", "message"],
+				"properties": {
+					"id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+					"type": {
+						"enum": [
+							"blocks.disallow",
+							"blocks.require",
+							"blocks.count",
+							"headings.single_h1",
+							"headings.no_skips",
+							"anchors.unique",
+							"attributes.require",
+							"patterns.max",
+							"patterns.require_blocks",
+							"tokens.require_presets"
+						]
+					},
+					"severity": { "enum": ["error", "warning", "info"] },
+					"scope": { "type": "array", "items": { "type": "string" } },
+					"config": { "type": "object" },
+					"message": { "type": "string", "minLength": 1 },
+					"suggestion": { "type": "string" },
+					"docs": { "type": "string" }
+				}
+			}
+		}
+	}
+}

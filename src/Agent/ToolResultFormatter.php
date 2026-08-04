@@ -253,6 +253,13 @@ final class ToolResultFormatter {
         $tool = (string) ($tool_call['tool'] ?? '');
         $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
         $error = (string) ($output['error'] ?? $tool_call['status'] ?? 'failed');
+        $error_data = is_array($output['error_data'] ?? null) ? $output['error_data'] : [];
+        $feedback = is_array($error_data['agent_feedback'] ?? null) ? $error_data['agent_feedback'] : [];
+        $summary = trim((string) ($feedback['summary'] ?? ''));
+
+        if ('' !== $summary) {
+            $error .= ' ' . $summary;
+        }
 
         return sprintf(
             /* translators: 1: tool name, 2: error message */

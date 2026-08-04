@@ -1,0 +1,120 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://awpt.dev/schemas/awpt-patterns-v2.json",
+	"title": "AWPT Pattern Catalog v2",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schema_version", "patterns"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"schema_version": { "const": 2 },
+		"patterns": {
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/pattern" }
+		}
+	},
+	"$defs": {
+		"stringList": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1 },
+			"uniqueItems": true
+		},
+		"pattern": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["role", "summary", "intents", "search_terms"],
+			"properties": {
+				"role": { "type": "string" },
+				"summary": { "type": "string" },
+				"intents": { "$ref": "#/$defs/stringList" },
+				"use_when": { "$ref": "#/$defs/stringList" },
+				"avoid_when": { "$ref": "#/$defs/stringList" },
+				"search_terms": { "$ref": "#/$defs/stringList" },
+				"post_types": { "$ref": "#/$defs/stringList" },
+				"companions": { "$ref": "#/$defs/stringList" },
+				"composed": { "$ref": "#/$defs/stringList" },
+				"dynamic_content": { "type": "boolean" },
+				"required_blocks": { "$ref": "#/$defs/stringList" },
+				"max_per_document": { "type": "integer", "minimum": 0 },
+				"content_rules": { "$ref": "#/$defs/ruleMap" },
+				"validation": { "$ref": "#/$defs/ruleMap" },
+				"docs": { "type": "string" },
+				"placement": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"regions": { "$ref": "#/$defs/stringList" },
+						"recommended_position": { "type": "string" },
+						"conflicts_with_roles": { "$ref": "#/$defs/stringList" }
+					}
+				},
+				"relationships": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"alternatives": { "$ref": "#/$defs/stringList" },
+						"recommended_before": { "$ref": "#/$defs/stringList" },
+						"recommended_after": { "$ref": "#/$defs/stringList" },
+						"conflicts": { "$ref": "#/$defs/stringList" }
+					}
+				},
+				"slots": {
+					"type": "array",
+					"items": { "$ref": "#/$defs/slot" }
+				},
+				"design": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"width": { "type": "string" },
+						"background_roles": { "$ref": "#/$defs/stringList" },
+						"foreground_roles": { "$ref": "#/$defs/stringList" },
+						"spacing_register": { "type": "string" },
+						"block_styles": { "$ref": "#/$defs/stringList" },
+						"notes": { "$ref": "#/$defs/stringList" }
+					}
+				},
+				"dependencies": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"block_names": { "$ref": "#/$defs/stringList" },
+						"custom_block_names": { "$ref": "#/$defs/stringList" }
+					}
+				},
+				"preview": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"image": { "type": "string" },
+						"alt": { "type": "string" }
+					}
+				}
+			}
+		},
+		"slot": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "type"],
+			"properties": {
+				"id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+				"label": { "type": "string" },
+				"type": {
+					"enum": ["text", "rich_text", "link", "image", "query", "number", "date", "taxonomy"]
+				},
+				"block_path": { "type": "string" },
+				"required": { "type": "boolean" },
+				"max_characters": { "type": "integer", "minimum": 1 },
+				"allowed_blocks": { "$ref": "#/$defs/stringList" },
+				"requires_verified_value": { "type": "boolean" },
+				"description": { "type": "string" }
+			}
+		},
+		"ruleMap": {
+			"type": "object",
+			"additionalProperties": {
+				"oneOf": [{ "type": "string" }, { "$ref": "#/$defs/stringList" }]
+			}
+		}
+	}
+}

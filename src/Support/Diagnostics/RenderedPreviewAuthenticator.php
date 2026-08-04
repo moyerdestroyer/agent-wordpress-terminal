@@ -24,7 +24,10 @@ final class RenderedPreviewAuthenticator {
     private const TTL_SECONDS = 45;
 
     public static function register(): void {
-        add_filter('determine_current_user', [self::class, 'authenticate'], 5);
+        // Run after Core's auth-cookie validator (priority 10), which otherwise
+        // treats our numeric user ID as a cookie string and resets it to false.
+        // Core's later validators preserve an already-resolved user ID.
+        add_filter('determine_current_user', [self::class, 'authenticate'], 19);
     }
 
     /**
@@ -39,6 +42,8 @@ final class RenderedPreviewAuthenticator {
                 'agent-wordpress-terminal',
             ));
         }
+
+        $url = $this->with_headless_preview_nonce($url, $user_id);
 
         $token = wp_generate_password(48, false, false);
         $key = self::TRANSIENT_PREFIX . substr(hash('sha256', $token), 0, 40);
@@ -75,9 +80,7 @@ final class RenderedPreviewAuthenticator {
 
         $token_value = $_GET[self::QUERY_ARG] ?? '';
         $token = is_string($token_value) ? sanitize_text_field(wp_unslash($token_value)) : '';
-        $user_agent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
-
-        if ('' === $token || !str_contains($user_agent, 'HeadlessChrome')) {
+        if ('' === $token) {
             return 0;
         }
 
@@ -115,5 +118,38 @@ final class RenderedPreviewAuthenticator {
         $query_string = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
 
         return $path . ('' !== $query_string ? '?' . $query_string : '');
+    }
+
+    /**
+     * Core preview nonces include the browser's login-session token. The one-use
+     * render credential authenticates without that cookie, so it needs a nonce
+     * calculated for the same user with the empty session token seen by the
+     * server-launched request.
+     */
+    private function with_headless_preview_nonce(string $url, int $user_id): string {
+        $parts = wp_parse_url($url);
+
+        if (!is_array($parts)) {
+            return $url;
+        }
+
+        $query = [];
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $preview_id = absint($query['preview_id'] ?? 0);
+
+        if ($preview_id <= 0 || !array_key_exists('preview_nonce', $query)) {
+            return $url;
+        }
+
+        $action = 'post_preview_' . $preview_id;
+        $nonce = substr(
+            (string) wp_hash(wp_nonce_tick($action) . '|' . $action . '|' . $user_id . '|', 'nonce'),
+            -12,
+            10,
+        );
+        $replacement = '$1preview_nonce=' . rawurlencode($nonce);
+        $updated = preg_replace('/([?&])preview_nonce=[^&#]*/', $replacement, $url, 1);
+
+        return is_string($updated) ? $updated : $url;
     }
 }

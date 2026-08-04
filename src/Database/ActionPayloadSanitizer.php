@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
+use AWPT\Domain\DomainProposalManager;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\ResourceValueSanitizer;
 use AWPT\Support\SiteSettingsWhitelist;
@@ -37,6 +38,10 @@ final class ActionPayloadSanitizer {
 
         if (!ActionOperations::is_valid($operation)) {
             return ['operation' => ''];
+        }
+
+        if (!in_array($operation, ActionOperations::ALL, true)) {
+            return new DomainProposalManager()->sanitize_stored_payload($payload);
         }
 
         $clean = [

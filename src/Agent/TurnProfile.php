@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
-use AWPT\Support\ProposalAbilities;
 use AWPT\Support\SiteDesignContext;
 
 if (!defined('ABSPATH')) {
@@ -39,6 +38,8 @@ final class TurnProfile {
     public readonly bool $content_turn;
 
     public readonly bool $content_edit_turn;
+
+    public readonly bool $presentation_edit;
 
     public readonly string $design_level;
 
@@ -69,6 +70,7 @@ final class TurnProfile {
      *     message: string,
      *     content_turn: bool,
      *     content_edit_turn: bool,
+     *     presentation_edit: bool,
      *     design_level: string,
      *     tool_profile: string,
      *     auto_retrieve_knowledge: bool,
@@ -89,6 +91,7 @@ final class TurnProfile {
         $this->message = $state['message'];
         $this->content_turn = $state['content_turn'];
         $this->content_edit_turn = $state['content_edit_turn'];
+        $this->presentation_edit = $state['presentation_edit'];
         $this->design_level = $state['design_level'];
         $this->tool_profile = $state['tool_profile'];
         $this->auto_retrieve_knowledge = $state['auto_retrieve_knowledge'];
@@ -114,7 +117,16 @@ final class TurnProfile {
 
         $budget = new GenerationBudget();
         $content_turn = $budget->is_content_request($message, $budget_context);
-        $content_edit_turn = $budget->is_content_edit_request($message, $budget_context);
+        $presentation_edit = $has_focus && self::looks_like_presentation_edit($message);
+        $content_edit_turn = $presentation_edit || $budget->is_content_edit_request($message, $budget_context);
+
+        // Broad creation language includes phrases such as "make this page".
+        // Once a real focused post and an edit request are present, that wording
+        // must not activate the new-post preparation pipeline unless the admin
+        // explicitly asked for a separate new page or post.
+        if ($has_focus && $content_edit_turn && !self::explicit_new_page_request($message)) {
+            $content_turn = false;
+        }
         $design_level = new SiteDesignContext()->request_level($message);
         $signals = [
             'site_data' => self::looks_like_site_data($message),
@@ -151,6 +163,7 @@ final class TurnProfile {
             'message' => $message,
             'content_turn' => $content_turn,
             'content_edit_turn' => $content_edit_turn,
+            'presentation_edit' => $presentation_edit,
             'design_level' => $design_level,
             'tool_profile' => $tool_profile,
             'auto_retrieve_knowledge' => self::should_auto_retrieve_knowledge($signals),
@@ -240,6 +253,7 @@ final class TurnProfile {
             || self::TOOL_EDIT === $this->tool_profile
             || $this->content_turn
             || $this->content_edit_turn
+            || [] !== $this->compose_allowlist()
         );
     }
 
@@ -279,11 +293,17 @@ final class TurnProfile {
                 'awpt/read-themes',
                 'awpt/read-theme-json',
                 'awpt/read-theme-file',
+                'awpt/get-work-context',
                 'awpt/list-patterns',
+                'awpt/recommend-patterns',
                 'awpt/read-pattern',
+                'awpt/list-domain-packs',
+                'awpt/read-domain-guidance',
+                'awpt/validate-composition',
                 'awpt/list-templates',
                 'awpt/read-template',
                 'awpt/read-global-styles',
+                'awpt/read-navigation',
                 'awpt/read-block-tree',
                 'awpt/list-blocks',
                 'awpt/get-block',
@@ -291,12 +311,6 @@ final class TurnProfile {
                 'awpt/inspect-frontend',
                 'awpt/analyze-page',
                 'awpt/preview-post',
-                'awpt/propose-custom-css-update',
-                'awpt/propose-site-settings-update',
-                'awpt/propose-theme-switch',
-                'awpt/propose-template-update',
-                'awpt/propose-global-styles-update',
-                'awpt/propose-resource-change',
                 'awpt/read-proposal',
             ],
             self::TOOL_COMPOSE => [
@@ -307,6 +321,7 @@ final class TurnProfile {
                 ...$this->explore_allowlist_for_edit(),
                 'awpt/propose-content-update',
                 'awpt/propose-block-attrs-update',
+                'awpt/propose-block-batch-update',
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
@@ -325,9 +340,9 @@ final class TurnProfile {
                 'awpt/search-knowledge',
                 'awpt/list-knowledge-sources',
                 'awpt/read-theme-file',
-                'awpt/propose-custom-css-update',
-                'awpt/propose-plugin-deactivate',
-                'awpt/propose-site-settings-update',
+                'awpt/get-work-context',
+                'awpt/list-domain-packs',
+                'awpt/read-domain-guidance',
             ],
             default => [],
         };
@@ -339,15 +354,24 @@ final class TurnProfile {
      * @return list<string>
      */
     public function explore_allowlist(): array {
+        if (self::TOOL_DIAGNOSE === $this->tool_profile) {
+            return array_values(array_filter(
+                $this->tool_allowlist(),
+                static fn(string $tool): bool => !str_starts_with($tool, 'awpt/propose-'),
+            ));
+        }
+
         if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
             return $this->explore_allowlist_for_edit();
         }
 
         return [
+            'awpt/prepare-pattern-draft',
             'core/get-site-info',
             'awpt/list-content',
             'awpt/search-content',
             'awpt/read-content',
+            'awpt/analyze-page',
             'awpt/read-attachment-document',
             'awpt/search-knowledge',
             'awpt/list-knowledge-sources',
@@ -355,11 +379,17 @@ final class TurnProfile {
             'awpt/read-themes',
             'awpt/read-theme-json',
             'awpt/read-theme-file',
+            'awpt/get-work-context',
             'awpt/list-patterns',
+            'awpt/recommend-patterns',
             'awpt/read-pattern',
+            'awpt/list-domain-packs',
+            'awpt/read-domain-guidance',
+            'awpt/validate-composition',
             'awpt/list-templates',
             'awpt/read-template',
             'awpt/read-global-styles',
+            'awpt/read-navigation',
             'awpt/preview-post',
             'awpt/read-proposal',
         ];
@@ -374,6 +404,7 @@ final class TurnProfile {
             'awpt/list-content',
             'awpt/search-content',
             'awpt/read-content',
+            'awpt/analyze-page',
             'awpt/read-attachment-document',
             'awpt/search-knowledge',
             'awpt/list-knowledge-sources',
@@ -382,8 +413,14 @@ final class TurnProfile {
             'awpt/list-blocks',
             'awpt/get-block',
             'awpt/render-block',
+            'awpt/inspect-rendered-element',
+            'awpt/get-work-context',
             'awpt/list-patterns',
+            'awpt/recommend-patterns',
             'awpt/read-pattern',
+            'awpt/list-domain-packs',
+            'awpt/read-domain-guidance',
+            'awpt/validate-composition',
             'awpt/read-theme-file',
             'awpt/read-theme-json',
             'awpt/preview-post',
@@ -397,10 +434,22 @@ final class TurnProfile {
      * @return list<string>
      */
     public function compose_allowlist(): array {
-        // Finalization is approval-gated, but it is intentionally not operation
-        // forced. Discovery evidence and the user's request determine the correct
-        // proposal type.
-        return ProposalAbilities::names();
+        if (self::TOOL_COMPOSE === $this->tool_profile || $this->content_turn) {
+            return ['awpt/propose-patterned-post', 'awpt/propose-new-post'];
+        }
+
+        if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
+            return [
+                'awpt/propose-content-update',
+                'awpt/propose-block-attrs-update',
+                'awpt/propose-block-batch-update',
+                'awpt/propose-block-insert',
+                'awpt/propose-block-remove',
+                'awpt/propose-pattern-insert',
+            ];
+        }
+
+        return $this->non_content_proposal_allowlist();
     }
 
     /**
@@ -408,11 +457,20 @@ final class TurnProfile {
      * This must never narrow the proposal tools offered to the model.
      */
     public function compose_primary_ability(): string {
-        if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn && !$this->content_turn) {
-            return 'awpt/propose-content-update';
-        }
+        $allowed = $this->compose_allowlist();
 
-        return 'awpt/propose-new-post';
+        return $allowed[0] ?? '';
+    }
+
+    public function needs_mutation_clarification(): bool {
+        return (
+            self::TOOL_INVESTIGATE === $this->tool_profile
+            && [] === $this->compose_allowlist()
+            && (bool) preg_match(
+                '/\b(change|update|edit|fix|improve|make|switch|activate|deactivate|set|add|remove|delete)\b/i',
+                $this->message,
+            )
+        );
     }
 
     /**
@@ -424,9 +482,11 @@ final class TurnProfile {
             'design_level' => $this->design_level,
             'content_turn' => $this->content_turn,
             'content_edit_turn' => $this->content_edit_turn,
+            'presentation_edit' => $this->presentation_edit,
             'auto_retrieve_knowledge' => $this->auto_retrieve_knowledge,
             'history_limit' => $this->history_limit,
             'tool_allowlist_count' => count($this->tool_allowlist()),
+            'proposal_allowlist_count' => count($this->compose_allowlist()),
         ];
     }
 
@@ -447,6 +507,13 @@ final class TurnProfile {
     private static function resolve_tool_profile(string $message, array $signals): string {
         if ($signals['diagnosis'] && !$signals['content_turn'] && !$signals['content_edit_turn']) {
             return self::TOOL_DIAGNOSE;
+        }
+
+        // A focused session has an explicit existing-page target. Prefer the
+        // surgical edit route for a requested modification, even if a
+        // preservation phrase accidentally resembles composition language.
+        if ($signals['has_focus'] && $signals['content_edit_turn'] && !self::explicit_new_page_request($message)) {
+            return self::TOOL_EDIT;
         }
 
         if ($signals['content_turn']) {
@@ -488,6 +555,38 @@ final class TurnProfile {
         }
 
         return self::TOOL_CHAT;
+    }
+
+    private static function explicit_new_page_request(string $message): bool {
+        return (bool) preg_match(
+            '/\b(create|generate|build|draft|write)\b.+\b(new\s+)?(page|post|article|landing\s+page)\b/i',
+            $message,
+        );
+    }
+
+    private static function looks_like_presentation_edit(string $message): bool {
+        if ((bool) preg_match(
+            '/\b(improve|polish|tidy|clean\s*up|cleanup)\b.*\b(this|the|that)?\s*(page|post|article)\b/i',
+            $message,
+        )) {
+            return true;
+        }
+
+        if ((bool) preg_match('/\b(polish|restyle|redesign|reformat)\b/i', $message)) {
+            return true;
+        }
+
+        if (!(bool) preg_match(
+            '/\b(make|improve|polish|tidy|clean\s*up|cleanup|restyle|redesign|reformat|format|turn|convert|fix|adjust|revise)\b/i',
+            $message,
+        )) {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/\b(presentable|professional|visually?|readable|scannable|polished|documentation(?:[\s-]style)?|docs?|layout|formatting|spacing|hierarchy|design|style)\b/i',
+            $message,
+        );
     }
 
     /**
@@ -573,5 +672,50 @@ final class TurnProfile {
             . ')\b/i',
             $message,
         );
+    }
+
+    /** @return list<string> */
+    private function non_content_proposal_allowlist(): array {
+        $message = $this->message;
+
+        if ((bool) preg_match('/\b(deactivate|disable)\b.*\bplugin\b/i', $message)) {
+            return ['awpt/propose-plugin-deactivate'];
+        }
+
+        if ((bool) preg_match('/\b(switch|activate)\b.*\btheme\b/i', $message)) {
+            return ['awpt/propose-theme-switch'];
+        }
+
+        if ((bool) preg_match('/\b(additional|custom)\s+css\b/i', $message)) {
+            return ['awpt/propose-custom-css-update'];
+        }
+
+        if ((bool) preg_match('/\b(global\s+styles?|theme\.json|color\s+palette|typography)\b/i', $message)) {
+            return ['awpt/propose-global-styles-patch', 'awpt/propose-global-styles-update'];
+        }
+
+        if ((bool) preg_match('/\b(template|template\s+part|fse|site\s+editor)\b/i', $message)) {
+            return ['awpt/propose-template-update'];
+        }
+
+        if ((bool) preg_match(
+            '/\b(menu|navigation|terms?|categor(?:y|ies)|tags?|users?|roles?|comments?|widgets?|custom fields?|metadata|post meta)\b/i',
+            $message,
+        )) {
+            return (
+                (bool) preg_match('/\b(menu|navigation)\b/i', $message)
+                    ? ['awpt/propose-navigation-change']
+                    : ['awpt/propose-resource-change']
+            );
+        }
+
+        if ((bool) preg_match(
+            '/\b(settings?|options?|permalinks?|site title|tagline|timezone|date format)\b/i',
+            $message,
+        )) {
+            return ['awpt/propose-site-settings-update'];
+        }
+
+        return [];
     }
 }

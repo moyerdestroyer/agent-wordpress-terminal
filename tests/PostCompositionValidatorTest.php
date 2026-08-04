@@ -31,6 +31,28 @@ function test_post_composition_validator_rejects_featured_only_media(): void {
     Assert::same('awpt_required_inline_media_missing', $error?->get_error_code(), 'missing-media error code');
 }
 
+function test_post_composition_validator_accepts_required_media_in_media_text(): void {
+    awpt_test_reset_state();
+    $attachment = new WP_Post();
+    $attachment->ID = 66;
+    $attachment->post_type = 'attachment';
+    $GLOBALS['awpt_test_posts'][66] = $attachment;
+    $GLOBALS['awpt_test_attachment_is_image'][66] = true;
+    $GLOBALS['awpt_test_attachment_urls'][66] = 'https://example.test/uploads/image-66.jpg';
+    $content =
+        '<!-- wp:media-text {"mediaId":66,"mediaLink":"https://example.test/uploads/image-66.jpg","mediaType":"image"} -->'
+        . '<div class="wp-block-media-text"><figure class="wp-block-media-text__media">'
+        . '<img src="https://example.test/uploads/image-66.jpg" class="wp-image-66 size-full"/>'
+        . '</figure><div class="wp-block-media-text__content"><p>Details</p></div></div>'
+        . '<!-- /wp:media-text -->';
+
+    Assert::same(
+        null,
+        new PostCompositionValidator()->validate($content, [66]),
+        'Media & Text is a visible inline image placement and should satisfy required media validation',
+    );
+}
+
 function test_post_composition_validator_rejects_malformed_blocks(): void {
     $unbalanced = '<!-- wp:cover {"id":66} --><div>Hero</div><!-- /wp:group -->';
     $nested = '<!-- wp:paragraph --><p><h1>Broken</h1></p><!-- /wp:paragraph -->';
@@ -209,6 +231,9 @@ function test_post_composition_validator_rejects_editor_invalid_static_markup():
         . '<div class="wp-block-media-text"><figure><img class="wp-image-66" /></figure></div>'
         . '<!-- /wp:media-text -->',
     );
+    $button = new PostCompositionValidator()->validate(
+        '<!-- wp:button --><div class="wp-block-button">Shop now</div><!-- /wp:button -->',
+    );
 
     Assert::same('awpt_block_wrapper_mismatch', $wrapper?->get_error_code(), 'group tag mismatches should fail');
     Assert::same('awpt_invalid_static_block_markup', $cover?->get_error_code(), 'cover image classes should validate');
@@ -216,6 +241,11 @@ function test_post_composition_validator_rejects_editor_invalid_static_markup():
         'awpt_invalid_static_block_markup',
         $media_text?->get_error_code(),
         'media-text image classes should validate',
+    );
+    Assert::same(
+        'awpt_invalid_static_block_markup',
+        $button?->get_error_code(),
+        'button labels outside the canonical link element should fail',
     );
 }
 
@@ -235,6 +265,7 @@ function test_post_composition_validator_rejects_visible_pattern_placeholders():
 
 test_post_composition_validator_accepts_required_media_and_link();
 test_post_composition_validator_rejects_featured_only_media();
+test_post_composition_validator_accepts_required_media_in_media_text();
 test_post_composition_validator_rejects_malformed_blocks();
 test_post_composition_validator_explains_columns_mismatch();
 test_post_composition_validator_accepts_block_after_closed_paragraph();

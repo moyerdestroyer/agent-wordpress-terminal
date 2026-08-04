@@ -99,6 +99,8 @@ final class SessionRepository {
             output: \ARRAY_A,
         );
         $session['actions'] = $this->hydrator->actions(is_array($action_rows) ? $action_rows : []);
+        $session['last_turn_outcome'] = Json::decode_array((string) ($session['last_outcome_json'] ?? ''));
+        unset($session['last_outcome_json']);
 
         return $this->with_focus_summary($session);
     }
@@ -106,7 +108,7 @@ final class SessionRepository {
     /**
      * @return array<string, mixed>
      */
-    public function create(string $title): array {
+    public function create(string $title, int $focus_post_id = 0): array {
         $wpdb = WpDb::get();
 
         $now = current_time('mysql');
@@ -117,10 +119,11 @@ final class SessionRepository {
             [
                 'user_id' => $this->current_user_id(),
                 'title' => $title,
+                'focus_post_id' => $focus_post_id > 0 ? $focus_post_id : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
-            format: ['%d', '%s', '%s', '%s'],
+            format: ['%d', '%s', '%d', '%s', '%s'],
         );
 
         if (false === $inserted) {
@@ -131,10 +134,38 @@ final class SessionRepository {
             'id' => (int) $wpdb->insert_id,
             'user_id' => $this->current_user_id(),
             'title' => $title,
-            'focus' => null,
+            'focus_post_id' => $focus_post_id > 0 ? $focus_post_id : null,
+            'focus' => $focus_post_id > 0
+                ? $this->with_focus_summary(['focus_post_id' => $focus_post_id])['focus']
+                : null,
             'created_at' => $now,
             'updated_at' => $now,
         ];
+    }
+
+    /** @return array<string, mixed>|null */
+    public function find_by_focus(int $post_id): ?array {
+        if ($post_id <= 0) {
+            return null;
+        }
+
+        $wpdb = WpDb::get();
+        $table = $wpdb->prefix . 'awpt_sessions';
+        $actions = $wpdb->prefix . 'awpt_actions';
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, user_id, title, model, provider, focus_post_id, created_at, updated_at
+            FROM {$table}
+            WHERE user_id = %d AND focus_post_id = %d
+            ORDER BY (SELECT COUNT(*) FROM {$actions} WHERE session_id = {$table}.id) DESC, updated_at DESC
+            LIMIT 1",
+                $this->current_user_id(),
+                $post_id,
+            ),
+            output: \ARRAY_A,
+        );
+
+        return is_array($row) ? $this->with_focus_summary($row) : null;
     }
 
     /**

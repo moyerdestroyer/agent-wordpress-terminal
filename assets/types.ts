@@ -35,21 +35,47 @@ export interface Message {
 	created_at?: string;
 }
 
-export type ActionOperation =
-	| 'content_update'
-	| 'block_attrs_update'
-	| 'block_insert'
-	| 'block_remove'
-	| 'pattern_insert'
-	| 'new_post'
-	| 'template_update'
-	| 'global_styles_update'
-	| 'global_styles_create'
-	| 'site_settings_update'
-	| 'theme_switch'
-	| 'plugin_deactivate'
-	| 'custom_css_update'
-	| 'resource_change';
+export type ActionOperation = string;
+
+export interface ValidationFinding {
+	severity: 'error' | 'warning' | 'info';
+	code: string;
+	message: string;
+	rule_id?: string;
+	block_path?: string;
+	source?: string;
+	suggestion?: string;
+	pack_id?: string;
+	expected?: string | number | boolean;
+	actual?: string | number | boolean;
+	docs?: string;
+}
+
+export interface SafeFix {
+	id: string;
+	description: string;
+	block_path?: string;
+	before_hash?: string;
+	after_hash?: string;
+	applied: boolean;
+}
+
+export interface AgentFeedback {
+	outcome: 'ready' | 'needs_evidence' | 'needs_correction' | 'staged' | 'blocked';
+	summary: string;
+	findings: ValidationFinding[];
+	fixes: SafeFix[];
+	next_actions: Array<{
+		ability: string;
+		reason: string;
+		input?: Record<string, unknown>;
+	}>;
+	retry: {
+		allowed: boolean;
+		attempts_remaining: number;
+		preserve_evidence: boolean;
+	};
+}
 
 export interface ActionPayload {
 	operation?: ActionOperation;
@@ -114,6 +140,14 @@ export interface ActionPayload {
 	template_type?: string;
 	template_area?: string;
 	attrs?: Record<string, unknown>;
+	batch_changes?: Array<{
+		kind: 'update_attrs' | 'replace_text' | 'remove';
+		block_path: string;
+		expected_fingerprint?: string;
+		block_name?: string;
+		attrs?: Record<string, unknown>;
+		content?: string;
+	}>;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
 	stylesheet?: string;
@@ -132,6 +166,30 @@ export interface ActionPayload {
 	resource_data?: Record<string, unknown>;
 	resource_original?: Record<string, unknown>;
 	resource_fingerprint?: string;
+	domain_pack_id?: string;
+	domain_ability_name?: string;
+	domain_payload?: Record<string, unknown>;
+	domain_snapshot?: Record<string, unknown>;
+	domain_result?: Record<string, unknown>;
+	domain_rollback_token?: Record<string, unknown>;
+	domain_rollback_result?: Record<string, unknown>;
+	domain_applied_fingerprint?: string;
+	domain_irreversible?: boolean;
+	domain_previewable?: boolean;
+	validation_findings?: ValidationFinding[];
+	safe_fixes?: SafeFix[];
+	ruleset_hash?: string;
+	agent_feedback?: AgentFeedback;
+	composition_manifest?: {
+		patterns: Array<{
+			name: string;
+			block_path: string;
+			mode: string;
+			source_hash: string;
+			pack_id?: string;
+			pack_version?: string;
+		}>;
+	};
 }
 
 export interface PreviewDetails {
@@ -165,7 +223,7 @@ export interface ProposedAction {
 	title: string;
 	description: string;
 	payload?: ActionPayload;
-	status: 'proposed' | 'approved' | 'rejected' | 'applied' | 'superseded';
+	status: 'proposed' | 'approved' | 'rejected' | 'applied' | 'superseded' | 'rolled_back';
 	created_at?: string;
 	updated_at?: string;
 	revision_kind?: 'created' | 'revised' | string;
@@ -287,6 +345,68 @@ export interface KnowledgeSettings {
 	embedding_provider: string;
 }
 
+export interface DomainPackStatus {
+	id: string;
+	label: string;
+	version: string;
+	source: string;
+	enabled: boolean;
+	guidance_count: number;
+	pattern_catalog: string;
+	schema_version?: number;
+	rules?: string;
+}
+
+export interface DomainPackHealth {
+	pack_id: string;
+	schema_version: number;
+	status: 'healthy' | 'attention';
+	guidance_scopes: string[];
+	pattern_coverage: {
+		registered: number;
+		enriched: number;
+		header_only: number;
+		stale: number;
+		missing_docs?: number;
+		broken_references?: number;
+		sparse_contracts?: number;
+	};
+	rule_count: number;
+	issues: Array<{
+		severity: 'error' | 'warning' | 'recommendation';
+		code: string;
+		message: string;
+	}>;
+}
+
+export interface DomainPatternSummary {
+	name: string;
+	title: string;
+	description: string;
+	owner: string;
+	compatibility: string;
+	composition_scope: string;
+	block_count: number;
+	pack_id: string;
+	role: string;
+	summary: string;
+	intents: string[];
+	dynamic_content: boolean;
+	post_types: string[];
+	slot_count: number;
+	docs: string;
+	preview_url: string;
+	preview_alt: string;
+	preview_source: string;
+}
+
+export interface DomainPacksResponse {
+	packs: DomainPackStatus[];
+	health: DomainPackHealth[];
+	patterns: DomainPatternSummary[];
+	knowledge_backend: string;
+}
+
 export interface EnvironmentStatus {
 	php: {
 		version: string;
@@ -328,6 +448,7 @@ export interface ProviderBilling {
 
 export interface ChatResponse {
 	content: string;
+	turn_outcome?: TurnOutcome;
 	tool_calls?: ToolCall[];
 	actions?: ProposedAction[];
 	preview?: PreviewDetails;
@@ -340,6 +461,12 @@ export interface ChatResponse {
 	removed_action_ids?: number[];
 	revised_action_id?: number | null;
 	revision_kind?: 'created' | 'revised' | string;
+}
+
+export interface TurnOutcome {
+	status: 'staged' | 'no_change' | 'failed';
+	message: string;
+	error_code?: string;
 }
 
 export interface ChatProgress {
@@ -363,6 +490,7 @@ export interface ChatProgress {
 		design_level?: string;
 		content_turn?: boolean;
 		content_edit_turn?: boolean;
+		presentation_edit?: boolean;
 		auto_retrieve_knowledge?: boolean;
 		history_limit?: number;
 		tool_allowlist_count?: number;

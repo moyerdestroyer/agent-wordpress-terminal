@@ -10,6 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
+use AWPT\Domain\DomainPackRegistry;
+use AWPT\Domain\DomainProposalManager;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -27,6 +30,7 @@ final class ActionOperations {
     public const TEMPLATE_UPDATE = 'template_update';
     public const GLOBAL_STYLES_UPDATE = 'global_styles_update';
     public const GLOBAL_STYLES_CREATE = 'global_styles_create';
+    public const NAVIGATION_UPDATE = 'navigation_update';
     public const SITE_SETTINGS_UPDATE = 'site_settings_update';
     public const THEME_SWITCH = 'theme_switch';
     public const PLUGIN_DEACTIVATE = 'plugin_deactivate';
@@ -46,6 +50,7 @@ final class ActionOperations {
         self::TEMPLATE_UPDATE,
         self::GLOBAL_STYLES_UPDATE,
         self::GLOBAL_STYLES_CREATE,
+        self::NAVIGATION_UPDATE,
         self::SITE_SETTINGS_UPDATE,
         self::THEME_SWITCH,
         self::PLUGIN_DEACTIVATE,
@@ -68,10 +73,27 @@ final class ActionOperations {
     ];
 
     public static function is_valid(string $operation): bool {
-        return in_array($operation, self::ALL, true);
+        return (
+            in_array($operation, self::ALL, true)
+            || null !== DomainPackRegistry::instance()->proposal_operation($operation)
+        );
     }
 
     public static function is_previewable(string $operation): bool {
-        return in_array($operation, self::PREVIEWABLE, true);
+        return in_array($operation, self::PREVIEWABLE, true) || new DomainProposalManager()->can_preview($operation);
+    }
+
+    public static function is_review_safe_content(string $operation): bool {
+        return in_array(
+            $operation,
+            [
+                self::CONTENT_UPDATE,
+                self::BLOCK_ATTRS_UPDATE,
+                self::BLOCK_INSERT,
+                self::BLOCK_REMOVE,
+                self::PATTERN_INSERT,
+            ],
+            true,
+        );
     }
 }

@@ -55,20 +55,40 @@ final class ReadGlobalStyles implements AbilityInterface {
                 continue;
             }
 
-            return [
+            $result = [
                 'id' => $post->ID,
                 'theme' => '' !== $stylesheet ? $stylesheet : $theme,
                 'status' => $post->post_status,
                 'content' => $post->post_content,
                 'modified' => $post->post_modified,
             ];
+
+            if (function_exists('wp_get_global_settings')) {
+                $result['resolved_settings'] = wp_get_global_settings();
+            }
+
+            if (function_exists('wp_get_global_styles')) {
+                $result['resolved_styles'] = wp_get_global_styles();
+            }
+
+            return $result;
         }
 
-        return [
+        $result = [
             'id' => 0,
             'theme' => $theme,
             'content' => '',
             'note' => 'No saved global-styles revision exists for the active theme.',
         ];
+
+        if (function_exists('wp_get_global_settings')) {
+            $result['resolved_settings'] = wp_get_global_settings();
+        }
+
+        if (function_exists('wp_get_global_styles')) {
+            $result['resolved_styles'] = wp_get_global_styles();
+        }
+
+        return $result;
     }
 }

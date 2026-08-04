@@ -18,6 +18,7 @@ use AWPT\REST\ActionsController;
 use AWPT\REST\AttachmentsController;
 use AWPT\REST\CapturesController;
 use AWPT\REST\ChatController;
+use AWPT\REST\DomainController;
 use AWPT\REST\IncidentsController;
 use AWPT\REST\KnowledgeController;
 use AWPT\REST\ProviderController;
@@ -79,6 +80,7 @@ final class ServiceProvider {
             new ChatController($this->agent_runtime),
             new CapturesController(),
             new KnowledgeController(),
+            new DomainController(),
             new ActionsController(),
             new IncidentsController(),
             new ToolsController(),

@@ -95,3 +95,71 @@ function test_proposal_context_does_not_override_explicit_content_edit_fields():
 }
 
 test_proposal_context_does_not_override_explicit_content_edit_fields();
+
+function test_proposal_context_does_not_bind_focused_post_to_creation_ability(): void {
+    awpt_test_reset_state();
+
+    $input = new ProposalRequestContext()->enrich(
+        10,
+        ['post_type' => 'page', 'post_title' => 'A separate page'],
+        ['user_message' => 'Create a new page for filing help.'],
+        'awpt/propose-patterned-post',
+    );
+
+    Assert::false(array_key_exists('post_id', $input), 'new-post abilities must not inherit session focus');
+}
+
+test_proposal_context_does_not_bind_focused_post_to_creation_ability();
+
+function test_proposal_context_rejects_model_invented_composition_minimums(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        [
+            'required_minimum_library_images' => 2,
+            'required_minimum_visuals' => 4,
+        ],
+        ['user_message' => 'Use the Teferi image from the media library.'],
+    );
+
+    Assert::false(
+        array_key_exists('required_minimum_library_images', $input),
+        'a singular named-image request must not become a model-invented multi-image minimum',
+    );
+    Assert::false(
+        array_key_exists('required_minimum_visuals', $input),
+        'creative visual density must not become an unstated validation requirement',
+    );
+}
+
+function test_proposal_context_enforces_exact_user_composition_counts(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        [
+            'required_minimum_library_images' => 1,
+            'required_minimum_visuals' => 9,
+        ],
+        ['user_message' => 'Use four images and three icons.'],
+    );
+
+    Assert::same(4, $input['required_minimum_library_images'] ?? 0, 'the user image count should be authoritative');
+    Assert::same(3, $input['required_minimum_visuals'] ?? 0, 'the user visual count should be authoritative');
+}
+
+test_proposal_context_rejects_model_invented_composition_minimums();
+test_proposal_context_enforces_exact_user_composition_counts();
+
+function test_proposal_context_enforces_rendered_page_h1_requirement(): void {
+    $input = new ProposalRequestContext()->enrich(
+        0,
+        ['post_id' => 580],
+        ['presentation_requires_h1' => true, 'user_message' => 'Make this page more presentable.'],
+        'awpt/propose-block-batch-update',
+    );
+
+    Assert::true(
+        true === ($input['presentation_requires_h1'] ?? false),
+        'the server-derived title requirement must override an omitted provider flag',
+    );
+}
+
+test_proposal_context_enforces_rendered_page_h1_requirement();

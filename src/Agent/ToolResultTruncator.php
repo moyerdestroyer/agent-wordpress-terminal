@@ -84,6 +84,24 @@ final class ToolResultTruncator {
             $output['blocks'] = $this->clip_array_items($output['blocks'] ?? [], 40);
         }
 
+        if ('awpt/read-proposal' === $tool) {
+            $payload = is_array($output['payload'] ?? null) ? $output['payload'] : [];
+            $output['payload'] = array_intersect_key($payload, array_flip([
+                'operation',
+                'post_id',
+                'post_title',
+                'post_type',
+                'post_status',
+                'pattern_name',
+                'pattern_mode',
+                'featured_image_id',
+                'required_attachment_ids',
+                'required_minimum_library_images',
+                'required_minimum_visuals',
+            ]));
+            unset($output['removed_action_ids']);
+        }
+
         if ('awpt/list-content' === $tool) {
             $output['items'] = $this->clip_array_items($output['items'] ?? [], 25);
         }

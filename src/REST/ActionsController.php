@@ -10,8 +10,11 @@ declare(strict_types=1);
 
 namespace AWPT\REST;
 
+use AWPT\Abilities\ActionAppliers\ContentActionRollback;
 use AWPT\Abilities\ApplyAction;
 use AWPT\Database\ActionRepository;
+use AWPT\Domain\DomainPackRegistry;
+use AWPT\Domain\DomainProposalManager;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\StagedPostPreview;
 
@@ -52,7 +55,7 @@ final class ActionsController extends RestController {
                     'operation' => [
                         'required' => true,
                         'type' => 'string',
-                        'enum' => ['approve', 'reject', 'apply'],
+                        'enum' => ['approve', 'reject', 'apply', 'rollback'],
                         'sanitize_callback' => 'sanitize_key',
                     ],
                 ],
@@ -83,6 +86,12 @@ final class ActionsController extends RestController {
                 message: __('Only post content actions can be previewed.', 'agent-wordpress-terminal'),
                 data: ['status' => 400],
             );
+        }
+
+        if (null !== DomainPackRegistry::instance()->proposal_operation($operation)) {
+            $preview = new DomainProposalManager()->preview($payload);
+
+            return is_wp_error($preview) ? $preview : new \WP_REST_Response($preview, status: 200);
         }
 
         if (ActionOperations::NEW_POST === $operation && (int) ($payload['post_id'] ?? 0) <= 0) {
@@ -126,9 +135,42 @@ final class ActionsController extends RestController {
             );
         }
 
+        if ('rollback' === $operation) {
+            if ('applied' !== (string) ($action['status'] ?? '')) {
+                return new \WP_Error(
+                    code: 'awpt_action_not_applied',
+                    message: __('Only applied actions can be rolled back.', 'agent-wordpress-terminal'),
+                    data: ['status' => 409],
+                );
+            }
+
+            $payload = $this->actions->decode_payload($action);
+            $operation = (string) ($payload['operation'] ?? '');
+            $result = ActionOperations::is_review_safe_content($operation)
+                ? new ContentActionRollback()->rollback($payload)
+                : new DomainProposalManager()->rollback($payload);
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            $payload['domain_rollback_result'] = $result;
+            $this->actions->update_payload($action_id, $payload);
+            $this->actions->update_status($action_id, 'rolled_back');
+
+            return new \WP_REST_Response($this->actions->format_action($action_id), status: 200);
+        }
+
         if ('reject' === $operation || 'approve' === $operation) {
             if ('reject' === $operation) {
-                $this->preview->discard_preview_resources($this->actions->decode_payload($action));
+                $payload = $this->actions->decode_payload($action);
+                $cleanup_error = new DomainProposalManager()->cleanup($payload);
+
+                if (null !== $cleanup_error) {
+                    return $cleanup_error;
+                }
+
+                $this->preview->discard_preview_resources($payload);
             }
 
             $this->actions->update_status($action_id, 'reject' === $operation ? 'rejected' : 'approved');

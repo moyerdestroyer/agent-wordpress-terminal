@@ -69,6 +69,64 @@ function test_openrouter_provider_tool_routing(): void {
 
 test_openrouter_provider_tool_routing();
 
+function test_openrouter_provider_preserves_completion_finish_reason(): void {
+    awpt_test_reset_state();
+    update_option('awpt_openrouter_api_key', 'test-key');
+    $GLOBALS['awpt_test_http_response'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode([
+            'model' => 'deepseek/deepseek-v4-pro',
+            'choices' => [[
+                'finish_reason' => 'length',
+                'message' => ['role' => 'assistant', 'content' => 'partial'],
+            ]],
+        ]),
+    ];
+
+    $result = new OpenRouterProvider()->complete([['role' => 'user', 'content' => 'Build a long page.']]);
+
+    Assert::false(is_wp_error($result), 'a length-limited provider response is still structurally readable');
+    Assert::same('length', $result['finish_reason'] ?? '', 'runtime should receive the provider finish reason');
+}
+
+test_openrouter_provider_preserves_completion_finish_reason();
+
+function test_openrouter_provider_can_bound_reasoning_for_large_structured_output(): void {
+    awpt_test_reset_state();
+    update_option('awpt_openrouter_api_key', 'test-key');
+    $GLOBALS['awpt_test_http_response'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode([
+            'model' => 'deepseek/deepseek-v4-pro',
+            'choices' => [['message' => ['role' => 'assistant', 'content' => 'done']]],
+        ]),
+    ];
+
+    new OpenRouterProvider()->complete(
+        [['role' => 'user', 'content' => 'Build the custom page.']],
+        [],
+        [
+            'max_completion_tokens' => 20_000,
+            'reasoning_effort' => 'low',
+            'timeout' => 450,
+        ],
+    );
+
+    $request = $GLOBALS['awpt_test_http_requests'][0] ?? [];
+    $args = is_array($request['args'] ?? null) ? $request['args'] : [];
+    $payload = json_decode((string) ($args['body'] ?? ''), true);
+    Assert::same(20_000, $payload['max_tokens'] ?? 0, 'large custom output should receive its full transport budget');
+    Assert::same('low', $payload['reasoning']['effort'] ?? '', 'custom generation should reserve output room');
+    Assert::same(
+        true,
+        $payload['reasoning']['exclude'] ?? false,
+        'unused reasoning text should not inflate the response',
+    );
+    Assert::same(450, (int) ($args['timeout'] ?? 0), 'the raw request may use the explicit extended timeout');
+}
+
+test_openrouter_provider_can_bound_reasoning_for_large_structured_output();
+
 function test_openrouter_provider_migrates_legacy_auto_but_preserves_exact_models(): void {
     awpt_test_reset_state();
     update_option('awpt_openrouter_api_key', 'test-key');
@@ -189,7 +247,7 @@ function test_openrouter_provider_strips_images_for_deepseek_before_request(): v
 
 test_openrouter_provider_strips_images_for_deepseek_before_request();
 
-function test_openrouter_vision_provider_uses_auto_without_tool_routing_constraints(): void {
+function test_openrouter_vision_provider_uses_pinned_multimodal_model_without_tool_routing_constraints(): void {
     awpt_test_reset_state();
     update_option('awpt_openrouter_api_key', 'test-key');
     $GLOBALS['awpt_test_http_response'] = [
@@ -211,7 +269,11 @@ function test_openrouter_vision_provider_uses_auto_without_tool_routing_constrai
     $request = $GLOBALS['awpt_test_http_requests'][0] ?? [];
     $args = is_array($request['args'] ?? null) ? $request['args'] : [];
     $payload = json_decode((string) ($args['body'] ?? ''), true);
-    Assert::same('openrouter/auto', $payload['model'] ?? null, 'vision sidecar should use automatic routing');
+    Assert::same(
+        'google/gemini-3-flash-preview',
+        $payload['model'] ?? null,
+        'vision sidecar should use a known multimodal model instead of a text-quality router',
+    );
     Assert::false(array_key_exists('tools', $payload), 'vision sidecar should remain tool-free');
     Assert::false(
         array_key_exists('provider', $payload),
@@ -219,4 +281,26 @@ function test_openrouter_vision_provider_uses_auto_without_tool_routing_constrai
     );
 }
 
-test_openrouter_vision_provider_uses_auto_without_tool_routing_constraints();
+test_openrouter_vision_provider_uses_pinned_multimodal_model_without_tool_routing_constraints();
+
+function test_openrouter_vision_provider_never_silently_retries_without_images(): void {
+    awpt_test_reset_state();
+    update_option('awpt_openrouter_api_key', 'test-key');
+    $GLOBALS['awpt_test_http_response'] = [
+        'response' => ['code' => 404],
+        'body' => wp_json_encode(['error' => ['message' => 'No endpoints found that support image input']]),
+    ];
+
+    $result = new OpenRouterVisionProvider()->complete([[
+        'role' => 'user',
+        'content' => [
+            ['type' => 'text', 'text' => 'Describe attachment #5.'],
+            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/png;base64,aaa']],
+        ],
+    ]]);
+
+    Assert::true(is_wp_error($result), 'visual analysis should fail honestly when no vision route is available');
+    Assert::same(1, count($GLOBALS['awpt_test_http_requests']), 'vision must not retry after dropping the image');
+}
+
+test_openrouter_vision_provider_never_silently_retries_without_images();

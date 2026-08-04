@@ -91,6 +91,15 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                 $payload['session_id'] = 'awpt-' . (int) $options['session_id'];
             }
 
+            $reasoning_effort = sanitize_key((string) ($options['reasoning_effort'] ?? ''));
+
+            if (in_array($reasoning_effort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], true)) {
+                $payload['reasoning'] = [
+                    'effort' => $reasoning_effort,
+                    'exclude' => true,
+                ];
+            }
+
             if ([] !== $tools) {
                 // Ensure Auto selects a provider endpoint that supports every
                 // declared parameter, especially structured tool choice.
@@ -98,9 +107,10 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             }
         }
 
-        // Content composition and multi-tool revision turns need longer than a
-        // short Q&A call. Cap at the content turn wall used by ProviderRuntime.
-        $timeout = max(5, min(120, (int) ($options['timeout'] ?? 45)));
+        // The runtime owns the per-turn wall and may reserve a longer single
+        // request for a slow reasoning model. Do not impose a second, shorter
+        // transport ceiling that aborts an otherwise healthy completion.
+        $timeout = max(5, min(480, (int) ($options['timeout'] ?? 45)));
         $encoded_payload = wp_json_encode($payload);
 
         if (!is_string($encoded_payload)) {
@@ -132,7 +142,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                 || str_contains($error_text, 'vision');
             $text_only_messages = $this->without_images($messages);
 
-            if ($image_routing_failure && null !== $text_only_messages) {
+            if ($image_routing_failure && $this->allows_text_only_image_fallback() && null !== $text_only_messages) {
                 $text_only_payload = $payload;
                 $text_only_payload['messages'] = $text_only_messages;
                 $encoded_payload = wp_json_encode($text_only_payload);
@@ -187,9 +197,19 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             'content' => $this->stringify_content($message['content'] ?? ''),
             'raw_tool_calls' => is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [],
             'message' => $message,
+            'finish_reason' => sanitize_key((string) ($data['choices'][0]['finish_reason'] ?? '')),
             'model' => (string) ($data['model'] ?? $model),
             'usage' => is_array($data['usage'] ?? null) ? $data['usage'] : [],
         ];
+    }
+
+    /**
+     * Ordinary chat may retain text instructions when a selected route cannot
+     * see images. A dedicated visual analyzer must fail honestly instead of
+     * returning a plausible description after silently dropping image bytes.
+     */
+    protected function allows_text_only_image_fallback(): bool {
+        return true;
     }
 
     /**

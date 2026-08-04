@@ -24,6 +24,7 @@ const ACTION_STATUS_RANK: Record<ProposedAction['status'], number> = {
 	rejected: 3,
 	superseded: 3,
 	applied: 4,
+	rolled_back: 5,
 };
 
 function actionStatusRank(status: ProposedAction['status']): number {
@@ -50,7 +51,8 @@ function isProposedActionStatus(value: unknown): value is ProposedAction['status
 		value === 'approved' ||
 		value === 'rejected' ||
 		value === 'applied' ||
-		value === 'superseded'
+		value === 'superseded' ||
+		value === 'rolled_back'
 	);
 }
 

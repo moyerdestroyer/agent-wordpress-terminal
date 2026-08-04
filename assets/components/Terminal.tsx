@@ -937,9 +937,22 @@ export function Terminal(): JSX.Element {
 
 	const handleActionOperation = async (
 		action: ProposedAction,
-		operation: 'approve' | 'reject' | 'apply',
+		operation: 'approve' | 'reject' | 'apply' | 'rollback',
 	): Promise<void> => {
 		if (!action.id) {
+			return;
+		}
+
+		if (
+			operation === 'apply' &&
+			action.payload?.domain_irreversible &&
+			!window.confirm(
+				__(
+					'This Domain Pack action cannot be rolled back automatically. Apply it anyway?',
+					'agent-wordpress-terminal',
+				),
+			)
+		) {
 			return;
 		}
 
@@ -1088,7 +1101,7 @@ export function Terminal(): JSX.Element {
 
 			<div className="awpt-grid">
 				<aside className="awpt-sidebar">
-					<div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+					<div className="awpt-sidebar-tabs">
 						<Button
 							variant={sidebarTab === 'knowledge' ? 'primary' : 'secondary'}
 							aria-pressed={sidebarTab === 'knowledge'}
@@ -1111,7 +1124,7 @@ export function Terminal(): JSX.Element {
 						<ToolsSidebar tools={tools} onToolsChange={setTools} />
 					)}
 
-					<div style={{ marginTop: 16 }}>
+					<div className="awpt-sessions">
 						<h3 className="awpt-section-title">{__('Sessions', 'agent-wordpress-terminal')}</h3>
 						<ul className="awpt-list">
 							{sessions.map((session) => (

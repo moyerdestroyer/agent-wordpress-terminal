@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Agent\AbilityReplacementRegistry;
+use AWPT\Domain\DomainPackRegistry;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -63,6 +64,7 @@ final class RegisterAbilities {
             wp_unregister_ability('awpt/read-content');
         }
         new FindAbilities()->register();
+        new GetWorkContext()->register();
         new ReadProposal()->register();
         new ReadAttachmentDocument()->register();
         new ListWordPressResources()->register();
@@ -81,18 +83,28 @@ final class RegisterAbilities {
         new ListTemplates()->register();
         new ReadTemplate()->register();
         new ListPatterns()->register();
+        new RecommendPatterns()->register();
+        new PreparePatternDraft()->register();
         new ReadPattern()->register();
+        new ListDomainPacks()->register();
+        new ReadDomainGuidance()->register();
+        new ValidateComposition()->register();
         new ReadGlobalStyles()->register();
+        new ReadNavigation()->register();
         new SearchKnowledge()->register();
         new ListKnowledgeSources()->register();
         new ReadKnowledge()->register();
         new ProposeContentUpdate()->register();
         new ProposeBlockAttrsUpdate()->register();
+        new ProposeBlockBatchUpdate()->register();
         new ProposeBlockInsert()->register();
         new ProposeBlockRemove()->register();
         new ProposePatternInsert()->register();
         new ProposeTemplateUpdate()->register();
         new ProposeGlobalStylesUpdate()->register();
+        new ProposeGlobalStylesPatch()->register();
+        new ProposeNavigationChange()->register();
+        new ProposePatternedPost()->register();
         new ProposeNewPost()->register();
         new ProposeSiteSettingsUpdate()->register();
         new ProposeThemeSwitch()->register();
@@ -108,5 +120,9 @@ final class RegisterAbilities {
         new InspectFrontend()->register();
         new InspectRenderedElement()->register();
         new DiagnoseError()->register();
+
+        foreach (DomainPackRegistry::instance()->proposal_operations() as $operation) {
+            new DomainProposalAbility($operation)->register();
+        }
     }
 }

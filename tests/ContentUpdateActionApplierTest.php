@@ -16,6 +16,8 @@
 declare(strict_types=1);
 
 use AWPT\Abilities\ActionAppliers\ContentUpdateActionApplier;
+use AWPT\Abilities\ApplyAction;
+use AWPT\Abilities\ProposeContentUpdate;
 
 function test_content_update_action_applier(): void {
     $applier = new ContentUpdateActionApplier();
@@ -123,6 +125,31 @@ function test_content_update_action_applier(): void {
         Assert::same('awpt_action_conflict', $result->get_error_code(), 'stale template content uses conflict code');
     }
 
+    // A transport-only final newline does not make an otherwise exact baseline stale.
+    awpt_test_reset_state();
+    $GLOBALS['awpt_test_current_user_can'] = static fn(string $capability, mixed ...$args): bool => match (
+        $capability
+    ) {
+        'edit_post' => 42 === ($args[0] ?? null),
+        default => false,
+    };
+    $post = new WP_Post();
+    $post->ID = 42;
+    $post->post_content = '<!-- wp:paragraph --><p>live</p><!-- /wp:paragraph -->' . "\n";
+    $GLOBALS['awpt_test_posts'][42] = $post;
+    $result = $applier->apply([
+        'operation' => 'content_update',
+        'post_id' => 42,
+        'post_content' => '<!-- wp:paragraph --><p>improved</p><!-- /wp:paragraph -->',
+        'original_post_content' => '<!-- wp:paragraph --><p>live</p><!-- /wp:paragraph -->',
+    ]);
+    Assert::false(is_wp_error($result), 'a final-newline-only baseline difference should remain safely applicable');
+    Assert::same(
+        '<!-- wp:paragraph --><p>improved</p><!-- /wp:paragraph -->',
+        $GLOBALS['awpt_test_posts'][42]->post_content,
+        'the whitespace-tolerant concurrency check should still apply the proposed content',
+    );
+
     // Meta already matches the proposed value after another apply — not a conflict.
     awpt_test_reset_state();
     $GLOBALS['awpt_test_current_user_can'] = static fn(string $capability, mixed ...$args): bool => match (
@@ -153,3 +180,56 @@ function test_content_update_action_applier(): void {
 }
 
 test_content_update_action_applier();
+
+function test_content_update_proposal_and_apply_boundaries_reject_noop_payloads(): void {
+    $payload = [
+        'operation' => 'content_update',
+        'post_title' => 'Same title',
+        'original_post_title' => 'Same title',
+        'post_content' => '<p>Same body.</p>',
+        'original_post_content' => '<p>Same body.</p>',
+        'post_status' => 'publish',
+        'original_post_status' => 'publish',
+        'post_meta' => ['reviewed' => 'yes'],
+        'original_post_meta' => ['reviewed' => 'yes'],
+    ];
+    $proposal_check = new ReflectionMethod(ProposeContentUpdate::class, 'has_effective_mutation');
+    $apply_check = new ReflectionMethod(ApplyAction::class, 'content_update_has_mutation');
+    $proposal_h1_check = new ReflectionMethod(ProposeContentUpdate::class, 'missing_required_content_h1');
+    $apply_h1_check = new ReflectionMethod(ApplyAction::class, 'missing_required_content_h1');
+
+    Assert::false(
+        $proposal_check->invoke(new ProposeContentUpdate(), $payload),
+        'action-card metadata without a changed post field must not stage',
+    );
+    Assert::false(
+        $apply_check->invoke(new ApplyAction(), $payload),
+        'the apply boundary must reject legacy no-op content actions too',
+    );
+
+    $payload['post_content'] = '<p>Changed body.</p>';
+    Assert::true(
+        $proposal_check->invoke(new ProposeContentUpdate(), $payload),
+        'a genuine content mutation should remain stageable',
+    );
+    Assert::true(
+        $apply_check->invoke(new ApplyAction(), $payload),
+        'a genuine content mutation should remain applicable',
+    );
+
+    $title_only = [
+        'presentation_requires_h1' => true,
+        'post_title' => 'Visible only in admin',
+        'original_post_title' => 'Old admin title',
+    ];
+    Assert::true(
+        $proposal_h1_check->invoke(new ProposeContentUpdate(), $title_only),
+        'a title-only proposal cannot satisfy evidence that the template omits the page H1',
+    );
+    Assert::true(
+        $apply_h1_check->invoke(new ApplyAction(), $title_only),
+        'the apply boundary must retain the same rendered-title invariant',
+    );
+}
+
+test_content_update_proposal_and_apply_boundaries_reject_noop_payloads();

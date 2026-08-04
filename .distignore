@@ -15,6 +15,7 @@
 .vscode/
 .idea/
 .agents/
+/ol/
 
 # Local packaging output
 /dist/

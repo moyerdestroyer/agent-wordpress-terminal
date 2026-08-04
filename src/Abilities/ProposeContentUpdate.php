@@ -11,13 +11,19 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Agent\AbilityReplacementRegistry;
+use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\CompositionProposalGuard;
+use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\ExistingContentPreservationValidator;
+use AWPT\Domain\PatternMaterializer;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\NewPostStagingDraft;
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PatternFallbackPolicy;
+use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\SiteDesignContext;
 use AWPT\Support\StagedPostPreview;
@@ -69,6 +75,7 @@ final class ProposeContentUpdate implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    'presentation_requires_h1' => ['type' => 'boolean'],
                     'title' => [
                         'type' => 'string',
                         'description' => __(
@@ -220,6 +227,7 @@ final class ProposeContentUpdate implements AbilityInterface {
             'original_post_title' => $post->post_title,
             'original_post_content' => $post->post_content,
             'original_post_status' => $post->post_status,
+            'presentation_requires_h1' => true === ($input['presentation_requires_h1'] ?? false),
         ];
 
         if (array_key_exists('post_title', $input)) {
@@ -297,6 +305,85 @@ final class ProposeContentUpdate implements AbilityInterface {
             $payload['pattern_fallback_reason'] = $fallback_reason;
         }
 
+        if (array_key_exists('post_content', $payload)) {
+            if ('' !== $pattern_name) {
+                $payload['post_content'] = new PatternMaterializer()->materialize(
+                    $pattern_name,
+                    (string) $payload['post_content'],
+                    false,
+                );
+                $payload['composition_manifest'] = new PatternMaterializer()->provenance(
+                    $pattern_name,
+                    'adapted',
+                    (string) ($pattern['content'] ?? ''),
+                );
+            }
+
+            $domain_validation = new DomainValidationService();
+            $domain_result = $domain_validation->evaluate(
+                (string) $payload['post_content'],
+                [
+                    'operation' => ActionOperations::CONTENT_UPDATE,
+                    'work_type' => 'edit',
+                    'post_type' => $post->post_type,
+                    'pattern_name' => $pattern_name,
+                    'phase' => 'stage',
+                ],
+                true,
+            );
+            $payload['post_content'] = $domain_result['content'];
+            $domain_findings = $domain_result['findings'];
+            $baseline_result = $domain_validation->evaluate(
+                $post->post_content,
+                [
+                    'operation' => ActionOperations::CONTENT_UPDATE,
+                    'work_type' => 'edit',
+                    'post_type' => $post->post_type,
+                    'pattern_name' => $pattern_name,
+                    'phase' => 'baseline',
+                ],
+                true,
+            );
+            $domain_error = $domain_validation->blocking_error(CompositionProposalGuard::new_findings(
+                $domain_findings,
+                $baseline_result['findings'],
+            ));
+
+            if (null !== $domain_error) {
+                $domain_error->add_data([
+                    'status' => 409,
+                    'validation_findings' => $domain_findings,
+                    'ruleset_hash' => $domain_result['ruleset_hash'],
+                    'safe_fixes' => $domain_result['fixes'],
+                    'agent_feedback' => $domain_result['agent_feedback'],
+                ]);
+                return $domain_error;
+            }
+
+            $payload['ruleset_hash'] = $domain_result['ruleset_hash'];
+            $payload['agent_feedback'] = AgentFeedback::validation($domain_findings, $domain_result['fixes'], true);
+
+            if ([] !== $domain_findings) {
+                $payload['validation_findings'] = $domain_findings;
+            }
+
+            if ([] !== $domain_result['fixes']) {
+                $payload['safe_fixes'] = $domain_result['fixes'];
+            }
+
+            $media_integrity = new PostContentMediaIntegrity()->prepare((string) $payload['post_content']);
+
+            if (is_wp_error($media_integrity)) {
+                return $media_integrity;
+            }
+
+            $payload['post_content'] = $media_integrity['content'];
+
+            if ([] !== $media_integrity['repairs']) {
+                $payload['repairs_applied'] = $media_integrity['repairs'];
+            }
+        }
+
         if (array_key_exists('post_status', $input)) {
             $status = sanitize_key((string) $input['post_status']);
 
@@ -333,6 +420,50 @@ final class ProposeContentUpdate implements AbilityInterface {
 
         if (array_key_exists('affected', $input)) {
             $payload['affected'] = sanitize_textarea_field((string) $input['affected']);
+        }
+
+        if ($this->missing_required_content_h1($payload)) {
+            return new \WP_Error(
+                'awpt_required_page_h1_missing',
+                __(
+                    'Rendered evidence shows this page needs a content H1; changing post metadata alone will not display one.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 409,
+                    'recommended_next_tools' => [[
+                        'tool' => 'awpt/propose-block-batch-update',
+                        'reason' => 'Promote or insert one verified content heading at level 1.',
+                    ]],
+                ],
+            );
+        }
+
+        if (!$this->has_effective_mutation($payload)) {
+            return new \WP_Error(
+                'awpt_content_update_no_changes',
+                __(
+                    'A content update must change the post title, content, status, or at least one meta value.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 400,
+                    'recommended_next_tools' => [[
+                        'tool' => 'awpt/propose-block-batch-update',
+                        'reason' => 'Use verified block paths and fingerprints for presentation-only page changes.',
+                    ]],
+                ],
+            );
+        }
+
+        $preservation_error = new ExistingContentPreservationValidator()->validate_for_session(
+            $session_id,
+            $post->post_content,
+            (string) ($payload['post_content'] ?? $post->post_content),
+        );
+
+        if ($preservation_error instanceof \WP_Error) {
+            return $preservation_error;
         }
 
         $preview = $this->preview->preview_from_payload($payload);
@@ -381,6 +512,46 @@ final class ProposeContentUpdate implements AbilityInterface {
         $action = $this->actions->format_action($action_id);
 
         return is_array($action) ? $action : [];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function has_effective_mutation(array $payload): bool {
+        if (
+            array_key_exists('post_title', $payload)
+            && (string) $payload['post_title'] !== (string) ($payload['original_post_title'] ?? '')
+        ) {
+            return true;
+        }
+
+        if (
+            array_key_exists('post_content', $payload)
+            && (string) $payload['post_content'] !== (string) ($payload['original_post_content'] ?? '')
+        ) {
+            return true;
+        }
+
+        if (
+            array_key_exists('post_status', $payload)
+            && (string) $payload['post_status'] !== (string) ($payload['original_post_status'] ?? '')
+        ) {
+            return true;
+        }
+
+        $meta = is_array($payload['post_meta'] ?? null) ? $payload['post_meta'] : [];
+        $original_meta = is_array($payload['original_post_meta'] ?? null) ? $payload['original_post_meta'] : [];
+
+        foreach ($meta as $key => $value) {
+            if (!array_key_exists($key, $original_meta) || $value !== $original_meta[$key]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function missing_required_content_h1(array $payload): bool {
+        return true === ($payload['presentation_requires_h1'] ?? false) && !array_key_exists('post_content', $payload);
     }
 
     private function sanitize_meta_value(mixed $value): string|int|float|bool {

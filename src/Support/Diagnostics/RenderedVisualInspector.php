@@ -86,6 +86,10 @@ final class RenderedVisualInspector {
             'viewport' => ['width' => 1440, 'height' => 1200],
             'document' => is_array($result['document'] ?? null) ? $result['document'] : [],
             'elements' => is_array($result['elements'] ?? null) ? $result['elements'] : [],
+            'main_heading_outline' => is_array($result['main_heading_outline'] ?? null)
+                ? $result['main_heading_outline']
+                : [],
+            'main_h1_count' => (int) ($result['main_h1_count'] ?? 0),
             'matched_count' => (int) ($result['matched_count'] ?? 0),
             'screenshot_data' => $image_data,
             'has_screenshot' => '' !== $image_data,
@@ -145,8 +149,13 @@ final class RenderedVisualInspector {
             . 'computed:{display:style.display,position:style.position,width:style.width,height:style.height,fontSize:style.fontSize,'
             . 'lineHeight:style.lineHeight,padding:style.padding,margin:style.margin,color:style.color,backgroundColor:style.backgroundColor,'
             . 'transform:style.transform,overflow:style.overflow,visibility:style.visibility,opacity:style.opacity}});}}'
+            . 'const main=doc.querySelector("main")||doc.body;const headings=[...main.querySelectorAll("h1,h2,h3,h4,h5,h6")]'
+            . '.filter(element=>{const style=win.getComputedStyle(element);const rect=element.getBoundingClientRect();'
+            . 'return style.display!=="none"&&style.visibility!=="hidden"&&Number(style.opacity)!==0&&rect.width>0&&rect.height>0})'
+            . '.slice(0,64).map(element=>({level:Number(element.tagName.slice(1)),text:(element.textContent||"").trim().slice(0,180)}));'
             . 'finish({document:{title:doc.title,url:frame.contentWindow.location.href,scrollWidth:doc.documentElement.scrollWidth,'
-            . 'scrollHeight:doc.documentElement.scrollHeight},matched_count:found.length,elements:found});'
+            . 'scrollHeight:doc.documentElement.scrollHeight},main_heading_outline:headings,'
+            . 'main_h1_count:headings.filter(heading=>heading.level===1).length,matched_count:found.length,elements:found});'
             . '}catch(error){finish({error:String(error),matched_count:0,elements:[]});}},1200);'
             . 'frame.src=target;setTimeout(()=>{if(!output.textContent)finish({error:"capture timeout",matched_count:0,elements:[]})},6500);'
             . '})()</script></body></html>'
@@ -212,7 +221,13 @@ final class RenderedVisualInspector {
      * @return array<string, mixed>|\WP_Error
      */
     private function static_fallback(string $url, string $selector, string $warning): array|\WP_Error {
-        $static = new FrontendInspector()->inspect($url, $selector);
+        $authorization = new RenderedPreviewAuthenticator()->issue($url);
+        $target_url = is_wp_error($authorization) ? $url : $authorization['url'];
+        $static = new FrontendInspector()->inspect($target_url, $selector);
+
+        if (!is_wp_error($authorization)) {
+            new RenderedPreviewAuthenticator()->revoke($authorization['key']);
+        }
 
         if (is_wp_error($static)) {
             return $static;
@@ -220,6 +235,7 @@ final class RenderedVisualInspector {
 
         return [
             ...$static,
+            'url' => $url,
             'rendered' => false,
             'engine' => 'static_html',
             'elements' => [],

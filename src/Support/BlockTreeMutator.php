@@ -266,16 +266,23 @@ final class BlockTreeMutator {
 
             if ([] !== $segments) {
                 $inner = $this->paths->inner_blocks($block);
+                $before_count = count($inner);
                 $error = $this->append_at($inner, $segments, $new_block, $parent_path, $result_path);
                 $block['innerBlocks'] = $inner;
+
+                if (!is_wp_error($error) && count($inner) > $before_count) {
+                    $this->insert_inner_content_placeholder($block, $this->first_path_segment($result_path));
+                }
 
                 return $error;
             }
 
             $inner = $this->paths->inner_blocks($block);
+            $inserted_index = $this->paths->visible_count($inner);
             $inner[] = $new_block;
             $block['innerBlocks'] = $inner;
-            $result_path = $parent_path . '.' . ($this->paths->visible_count($inner) - 1);
+            $this->insert_inner_content_placeholder($block, $inserted_index);
+            $result_path = $parent_path . '.' . $inserted_index;
 
             return true;
         }
@@ -323,10 +330,15 @@ final class BlockTreeMutator {
                 }
 
                 $inner = $this->paths->inner_blocks($block);
+                $before_count = count($inner);
                 $error = $this->insert_relative($inner, $segments, $new_block, $position, $result_path);
                 $block['innerBlocks'] = $inner;
 
                 if (!is_wp_error($error)) {
+                    if (count($inner) > $before_count) {
+                        $this->insert_inner_content_placeholder($block, $this->first_path_segment($result_path));
+                    }
+
                     $result_path = (string) $target . '.' . $result_path;
                 }
 
@@ -355,6 +367,49 @@ final class BlockTreeMutator {
         $result_path = (string) (BlockTree::POSITION_BEFORE === $position ? $target : $target + 1);
 
         return true;
+    }
+
+    private function first_path_segment(string $path): int {
+        $segments = explode('.', $path, 2);
+
+        return max(0, (int) ($segments[0] ?? 0));
+    }
+
+    /**
+     * Keep serialize_block()'s null-to-innerBlock map aligned after a nested
+     * insertion. WordPress stores wrapper HTML and child placeholders
+     * separately; changing only innerBlocks can make a later edit discard an
+     * earlier inserted child.
+     *
+     * @param array<string, mixed> $parent
+     */
+    private function insert_inner_content_placeholder(array &$parent, int $child_index): void {
+        $inner_content = is_array($parent['innerContent'] ?? null) ? $parent['innerContent'] : [];
+
+        if ([] === $inner_content) {
+            $parent['innerContent'] = [null];
+
+            return;
+        }
+
+        $null_positions = [];
+
+        foreach ($inner_content as $index => $part) {
+            if (null === $part) {
+                $null_positions[] = (int) $index;
+            }
+        }
+
+        if (array_key_exists($child_index, $null_positions)) {
+            $insert_at = $null_positions[$child_index];
+        } elseif ([] !== $null_positions) {
+            $insert_at = (int) end($null_positions) + 1;
+        } else {
+            $insert_at = count($inner_content);
+        }
+
+        array_splice($inner_content, $insert_at, 0, [null]);
+        $parent['innerContent'] = $inner_content;
     }
 
     /**

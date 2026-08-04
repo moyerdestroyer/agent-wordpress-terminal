@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\ExistingContentPreservationValidator;
+use AWPT\Domain\PatternMaterializer;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\PatternCatalog;
+use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -94,10 +99,11 @@ final class ProposePatternInsert implements AbilityInterface {
             ]);
         }
 
-        $blocks = array_values(array_filter(
-            parse_blocks((string) ($pattern['content'] ?? '')),
-            BlockTree::has_block_name(...),
-        ));
+        $pattern_content = (string) ($pattern['content'] ?? '');
+        $pattern_name = (string) ($pattern['name'] ?? '');
+        $materializer = new PatternMaterializer();
+        $materialized_content = $materializer->materialize($pattern_name, $pattern_content);
+        $blocks = array_values(array_filter(parse_blocks($materialized_content), BlockTree::has_block_name(...)));
         $path = sanitize_text_field((string) ($input['block_path'] ?? ''));
         $position = sanitize_key((string) ($input['position'] ?? BlockTree::POSITION_APPEND));
         $update = BlockTree::from_content($post->post_content)->insert_blocks($path, $blocks, $position);
@@ -107,6 +113,41 @@ final class ProposePatternInsert implements AbilityInterface {
         }
 
         $summary = $this->patterns->summary($pattern, $post->post_type);
+        $validation = new DomainValidationService();
+        $validation_result = $validation->evaluate(
+            $update['content'],
+            [
+                'operation' => ActionOperations::PATTERN_INSERT,
+                'work_type' => 'edit',
+                'post_type' => $post->post_type,
+                'pattern_name' => $pattern_name,
+                'phase' => 'stage',
+            ],
+            true,
+        );
+        $update['content'] = $validation_result['content'];
+        $findings = $validation_result['findings'];
+        $validation_error = $validation->blocking_error($findings);
+
+        if (null !== $validation_error) {
+            $validation_error->add_data([
+                'status' => 409,
+                'validation_findings' => $findings,
+                'ruleset_hash' => $validation_result['ruleset_hash'],
+                'safe_fixes' => $validation_result['fixes'],
+                'agent_feedback' => $validation_result['agent_feedback'],
+            ]);
+            return $validation_error;
+        }
+
+        $media_integrity = new PostContentMediaIntegrity()->prepare($update['content']);
+
+        if (is_wp_error($media_integrity)) {
+            return $media_integrity;
+        }
+
+        $update['content'] = $media_integrity['content'];
+
         $payload = [
             'operation' => ActionOperations::PATTERN_INSERT,
             'post_id' => $post_id,
@@ -125,7 +166,32 @@ final class ProposePatternInsert implements AbilityInterface {
             'blocks' => $update['blocks'],
             'inserted_paths' => $update['paths'],
             'affected' => sprintf(__('Insert pattern %s', 'agent-wordpress-terminal'), (string) $summary['title']),
+            'composition_manifest' => $materializer->provenance($pattern_name, 'inserted', $pattern_content),
+            'ruleset_hash' => $validation_result['ruleset_hash'],
+            'agent_feedback' => AgentFeedback::validation($findings, $validation_result['fixes'], true),
         ];
+
+        if ([] !== $findings) {
+            $payload['validation_findings'] = $findings;
+        }
+
+        if ([] !== $validation_result['fixes']) {
+            $payload['safe_fixes'] = $validation_result['fixes'];
+        }
+
+        if ([] !== $media_integrity['repairs']) {
+            $payload['repairs_applied'] = $media_integrity['repairs'];
+        }
+
+        $preservation_error = new ExistingContentPreservationValidator()->validate_for_session(
+            $session_id,
+            $post->post_content,
+            (string) $payload['post_content'],
+        );
+
+        if ($preservation_error instanceof \WP_Error) {
+            return $preservation_error;
+        }
 
         $preview = $this->preview->preview_from_payload($payload);
 

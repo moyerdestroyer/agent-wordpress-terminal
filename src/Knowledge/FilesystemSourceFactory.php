@@ -64,6 +64,12 @@ final class FilesystemSourceFactory {
         $modified = filemtime($real);
         $relative = $this->relative_path($real, $root);
         $label = '' !== $relative ? $relative : basename($real);
+        $normalized_relative = strtolower(str_replace('\\', '/', $relative));
+        $audience = 'agents.md' === strtolower(basename($relative))
+        || str_contains($normalized_relative, '/agents/')
+        || str_starts_with($normalized_relative, 'docs/agents/')
+            ? 'developer'
+            : 'site';
 
         if (FilesystemAccessPolicy::ROOT_THEME === $root_type) {
             $label = 'theme:' . $label;
@@ -94,6 +100,7 @@ final class FilesystemSourceFactory {
                 'root' => $root,
                 'root_type' => $root_type,
                 'relative_path' => $relative,
+                'audience' => $audience,
             ],
         ];
     }

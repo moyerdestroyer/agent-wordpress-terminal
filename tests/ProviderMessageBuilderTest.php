@@ -67,12 +67,16 @@ function test_compose_prompt_includes_composition_policy(): void {
     $system = (string) ($messages[0]['content'] ?? '');
 
     Assert::true(
-        str_contains($system, 'awpt/propose-new-post'),
-        'composition turns should include propose-new-post policy',
+        str_contains($system, 'awpt/prepare-pattern-draft'),
+        'composition turns should include compact pattern preparation policy',
     );
     Assert::true(
-        str_contains($system, 'pattern_mode'),
+        str_contains($system, 'awpt/propose-patterned-post'),
         'composition turns should include pattern composition guidance',
+    );
+    Assert::true(
+        str_contains($system, 'awpt/propose-new-post'),
+        'composition turns should retain the unrestricted custom fallback',
     );
     Assert::true($profile->include_design_tokens(), 'composition turns should request design tokens');
 }
@@ -101,3 +105,63 @@ function test_edit_prompt_prefers_page_content_over_template_writes(): void {
 }
 
 test_edit_prompt_prefers_page_content_over_template_writes();
+
+function test_presentation_edit_prompt_requires_structural_and_visual_judgment(): void {
+    awpt_test_reset_state();
+    $GLOBALS['wpdb'] = new wpdb();
+
+    $profile = TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
+    $messages = new ProviderMessageBuilder()->build(4, null, $profile);
+    $system = (string) ($messages[0]['content'] ?? '');
+
+    Assert::true(
+        str_contains($system, 'inspect the complete current page with awpt/analyze-page'),
+        'presentation edits should require complete structural inspection',
+    );
+    Assert::true(
+        str_contains($system, 'awpt/inspect-rendered-element'),
+        'presentation edits should require rendered inspection',
+    );
+    Assert::true(
+        str_contains($system, 'Decide the appropriate scope yourself'),
+        'AWPT should own routine transformation scope in every surface',
+    );
+    Assert::true(
+        str_contains($system, 'substantial full-page layout adaptation'),
+        'generic presentation work should permit a large page overhaul when inspection warrants one',
+    );
+    Assert::true(
+        str_contains($system, 'Do not assume the active template displays post_title'),
+        'rendered evidence should determine whether an existing page needs a page-local H1',
+    );
+    Assert::true(
+        str_contains($system, 'place the page H1 before its introductory prose'),
+        'ordinary document improvements should not strand explanatory copy above the page title',
+    );
+    Assert::true(
+        str_contains($system, 'awpt/propose-content-update with pattern_name provenance'),
+        'generic presentation work should expose the normal active-theme pattern adaptation path',
+    );
+    Assert::true(
+        str_contains($system, 'call awpt/recommend-patterns'),
+        'recognizable page archetypes should trigger pattern discovery before the scope decision',
+    );
+    Assert::false(
+        str_contains($system, 'Do not reorder blocks'),
+        'generic presentation work should not be artificially limited to cosmetic attribute changes',
+    );
+    Assert::false(
+        str_contains($system, 'A full-document update is a last resort'),
+        'full-page adaptation should be selected on merit rather than discouraged categorically',
+    );
+    Assert::true(
+        str_contains($system, 'must describe only changes actually present'),
+        'proposal copy must not promise structural work absent from its operation payload',
+    );
+    Assert::false(
+        str_contains($system, 'review queue'),
+        'presentation guidance should not mention or depend on the hosting surface',
+    );
+}
+
+test_presentation_edit_prompt_requires_structural_and_visual_judgment();

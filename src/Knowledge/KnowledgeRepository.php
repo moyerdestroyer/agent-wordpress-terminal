@@ -256,8 +256,12 @@ final class KnowledgeRepository {
         $sources = array_values(array_filter(
             $this->list_sources(),
             static fn(array $source): bool => (
-                in_array('guideline', (array) ($source['types'] ?? []), true)
-                || 'legacy_guideline' === (string) ($source['kind'] ?? '')
+                (
+                    in_array('guideline', (array) ($source['types'] ?? []), true)
+                    || 'legacy_guideline' === (string) ($source['kind'] ?? '')
+                )
+                && 'publish' === (string) ($source['metadata']['status'] ?? '')
+                && '' === (string) ($source['metadata']['awpt_pack_id'] ?? '')
             ),
         ));
 

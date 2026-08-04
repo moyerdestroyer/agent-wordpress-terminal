@@ -16,12 +16,14 @@ if (!defined('ABSPATH')) {
 
 /**
  * Keeps propose-new-post pattern composition fail-closed:
+ * - materialized: server expands the pattern; agent supplies compact replacements/tail
  * - adapted: agent owns the full document; never prepend raw pattern markup
  * - prepend: server owns the pattern; agent may only supply a short body tail
  */
 final class PatternCompositionPolicy {
     public const MODE_PREPEND = 'prepend';
     public const MODE_ADAPTED = 'adapted';
+    public const MODE_MATERIALIZED = 'materialized';
 
     /** Soft cap for a legitimate prepend tail (body after an unchanged pattern). */
     private const PREPEND_TAIL_MAX_CHARS = 1_200;
@@ -29,23 +31,23 @@ final class PatternCompositionPolicy {
     /**
      * Resolve the effective pattern mode.
      *
-     * When a pattern is named and the caller omits mode, default to adapted so a
-     * filled post_content is not silently concatenated with the raw pattern.
+     * When a pattern is named and the caller omits mode, default to materialized
+     * so ordinary requests do not require the model to serialize the full page.
      */
     public function resolve_mode(string $requested_mode, string $pattern_name, string $existing_mode = ''): string {
         $requested = sanitize_key($requested_mode);
         $existing = sanitize_key($existing_mode);
 
-        if (in_array($requested, [self::MODE_PREPEND, self::MODE_ADAPTED], true)) {
+        if (in_array($requested, [self::MODE_PREPEND, self::MODE_ADAPTED, self::MODE_MATERIALIZED], true)) {
             return $requested;
         }
 
-        if (in_array($existing, [self::MODE_PREPEND, self::MODE_ADAPTED], true)) {
+        if (in_array($existing, [self::MODE_PREPEND, self::MODE_ADAPTED, self::MODE_MATERIALIZED], true)) {
             return $existing;
         }
 
         if ('' !== trim($pattern_name)) {
-            return self::MODE_ADAPTED;
+            return self::MODE_MATERIALIZED;
         }
 
         return self::MODE_PREPEND;

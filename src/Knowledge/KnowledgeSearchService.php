@@ -200,6 +200,15 @@ final class KnowledgeSearchService {
      * @param array<array-key, mixed> $metadata
      */
     private function source_weight(string $kind, array $metadata, string $query): float {
+        if ('developer' === (string) ($metadata['audience'] ?? '')) {
+            return (bool) preg_match(
+                '/\b(develop|developer|code|contributor|build|implement|pattern file|theme author)\b/i',
+                $query,
+            )
+                ? 1.10
+                : 0.15;
+        }
+
         if (in_array($kind, ['core_knowledge', 'legacy_guideline'], true)) {
             return 1.30;
         }

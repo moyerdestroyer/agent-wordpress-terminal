@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
+use AWPT\Agent\AgentFeedback;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\CompositionActionContext;
 use AWPT\Support\Json;
@@ -217,8 +218,8 @@ final class ActionRepository {
      *
      * Preference order among open new-post actions in the session (newest first):
      * 1. Exact title match for the same post type
-     * 2. The only open new-post of that post type
-     * 3. The only open new-post of any type when the agent omitted post_type
+     * 2. When the agent omitted the title, the only open new-post of that post type
+     * 3. When both title and type are omitted, the only open new-post of any type
      *
      * Returns 0 when nothing is safely revisable (caller should create a new proposal).
      */
@@ -279,7 +280,7 @@ final class ActionRepository {
             }
         }
 
-        if (1 === count($typed)) {
+        if ('' === $title_key && 1 === count($typed)) {
             return max(0, $typed[0]['id']);
         }
 
@@ -360,6 +361,17 @@ final class ActionRepository {
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
         ];
+        $payload = is_array($action['payload']) ? $action['payload'] : [];
+
+        if (!is_array($payload['agent_feedback'] ?? null)) {
+            $payload['agent_feedback'] = AgentFeedback::make(
+                in_array($action['status'], ['proposed', 'approved'], true) ? 'staged' : 'ready',
+                in_array($action['status'], ['proposed', 'approved'], true)
+                    ? __('The proposal is staged for human review.', 'agent-wordpress-terminal')
+                    : __('The action lifecycle state is reflected below.', 'agent-wordpress-terminal'),
+            );
+            $action['payload'] = $payload;
+        }
 
         // Surface superseded peers so the transcript can drop replaced cards.
         if ($action_id === $this->last_mutated_action_id && [] !== $this->last_superseded_ids) {

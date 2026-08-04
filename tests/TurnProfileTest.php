@@ -9,7 +9,6 @@
 declare(strict_types=1);
 
 use AWPT\Agent\TurnProfile;
-use AWPT\Support\ProposalAbilities;
 use AWPT\Support\SiteDesignContext;
 
 function test_turn_profile_chat_stays_light(): void {
@@ -76,6 +75,30 @@ function test_turn_profile_edit_and_diagnose(): void {
     );
     Assert::true($paragraph_fix->content_edit_turn, 'paragraph-break fixes are content-edit turns');
 
+    $heading_promotion = TurnProfile::from_message(
+        'Turn this into a scannable FAQ: promote only the question headings currently shown as H4 to H2, preserving all wording, answers, links, and order. Do not add or remove content.',
+    );
+    Assert::same(
+        TurnProfile::TOOL_EDIT,
+        $heading_promotion->tool_profile,
+        'heading-only preservation requests should use the surgical edit tools',
+    );
+    Assert::false(
+        $heading_promotion->content_turn,
+        'a negative add/remove constraint must not trigger the new-page composition path',
+    );
+
+    $focused_heading_promotion = TurnProfile::from_message(
+        'Change the first question heading only from H4 to H2. Preserve all other content and blocks exactly.',
+        [],
+        ['has_focus' => true],
+    );
+    Assert::same(
+        TurnProfile::TOOL_EDIT,
+        $focused_heading_promotion->tool_profile,
+        'focused review edits must remain surgical when preservation wording mentions content',
+    );
+
     $short_fix = TurnProfile::from_message('Can you fix?', [
         'prior_user_messages' => [
             'Hey, can you clean up page 410? IT needs to look better.',
@@ -88,6 +111,44 @@ function test_turn_profile_edit_and_diagnose(): void {
     $diag = TurnProfile::from_message('There is a fatal error in the PHP error log after saving.');
     Assert::same(TurnProfile::TOOL_DIAGNOSE, $diag->tool_profile, 'error questions should use diagnose tools');
     Assert::true($diag->needs_diagnosis_module(), 'diagnose turns need diagnosis instructions');
+}
+
+function test_presentation_edit_is_inferred_from_prompt_and_focus(): void {
+    $profile = TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
+
+    Assert::true($profile->presentation_edit, 'presentation intent should be inferred without a surface signal');
+    Assert::true($profile->content_edit_turn, 'presentation edits should receive the full edit budget');
+    Assert::false($profile->content_turn, 'a focused presentation edit must not enter new-page preparation');
+    Assert::same(TurnProfile::TOOL_EDIT, $profile->tool_profile, 'a focused presentation request edits the page');
+    Assert::true(
+        in_array('awpt/analyze-page', $profile->explore_allowlist(), true),
+        'presentation edits should inspect complete page structure',
+    );
+    Assert::true(
+        in_array('awpt/inspect-rendered-element', $profile->explore_allowlist(), true),
+        'presentation edits should inspect the rendered current page',
+    );
+    Assert::true(
+        in_array('awpt/propose-block-batch-update', $profile->compose_allowlist(), true),
+        'presentation edits should be able to stage coordinated surgical changes atomically',
+    );
+
+    $documentation = TurnProfile::from_message('Turn this into a documentation-style page.', [], ['has_focus' => true]);
+    Assert::true($documentation->presentation_edit, 'documentation-style requests use the same universal policy');
+    Assert::same(TurnProfile::TOOL_EDIT, $documentation->tool_profile, 'documentation styling edits focused content');
+
+    $polish = TurnProfile::from_message('Polish this page.', [], ['has_focus' => true]);
+    Assert::true($polish->presentation_edit, 'concise polish requests should receive presentation inspection');
+
+    $generic = TurnProfile::from_message('Improve this page.', [], ['has_focus' => true]);
+    Assert::true($generic->presentation_edit, 'the literal generic terminal prompt should use presentation inspection');
+    Assert::same(TurnProfile::TOOL_EDIT, $generic->tool_profile, 'generic focused improvements edit the current page');
+
+    $copy = TurnProfile::from_message('Change this page title to Filing Guide.', [], ['has_focus' => true]);
+    Assert::false($copy->presentation_edit, 'ordinary copy edits should not require presentation inspection');
+
+    $unfocused = TurnProfile::from_message('Make this page more presentable.');
+    Assert::false($unfocused->presentation_edit, 'presentation editing requires an existing focused post');
 }
 
 function test_turn_profile_open_proposal_revision_uses_compose(): void {
@@ -123,18 +184,34 @@ function test_turn_profile_explore_compose_allowlists(): void {
         in_array('awpt/list-patterns', $compose->explore_allowlist(), true),
         'explore phase should offer list-patterns',
     );
-    Assert::same(
-        ProposalAbilities::names(),
-        $compose->compose_allowlist(),
-        'compose phase should expose every approval-gated operation without forcing an arbitrary mutation path',
+    Assert::true(
+        in_array('awpt/get-work-context', $compose->explore_allowlist(), true),
+        'explore phase should expose the explicit work-context contract',
     );
-    Assert::same('awpt/propose-new-post', $compose->compose_primary_ability(), 'compose primary ability for new pages');
+    Assert::true(
+        in_array('awpt/read-domain-guidance', $compose->explore_allowlist(), true),
+        'explore phase should be able to read referenced theme guidance',
+    );
+    Assert::same(
+        ['awpt/propose-patterned-post', 'awpt/propose-new-post'],
+        $compose->compose_allowlist(),
+        'new-page composition should retain compact and unrestricted proposal surfaces',
+    );
+    Assert::same(
+        'awpt/propose-patterned-post',
+        $compose->compose_primary_ability(),
+        'compact patterned proposal should be primary for new pages',
+    );
 
     $edit = TurnProfile::from_message('Hey, can you fix page 408? I would like it to be a documentation page.');
     Assert::true($edit->uses_explore_compose_phases(), 'edit turns use explore/compose phases');
     Assert::true(
         in_array('awpt/propose-content-update', $edit->compose_allowlist(), true),
         'edit compose allowlist includes content update',
+    );
+    Assert::false(
+        in_array('awpt/propose-resource-change', $edit->compose_allowlist(), true),
+        'content edits must not expose unrelated resource mutations',
     );
     Assert::false(
         in_array('awpt/propose-content-update', $edit->explore_allowlist(), true),
@@ -149,10 +226,43 @@ function test_turn_profile_explore_compose_allowlists(): void {
     );
 }
 
+function test_turn_profile_routes_non_content_mutations_to_one_compatible_operation(): void {
+    $template = TurnProfile::from_message('Update the homepage template in the site editor.');
+    Assert::same(
+        ['awpt/propose-template-update'],
+        $template->compose_allowlist(),
+        'template requests should route only to template staging',
+    );
+    Assert::true(
+        $template->uses_explore_compose_phases(),
+        'recognized non-content mutations should explore before staging',
+    );
+
+    $resource = TurnProfile::from_message('Add a link to the primary navigation menu.');
+    Assert::same(
+        ['awpt/propose-navigation-change'],
+        $resource->compose_allowlist(),
+        'navigation requests should route only to semantic navigation staging',
+    );
+
+    $styles = TurnProfile::from_message('Update the site color palette.');
+    Assert::same(
+        ['awpt/propose-global-styles-patch', 'awpt/propose-global-styles-update'],
+        $styles->compose_allowlist(),
+        'global style requests should prefer partial patches while retaining the full-document escape hatch',
+    );
+
+    $ambiguous = TurnProfile::from_message('Make the site look better.');
+    Assert::same([], $ambiguous->compose_allowlist(), 'ambiguous site changes must not expose a broad proposal menu');
+    Assert::true($ambiguous->needs_mutation_clarification(), 'ambiguous site changes should request a narrow target');
+}
+
 test_turn_profile_chat_stays_light();
 test_turn_profile_compose_keeps_rich_path();
 test_turn_profile_site_fact_uses_investigate();
 test_turn_profile_edit_and_diagnose();
+test_presentation_edit_is_inferred_from_prompt_and_focus();
 test_turn_profile_open_proposal_revision_uses_compose();
 test_turn_profile_design_level_none_for_chat();
 test_turn_profile_explore_compose_allowlists();
+test_turn_profile_routes_non_content_mutations_to_one_compatible_operation();

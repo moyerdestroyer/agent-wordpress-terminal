@@ -15,6 +15,7 @@ use AWPT\Database\CaptureRepository;
 use AWPT\Database\IncidentRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\DomainGuidanceResolver;
 use AWPT\Knowledge\KnowledgeRepository;
 use AWPT\Knowledge\KnowledgeSearchCache;
 use AWPT\Support\ActionOperations;
@@ -61,14 +62,20 @@ final class ProviderMessageBuilder {
                     $profile->needs_site_data_module() ? $this->site_data_module() : '',
                     $profile->needs_compose_module() ? $this->compose_module() : '',
                     $profile->needs_edit_module() ? $this->edit_module() : '',
+                    $profile->presentation_edit ? $this->presentation_edit_module() : '',
                     $profile->needs_template_module() ? $this->template_styles_module() : '',
                     $profile->needs_settings_module() ? $this->settings_module() : '',
                     $profile->needs_frontend_module() ? $this->frontend_module() : '',
+                    $profile->needs_mutation_clarification()
+                        ? 'The requested site change does not identify a safe mutation type. Gather only the evidence needed to explain the ambiguity, then ask the admin to choose the specific target (for example a template, settings, CSS, or content item). Do not stage an unrelated proposal.'
+                        : '',
                     $profile->needs_proposal_manifest_module() ? $this->proposal_manifest_module() : '',
                     $profile->needs_diagnosis_module() ? DiagnosisInstructions::system_prompt_line() : '',
                     $this->get_open_incidents_context($session_id),
                     new ToolCatalogFormatter()->get_system_prompt_catalog(),
+                    new AgentWorkContextService()->format_for_prompt($latest_message, $profile),
                     $design_context->prompt_summary($latest_message, $profile->include_design_tokens()),
+                    $profile->needs_guidelines() ? new DomainGuidanceResolver()->format_for_prompt($profile) : '',
                     $profile->needs_guidelines()
                         ? new KnowledgeRepository()->format_guidelines_for_prompt(2, 2_000)
                         : '',
@@ -126,17 +133,16 @@ final class ProviderMessageBuilder {
 
     private function compose_module(): string {
         return implode("\n", [
-            'Phase workflow for new pages/posts: first explore with read tools only (list/read patterns, media, knowledge). Batch independent reads in one turn. When evidence is sufficient, stage with awpt/propose-new-post — do not keep rediscovering.',
-            'When the user asks to revise a staged new post or page, call awpt/propose-new-post in the same turn with the complete revised title and full post_content (not a delta). Prefer the open proposal action_id from session context. If action_id is omitted, AWPT revises the newest compatible open new-post proposal (matching title/type, or the only open one) instead of creating a duplicate. Pass a different post_title when you intentionally need a separate proposal. Never claim a preview or draft was revised unless that tool call succeeded in the same turn. Do not stop after discovery tools on a revision request.',
-            'On revisions, pattern_name is provenance only for an already-staged adapted draft: keep pattern_mode adapted, do not paste the raw registered pattern markup into post_content again, and do not re-read the original pattern unless you are switching to a different pattern_name. To add a section, discover the pattern via list-patterns, read it if needed, then merge customized markup into one full document in post_content.',
-            'For a page section or layout, inspect awpt/list-patterns and pass the target post_type when known. Pattern search filters pattern metadata, not the page subject. Prefer one full-layout pattern as the primary composition, then read only supplemental roles the user request actually needs. When reading beyond the primary composition, pass purpose describing the uncovered layout role or theme-compatibility question. Do not browse alternate variants merely because they exist. Prefer pattern_mode adapted for customized pages: rewrite the selected pattern markup with real copy/media into one post_content document and pass pattern_name as provenance. Never stack a filled composition under an unchanged pattern or claim an image is used unless it appears in editable block markup.',
+            'For an ordinary new page or post, call awpt/prepare-pattern-draft once, then stage its exact ordered pattern_names with awpt/propose-patterned-post. Fill the returned editable text slots and choose explicit media placement paths. The server expands, concatenates, and serializes the entire composition; never resend pattern markup. Do not drop supporting pattern names selected for explicit user requirements.',
+            'When the user asks to revise a staged new post or page, read awpt/read-proposal and treat revision_context as authoritative. The action_id is an AWPT proposal ID, never a WordPress post ID: do not pass it to read-content, read-block-tree, get-block, or other post abilities. For ordinary revisions, call awpt/propose-patterned-post with that action_id and partial path-addressed pattern_text_updates or intentional media_placements; AWPT preserves every unmentioned block server-side. Use awpt/propose-new-post with complete post_content only when the user explicitly requests a bespoke or from-scratch redesign. Never claim a preview or draft was revised unless the staging tool succeeded in the same turn. Do not stop after reading the proposal.',
+            'On revisions, keep the staged proposal mode and revise the existing action in place. Prefer compact path updates; unrestricted full Gutenberg composition remains available for explicit from-scratch redesigns.',
+            'If pattern preparation returns custom_fallback, use awpt/propose-new-post with a complete Gutenberg document. This unrestricted path remains available for explicitly bespoke/from-scratch requests or sites without a suitable full-document pattern.',
             'The active theme is the default design authority even when the user does not name it. Prefer active/parent-theme patterns, then site-owned reusable patterns. Core, plugin, or custom composition is allowed when it fits better; for a substantial new composition, pass pattern_fallback_reason explaining that choice. Do not ask the user to restate the active theme or request use of its design system.',
-            'When asked to create a new post or page (not editing an existing one), use awpt/propose-new-post, not awpt/propose-content-update. For a pattern-led page, list/search patterns first, read the chosen pattern, and stage one adapted composition with real copy in post_content (pattern_mode adapted; default when pattern_name is set). Do not use prepend together with a filled layout. Proposal calls are real staging attempts: never send dummy, temporary, placeholder, preflight, or validation-probe proposals. Do not search for or repurpose an unrelated existing post as a substitute for creating a new one, and do not tell the user you staged anything without a successful awpt/propose-new-post call in that same turn. New posts are always drafts.',
+            'Proposal calls are real staging attempts, never probes or placeholders. New posts are always drafts.',
             'You choose the composition strategy after discovery. Do not retry a failed proposal with unchanged arguments.',
-            'After a failed awpt/propose-new-post, reuse pattern markup and identifiers already returned by tools in this turn. Prefer fixing block serialization (balanced columns/column closers, list structure, image attrs) over re-listing or re-reading the same patterns. Only call read-pattern again when switching to a different pattern_name or the prior read was truncated beyond use.',
-            'For awpt/propose-new-post: put the headline only in post_title. post_content is the body only — do not start it with the same title as a markdown # heading, HTML h1, or "Title:" line (themes already show the post title).',
-            'Pasted composer images are Media Library assets already approved by the admin. They are required inline visual evidence: create an explicit core/cover or core/image block using the attachment ID and hosted URL near the start of post_content (featured_image_id alone is not enough). Pasted documents are source evidence, not images: read their supplied extracted text or call awpt/read-attachment-document by exact ID, use further pages when has_more is true, and do not force documents into image blocks. Do not fetch remote media URLs; ask the admin to paste or upload the asset instead.',
-            'Honor quantitative visual requests without over-interpreting them. A general request for N images may use image blocks, image-backed covers, icon blocks, or a featured image. Explicit requests for Media Library images or images from the library require N distinct attachment IDs: call awpt/list-content with post_type attachment, choose suitable assets from its evidence, and then compose. Do not ask the admin to provide images when they explicitly made the library available.',
+            'After a failed proposal, use the returned issue and existing evidence for a corrected attempt. Do not repeat discovery unless the failure says evidence is missing.',
+            'For awpt/propose-new-post, follow the verified title_strategy from preparation. When it is content_h1_required, put exactly one level-1 core/heading in the hero or page header because the active template omits post-title; otherwise do not duplicate post_title in post_content. Never use a markdown # heading or "Title:" line.',
+            'Use Media Library IDs returned by preparation. Prefer its semantic media_slots: assign a hero image with placement featured_cover at the returned Cover path, and use insert placements only for deliberate additional inline images. A featured_cover placement also assigns that attachment as featured_image_id. Pasted documents are source evidence, not images. Do not fetch remote media URLs.',
             'For a new page or post request, make a strong first pass after discovery: use relevant patterns and supplied assets, and stage a complete substantive draft in the same turn. Do not ask the admin to supply ordinary CTA, headline, or placeholder copy when you can write a credible version and present it for review. Do not make content-generation responses thin or generic.',
         ]);
     }
@@ -144,11 +150,29 @@ final class ProviderMessageBuilder {
     private function edit_module(): string {
         return implode("\n", [
             'For Gutenberg block attribute changes, prefer awpt/read-block-tree followed by awpt/propose-block-attrs-update using the block path and fingerprint. Use awpt/propose-content-update for full-document rewrites or classic content only.',
+            'When two or more verified Gutenberg blocks need coordinated attribute, rich-text, removal, or anchored insertion changes, prefer awpt/propose-block-batch-update. It stages one atomic, previewable, undoable content action without resending the full document. Inserted core headings and paragraphs need their semantic HTML wrapper in inner_html. Every expected_fingerprint must be copied as the exact complete 64-character value returned for that path; never abbreviate a fingerprint.',
             'Choose the proposal operation from verified evidence. Do not default to a full-document rewrite when a targeted block, CSS, metadata, taxonomy, navigation, comment, user, or other resource proposal preserves more of the existing site.',
             'When updating existing content, preserve structure for ordinary edits; for a substantial layout rewrite, prefer a read theme/reusable pattern and pass its name as provenance, or explain a Core/custom fallback.',
             'For a named page or post cleanup/fix, stage content or block changes on that post by default. Reading a template is fine when layout chrome may be involved; do not propose template or global-styles updates solely to clean up a single page\'s content.',
             'After an applied page/post change, when the admin asks to fix spacing, paragraph breaks, wording, or a similar correction, read the live post if needed and stage a content or block update in the same turn — do not stop after discovery alone.',
             'When a validation error includes recovery evidence, use it or call the suggested read tools before retrying.',
+        ]);
+    }
+
+    private function presentation_edit_module(): string {
+        return implode("\n", [
+            'This is a presentation-improvement request for the currently focused WordPress page.',
+            'Before staging anything, inspect the complete current page with awpt/analyze-page and inspect its rendered WordPress presentation with awpt/inspect-rendered-element using the focused post ID and a screenshot.',
+            'A generic request such as "Make this page more presentable" authorizes both presentation and page-level information-architecture work. After inspecting the page, choose the smallest coherent scope that materially improves it: surgical block changes, structural regrouping, or a substantial full-page layout adaptation. You may reorder or wrap blocks and add concise headings, labels, navigation, or framing that the chosen layout genuinely needs. Preserve the source\'s substantive meaning, links, numbers, media, and legal references, and never invent factual claims.',
+            'Use the structural and rendered evidence to identify the most consequential presentation problems. Decide the appropriate scope yourself; do not ask the admin to choose routine presentation details. A complicated or poorly structured page may warrant a large overhaul even when the user supplied only the generic request.',
+            'When the page content clearly matches a recognizable page archetype such as documentation, reference, policy, landing, news, or cards, call awpt/recommend-patterns and inspect the best compatible full-page pattern before choosing between targeted edits and a full layout adaptation. Pattern discovery informs the decision; it does not require forcing a pattern onto content that is better served by native block improvements.',
+            'Treat the rendered page as authoritative about visible title hierarchy. Do not assume the active template displays post_title. If the rendered page has no visible level-1 heading, include an appropriate page-local title or header in the proposal; if the template already renders one, do not duplicate it.',
+            'In conventional document flow, place the page H1 before its introductory prose. Put an eyebrow or kicker before the H1 only when a verified theme pattern explicitly uses that treatment; do not strand an ordinary explanatory paragraph above the page title.',
+            'For Gutenberg content, use verified block attribute changes and one atomic awpt/propose-block-batch-update when that is sufficient. When a complete active-theme page-layout pattern better fits the content, read that pattern and stage an adapted awpt/propose-content-update with pattern_name provenance. A focused page request may overhaul that page\'s block layout, but it does not authorize changing a site-wide FSE template.',
+            'The proposal title and description must describe only changes actually present in that proposal tool call. Never describe planned removals, insertions, grouping, pattern use, or layout work unless the payload performs those operations.',
+            'The active WordPress theme is the visual authority. Use verified theme patterns, guidance, and tokens when they materially improve the result; do not force a pattern when the existing content needs a simpler native-block treatment.',
+            'Preserve factual meaning, working links, media, and important content. Apply ordinary AWPT editorial judgment about hierarchy, framing, labels, and structure; never fabricate facts or remove substantive information merely to shorten the page.',
+            'Stage one coherent proposal that resolves the observed problems. The staged page will be rendered automatically after proposal validation. Review that evidence honestly and make at most one targeted revision if the result is visibly unsatisfactory.',
         ]);
     }
 
@@ -292,7 +316,7 @@ final class ProviderMessageBuilder {
         $lines = [
             'Open staged proposals (temporary preview post IDs are intentionally omitted).',
             'This session keeps one open proposal at a time: staging a new proposal supersedes prior open cards.',
-            'To revise a staged new post/page, call awpt/propose-new-post with action_id and the full updated draft:',
+            'To revise a staged new post/page, call awpt/propose-new-post with action_id. Prefer exact content_replacements for targeted edits; use the full updated draft only for substantive recomposition:',
         ];
 
         foreach ($actions as $action) {

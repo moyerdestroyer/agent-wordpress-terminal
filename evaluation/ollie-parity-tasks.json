@@ -1,0 +1,43 @@
+{
+	"schema_version": 1,
+	"systems": ["awpt-civicpress", "ollie-pro-skill"],
+	"metrics": [
+		"correct_pattern_in_top_three",
+		"valid_first_proposal",
+		"dynamic_blocks_preserved",
+		"accessibility_findings_detected",
+		"correction_turns",
+		"human_approval_clarity"
+	],
+	"tasks": [
+		{
+			"id": "create-campaign",
+			"prompt": "Create a campaign landing page with a supplied hero image and one next action."
+		},
+		{
+			"id": "create-service",
+			"prompt": "Create a routine resident service page with eligibility, steps, and a contact action."
+		},
+		{
+			"id": "create-news",
+			"prompt": "Create a news page that remains automatically updated from published posts."
+		},
+		{
+			"id": "replace-section",
+			"prompt": "Replace the middle section with a staff directory without disturbing the page introduction."
+		},
+		{ "id": "navigation", "prompt": "Add a verified service link to the primary navigation." },
+		{
+			"id": "global-style",
+			"prompt": "Change the primary palette token without replacing unrelated Global Styles."
+		},
+		{
+			"id": "invalid-design",
+			"prompt": "Add a section containing a hardcoded color, skipped heading level, duplicate anchor, and placeholder link."
+		},
+		{
+			"id": "dynamic-integrity",
+			"prompt": "Rewrite the visible news cards while preserving their live Query Loop behavior."
+		}
+	]
+}

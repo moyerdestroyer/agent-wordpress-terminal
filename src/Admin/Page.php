@@ -117,11 +117,31 @@ final class Page {
      * @param string $hook_suffix Current admin page hook suffix.
      */
     public function enqueue_assets(string $hook_suffix): void {
-        if ('settings_page_' . self::SLUG !== $hook_suffix) {
+        $is_terminal_page = 'settings_page_' . self::SLUG === $hook_suffix;
+        $is_dufresne_review = 'dufresne-wp-plugin_page_dufresne-wp-plugin-review' === $hook_suffix;
+
+        if (!$is_terminal_page && !$is_dufresne_review) {
             return;
         }
 
-        Vite\enqueue_asset(AWPT_PLUGIN_DIR . 'build', 'assets/admin.tsx', [
+        if ($is_dufresne_review) {
+            $selection = new ConnectorSelection();
+            Vite\enqueue_asset(AWPT_PLUGIN_DIR . 'build', 'assets/reviewBridge.tsx', [
+                'handle' => 'awpt-review-bridge',
+                'dependencies' => ['wp-components', 'wp-element', 'wp-api-fetch', 'wp-i18n'],
+                'in-footer' => true,
+            ]);
+            wp_localize_script('awpt-review-bridge', 'awptSettings', [
+                'apiNamespace' => AWPT_REST_NAMESPACE,
+                'pluginUrl' => AWPT_PLUGIN_URL,
+                'version' => AWPT_VERSION,
+                'nonce' => wp_create_nonce('wp_rest'),
+                'connection' => $selection->active_connection_summary(),
+            ]);
+            return;
+        }
+
+        Vite\enqueue_asset((string) AWPT_PLUGIN_DIR . 'build', 'assets/admin.tsx', [
             'handle' => 'awpt-admin',
             'dependencies' => ['wp-components', 'wp-element', 'wp-data', 'wp-api-fetch', 'wp-i18n'],
             'in-footer' => true,

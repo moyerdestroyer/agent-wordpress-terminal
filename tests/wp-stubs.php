@@ -44,6 +44,7 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_set_post_thumbnail_result'] = true;
     $GLOBALS['awpt_test_attachment_is_image'] = [];
     $GLOBALS['awpt_test_attachment_urls'] = [];
+    $GLOBALS['awpt_test_attachment_image_urls'] = [];
     $GLOBALS['awpt_test_attached_files'] = [];
     $GLOBALS['awpt_test_attachment_mime_types'] = [];
     $GLOBALS['awpt_test_trashed_posts'] = [];
@@ -64,6 +65,7 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_stylesheet'] = 'civicpress';
     $GLOBALS['awpt_test_template'] = 'civicpress';
     $GLOBALS['awpt_test_theme_names'] = ['civicpress' => 'CivicPress'];
+    $GLOBALS['awpt_test_page_templates'] = [];
     $GLOBALS['awpt_test_theme_json_data'] = [
         'settings' => [
             'color' => [
@@ -181,6 +183,8 @@ if (!class_exists('wpdb', false)) {
      */
     class wpdb {
         public string $prefix = 'wp_';
+
+        public int $insert_id = 1;
 
         public function prepare(string $query, mixed ...$args): string {
             unset($args);
@@ -314,6 +318,13 @@ if (!class_exists('WP_Theme')) {
         public function get_stylesheet_directory(): string {
             return ABSPATH . 'themes/' . $this->stylesheet;
         }
+
+        /** @return array<string, string> */
+        public function get_page_templates(mixed $post = null, string $post_type = 'page'): array {
+            unset($post, $post_type);
+
+            return is_array($GLOBALS['awpt_test_page_templates'] ?? null) ? $GLOBALS['awpt_test_page_templates'] : [];
+        }
     }
 }
 
@@ -396,6 +407,14 @@ if (!function_exists('__')) {
         unset($domain);
 
         return $text;
+    }
+}
+
+if (!function_exists('_n')) {
+    function _n(string $single, string $plural, int $number, string $domain = 'default'): string {
+        unset($domain);
+
+        return 1 === $number ? $single : $plural;
     }
 }
 
@@ -766,9 +785,9 @@ if (!function_exists('parse_blocks')) {
      * @return array<int, array<string, mixed>>
      */
     function parse_blocks(string $content): array {
-        $pattern = '/<!--\s+wp:([a-z0-9_\/-]+)(?:\s+(\{.*?\}))?\s+-->(.*?)<!--\s+\/wp:\1\s+-->/s';
+        $pattern = '/<!--\s*(\/)?wp:([a-z0-9_\/-]+)(?:\s+(\{.*?\}))?\s*(\/)?-->/s';
 
-        if (!preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+        if (!preg_match_all($pattern, $content, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
             return (
                 '' === trim($content)
                     ? []
@@ -777,28 +796,106 @@ if (!function_exists('parse_blocks')) {
                         'attrs' => [],
                         'innerBlocks' => [],
                         'innerHTML' => $content,
+                        'innerContent' => [$content],
                     ]]
             );
         }
 
         $blocks = [];
+        $stack = [];
+        $cursor = 0;
+        $append_text = static function (array &$frame, string $text): void {
+            $frame['block']['innerHTML'] .= $text;
+            $last = array_key_last($frame['block']['innerContent']);
 
-        foreach ($matches as $match) {
-            $name = (string) $match[1];
-            $attrs = [] !== ($decoded = json_decode((string) ($match[2] ?? ''), true)) && is_array($decoded)
-                ? $decoded
-                : [];
+            if (null !== $last && is_string($frame['block']['innerContent'][$last])) {
+                $frame['block']['innerContent'][$last] .= $text;
+            } else {
+                $frame['block']['innerContent'][] = $text;
+            }
+        };
+        $append_block = static function (array $block) use (&$blocks, &$stack): void {
+            if ([] === $stack) {
+                $blocks[] = $block;
 
-            if (!str_contains($name, '/')) {
-                $name = 'core/' . $name;
+                return;
+            }
+
+            $parent = array_key_last($stack);
+            $stack[$parent]['block']['innerBlocks'][] = $block;
+            $stack[$parent]['block']['innerContent'][] = null;
+        };
+        $append_freeform = static function (string $text) use (&$blocks): void {
+            if ('' === $text) {
+                return;
             }
 
             $blocks[] = [
-                'blockName' => $name,
-                'attrs' => $attrs,
-                'innerBlocks' => parse_blocks((string) $match[3]),
-                'innerHTML' => (string) $match[3],
+                'blockName' => null,
+                'attrs' => [],
+                'innerBlocks' => [],
+                'innerHTML' => $text,
+                'innerContent' => [$text],
             ];
+        };
+
+        foreach ($matches as $match) {
+            $token = (string) $match[0][0];
+            $offset = (int) $match[0][1];
+            $text = substr($content, $cursor, $offset - $cursor);
+
+            if ([] === $stack) {
+                $append_freeform($text);
+            } else {
+                $current = array_key_last($stack);
+                $append_text($stack[$current], $text);
+            }
+
+            $is_closing = '/' === (string) ($match[1][0] ?? '');
+            $is_self_closing = '/' === (string) ($match[4][0] ?? '');
+            $name = (string) $match[2][0];
+
+            if ($is_closing) {
+                $frame = array_pop($stack);
+
+                if (is_array($frame)) {
+                    $append_block($frame['block']);
+                }
+            } else {
+                $decoded = json_decode((string) ($match[3][0] ?? ''), true);
+                $block = [
+                    'blockName' => str_contains($name, '/') ? $name : 'core/' . $name,
+                    'attrs' => is_array($decoded) ? $decoded : [],
+                    'innerBlocks' => [],
+                    'innerHTML' => '',
+                    'innerContent' => [],
+                ];
+
+                if ($is_self_closing) {
+                    $append_block($block);
+                } else {
+                    $stack[] = ['name' => $name, 'block' => $block];
+                }
+            }
+
+            $cursor = $offset + strlen($token);
+        }
+
+        $tail = substr($content, $cursor);
+
+        if ([] === $stack) {
+            $append_freeform($tail);
+        } else {
+            $current = array_key_last($stack);
+            $append_text($stack[$current], $tail);
+
+            while ([] !== $stack) {
+                $frame = array_pop($stack);
+
+                if (is_array($frame)) {
+                    $append_block($frame['block']);
+                }
+            }
         }
 
         return $blocks;
@@ -818,7 +915,7 @@ if (!function_exists('wp_get_attachment_image_url')) {
     function wp_get_attachment_image_url(int $attachment_id, string|array $size = 'thumbnail'): string|false {
         unset($size);
 
-        return wp_get_attachment_url($attachment_id);
+        return $GLOBALS['awpt_test_attachment_image_urls'][$attachment_id] ?? wp_get_attachment_url($attachment_id);
     }
 }
 
@@ -837,6 +934,12 @@ if (!function_exists('esc_url_raw')) {
 if (!function_exists('esc_url')) {
     function esc_url(string $url): string {
         return esc_url_raw($url);
+    }
+}
+
+if (!function_exists('esc_attr')) {
+    function esc_attr(string $text): string {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }
 
@@ -885,6 +988,15 @@ if (!function_exists('serialize_blocks')) {
         }
 
         return $content;
+    }
+}
+
+if (!function_exists('serialize_block')) {
+    /**
+     * @param array<string, mixed> $block
+     */
+    function serialize_block(array $block): string {
+        return serialize_blocks([$block]);
     }
 }
 
@@ -1180,6 +1292,20 @@ if (!function_exists('get_the_title')) {
 if (!function_exists('wp_create_nonce')) {
     function wp_create_nonce(string $action = ''): string {
         return 'nonce-' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $action);
+    }
+}
+
+if (!function_exists('wp_nonce_tick')) {
+    function wp_nonce_tick(string|int $action = -1): float {
+        unset($action);
+
+        return 123.0;
+    }
+}
+
+if (!function_exists('wp_hash')) {
+    function wp_hash(string $data, string $scheme = 'auth'): string {
+        return hash('sha256', $scheme . '|' . $data);
     }
 }
 

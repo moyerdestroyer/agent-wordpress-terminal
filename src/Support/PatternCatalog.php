@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Support;
 
+use AWPT\Domain\PatternMetadataCatalog;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -20,8 +22,11 @@ if (!defined('ABSPATH')) {
 final class PatternCatalog {
     private SiteDesignContext $design;
 
-    public function __construct(?SiteDesignContext $design = null) {
+    private PatternMetadataCatalog $domain_patterns;
+
+    public function __construct(?SiteDesignContext $design = null, ?PatternMetadataCatalog $domain_patterns = null) {
         $this->design = $design ?? new SiteDesignContext();
+        $this->domain_patterns = $domain_patterns ?? new PatternMetadataCatalog();
     }
 
     /**
@@ -182,8 +187,11 @@ final class PatternCatalog {
         $content = (string) ($pattern['content'] ?? '');
         $source = (string) ($pattern['source'] ?? 'registered');
         $name = (string) ($pattern['name'] ?? '');
-        $pattern_post_types = $this->string_list($pattern['postTypes'] ?? null);
+        $registered_post_types = $this->string_list($pattern['postTypes'] ?? null);
         $post_type = sanitize_key($post_type);
+        $domain = $this->domain_patterns->get($name);
+        $domain_post_types = $this->string_list($domain['post_types'] ?? null);
+        $pattern_post_types = [] !== $domain_post_types ? $domain_post_types : $registered_post_types;
         $compatibility = 'unspecified';
 
         if ('' !== $post_type) {
@@ -192,7 +200,7 @@ final class PatternCatalog {
                 : 'incompatible';
         }
 
-        return [
+        $summary = [
             'name' => $name,
             'title' => (string) ($pattern['title'] ?? ''),
             'description' => (string) ($pattern['description'] ?? ''),
@@ -202,11 +210,18 @@ final class PatternCatalog {
             'categories' => $this->string_list($pattern['categories'] ?? null),
             'block_types' => $this->string_list($pattern['blockTypes'] ?? null),
             'post_types' => $pattern_post_types,
+            'registered_post_types' => $registered_post_types,
             'viewport_width' => (int) ($pattern['viewportWidth'] ?? 0),
             'block_count' => count(array_filter(parse_blocks($content), BlockTree::has_block_name(...))),
             'content_hash' => hash('sha256', $content),
             'composition_scope' => $this->composition_scope($name, (string) ($pattern['title'] ?? '')),
         ];
+
+        if ([] !== $domain) {
+            $summary['domain'] = $domain;
+        }
+
+        return $summary;
     }
 
     /**
@@ -324,6 +339,7 @@ final class PatternCatalog {
             (string) ($pattern['title'] ?? ''),
             (string) ($pattern['description'] ?? ''),
             implode(' ', $this->string_list($pattern['categories'] ?? null)),
+            $this->domain_search_text((string) ($pattern['name'] ?? '')),
         ]));
 
         if (str_contains($haystack, $search)) {
@@ -376,6 +392,7 @@ final class PatternCatalog {
             (string) ($pattern['title'] ?? ''),
             (string) ($pattern['description'] ?? ''),
             implode(' ', $this->string_list($pattern['categories'] ?? null)),
+            $this->domain_search_text((string) ($pattern['name'] ?? '')),
         ]));
         $score = str_contains($haystack, $search) ? 100 : 0;
 
@@ -506,5 +523,19 @@ final class PatternCatalog {
         }
 
         return array_values(array_filter($value, 'is_string'));
+    }
+
+    private function domain_search_text(string $pattern_name): string {
+        $metadata = $this->domain_patterns->get($pattern_name);
+        $parts = [
+            (string) ($metadata['role'] ?? ''),
+            (string) ($metadata['summary'] ?? ''),
+        ];
+
+        foreach (['intents', 'use_when', 'avoid_when', 'search_terms'] as $key) {
+            $parts[] = implode(' ', $this->string_list($metadata[$key] ?? null));
+        }
+
+        return implode(' ', $parts);
     }
 }

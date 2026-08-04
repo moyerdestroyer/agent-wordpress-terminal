@@ -67,6 +67,7 @@ function test_post_composition_normalizer_uses_canonical_attachment_urls(): void
         $GLOBALS['awpt_test_posts'][$id] = $attachment;
         $GLOBALS['awpt_test_attachment_is_image'][$id] = true;
         $GLOBALS['awpt_test_attachment_urls'][$id] = "https://example.test/uploads/real-{$id}.png";
+        $GLOBALS['awpt_test_attachment_image_urls'][$id] = "https://example.test/uploads/real-{$id}-1200x800.png";
     }
 
     $source =
@@ -90,6 +91,10 @@ function test_post_composition_normalizer_uses_canonical_attachment_urls(): void
         Assert::false(
             str_contains($result['content'], "https://example.test/uploads/image-{$id}.png"),
             "the invented URL for attachment #{$id} should be removed",
+        );
+        Assert::false(
+            str_contains($result['content'], "https://example.test/uploads/real-{$id}-1200x800.png"),
+            "an intermediate-size URL for attachment #{$id} should not become canonical identity",
         );
     }
 
@@ -157,8 +162,62 @@ function test_post_composition_normalizer_wraps_bare_list_items(): void {
     Assert::same([], $second['repairs'], 'list-item repair should be idempotent');
 }
 
+function test_post_composition_normalizer_closes_unambiguous_attribute_json(): void {
+    $source =
+        '<!-- wp:cover {"id":88,"style":{"spacing":{"padding":{"top":"var:preset|spacing|50"}}} -->'
+        . '<div class="wp-block-cover"><img class="wp-block-cover__image-background wp-image-88" /></div>'
+        . '<!-- /wp:cover -->';
+    $result = new PostCompositionNormalizer()->normalize($source);
+
+    Assert::same(
+        'block_attribute_json',
+        $result['repairs'][0]['kind'] ?? '',
+        'a missing final JSON object delimiter should be repaired and reported',
+    );
+    Assert::true(str_contains($result['content'], '"id":88'), 'valid attributes must survive the repair');
+    Assert::same(
+        null,
+        new PostCompositionValidator()->validate($result['content']),
+        'the repaired block attributes should validate for the editor',
+    );
+
+    $second = new PostCompositionNormalizer()->normalize($result['content']);
+    Assert::same([], $second['repairs'], 'attribute JSON repair should be idempotent');
+}
+
+function test_post_composition_normalizer_repairs_bare_button_labels(): void {
+    $source =
+        '<!-- wp:button {"backgroundColor":"secondary","className":"is-style-fill"} -->'
+        . '<div class="wp-block-button is-style-fill">Shop the Collection</div>'
+        . '<!-- /wp:button -->';
+    $result = new PostCompositionNormalizer()->normalize($source);
+
+    Assert::same(
+        'button_link_markup',
+        $result['repairs'][0]['kind'] ?? '',
+        'a bare button label should receive canonical link markup',
+    );
+    Assert::true(
+        str_contains(
+            $result['content'],
+            '<a class="wp-block-button__link has-secondary-background-color has-background wp-element-button">Shop the Collection</a>',
+        ),
+        'the repair should preserve the label and derive the preset background classes',
+    );
+    Assert::same(
+        null,
+        new PostCompositionValidator()->validate($result['content']),
+        'the repaired button should pass static markup validation',
+    );
+
+    $second = new PostCompositionNormalizer()->normalize($result['content']);
+    Assert::same([], $second['repairs'], 'button link repair should be idempotent');
+}
+
 test_post_composition_normalizer_aligns_group_wrapper_metadata();
 test_post_composition_normalizer_repairs_cover_and_media_text_classes();
 test_post_composition_normalizer_uses_canonical_attachment_urls();
 test_post_composition_normalizer_is_idempotent_and_does_not_rewrite_copy();
 test_post_composition_normalizer_wraps_bare_list_items();
+test_post_composition_normalizer_closes_unambiguous_attribute_json();
+test_post_composition_normalizer_repairs_bare_button_labels();

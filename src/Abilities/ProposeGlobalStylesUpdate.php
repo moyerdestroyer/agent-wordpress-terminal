@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ActionOperations;
@@ -124,6 +125,10 @@ final class ProposeGlobalStylesUpdate implements AbilityInterface {
             'post_content' => $normalized_content,
             'global_styles_theme' => get_stylesheet(),
             'affected' => sanitize_textarea_field((string) ($input['affected'] ?? 'Global styles')),
+            'agent_feedback' => AgentFeedback::make('staged', __(
+                'The normalized global-styles proposal is staged for human review.',
+                'agent-wordpress-terminal',
+            )),
         ];
         $action_id = $this->actions->create(
             $session_id,

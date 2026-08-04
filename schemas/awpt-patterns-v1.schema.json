@@ -1,0 +1,46 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://awpt.dev/schemas/awpt-patterns-v1.json",
+	"title": "AWPT Pattern Catalog",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schema_version", "patterns"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"schema_version": { "const": 1 },
+		"patterns": {
+			"type": "object",
+			"additionalProperties": {
+				"type": "object",
+				"additionalProperties": true,
+				"properties": {
+					"role": { "type": "string" },
+					"summary": { "type": "string" },
+					"intents": { "type": "array", "items": { "type": "string" } },
+					"use_when": { "type": "array", "items": { "type": "string" } },
+					"avoid_when": { "type": "array", "items": { "type": "string" } },
+					"search_terms": { "type": "array", "items": { "type": "string" } },
+					"post_types": { "type": "array", "items": { "type": "string" } },
+					"companions": { "type": "array", "items": { "type": "string" } },
+					"composed": { "type": "array", "items": { "type": "string" } },
+					"dynamic_content": { "type": "boolean" },
+					"required_blocks": { "type": "array", "items": { "type": "string" } },
+					"max_per_document": { "type": "integer", "minimum": 0 },
+					"content_rules": {
+						"type": "object",
+						"additionalProperties": {
+							"oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+						}
+					},
+					"validation": {
+						"type": "object",
+						"additionalProperties": {
+							"oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+						}
+					},
+					"docs": { "type": "string" }
+				}
+			}
+		}
+	}
+}

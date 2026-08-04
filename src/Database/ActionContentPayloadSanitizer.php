@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 namespace AWPT\Database;
 
+use AWPT\Support\ArrayKey;
 use AWPT\Support\PostContentSanitizer;
+use AWPT\Support\ResourceValueSanitizer;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -30,6 +32,8 @@ final class ActionContentPayloadSanitizer {
         $clean = $this->copy_html_fields($clean, $payload);
         $clean = $this->copy_preview_fields($clean, $payload);
         $clean = $this->copy_meta_fields($clean, $payload);
+        $clean = $this->copy_review_undo_fields($clean, $payload);
+        /** @var array<string, mixed> $clean */
         $clean = $this->copy_agent_rationale($clean, $payload);
         /** @var array<string, mixed> $clean */
 
@@ -37,6 +41,27 @@ final class ActionContentPayloadSanitizer {
     }
 
     /** @param array<string, mixed> $clean @param array<string, mixed> $payload @return array<string, mixed> */
+    private function copy_review_undo_fields(array $clean, array $payload): array {
+        if (is_array($payload['review_undo_snapshot'] ?? null)) {
+            $snapshot = $payload['review_undo_snapshot'];
+            $clean['review_undo_snapshot'] = [
+                'post_title' => sanitize_text_field((string) ($snapshot['post_title'] ?? '')),
+                'post_content' => PostContentSanitizer::for_staged_update((string) ($snapshot['post_content'] ?? '')),
+                'post_status' => sanitize_key((string) ($snapshot['post_status'] ?? '')),
+                'meta' => new ResourceValueSanitizer()->sanitize_object(
+                    is_array($snapshot['meta'] ?? null) ? $snapshot['meta'] : [],
+                ),
+            ];
+        }
+
+        if ('' !== (string) ($payload['review_applied_fingerprint'] ?? '')) {
+            $clean['review_applied_fingerprint'] = sanitize_text_field((string) $payload['review_applied_fingerprint']);
+        }
+
+        return $clean;
+    }
+
+    /** @param array<array-key, mixed> $clean @param array<string, mixed> $payload @return array<string, mixed> */
     private function copy_agent_rationale(array $clean, array $payload): array {
         if (is_array($payload['proposal_manifest'] ?? null)) {
             $manifest = $payload['proposal_manifest'];
@@ -81,15 +106,17 @@ final class ActionContentPayloadSanitizer {
             }, $payload['repairs_applied'])));
         }
 
-        return $this->copy_composition_context($clean, $payload);
+        return $this->copy_composition_context(ArrayKey::string_map($clean), ArrayKey::string_map($payload));
     }
 
     /**
      * @param array<string, mixed> $clean
-     * @param array<array-key, mixed> $payload
+     * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
     private function copy_composition_context(array $clean, array $payload): array {
+        $clean = $this->copy_domain_validation($clean, $payload);
+
         if (!is_array($payload['composition_context'] ?? null)) {
             return $clean;
         }
@@ -105,6 +132,94 @@ final class ActionContentPayloadSanitizer {
             'fallback_used' => filter_var($context['fallback_used'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'fallback_reason' => sanitize_textarea_field((string) ($context['fallback_reason'] ?? '')),
         ];
+
+        return $clean;
+    }
+
+    /**
+     * @param array<string, mixed> $clean
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function copy_domain_validation(array $clean, array $payload): array {
+        if ('' !== (string) ($payload['ruleset_hash'] ?? '')) {
+            $clean['ruleset_hash'] = sanitize_text_field((string) $payload['ruleset_hash']);
+        }
+
+        if (is_array($payload['agent_feedback'] ?? null)) {
+            $clean['agent_feedback'] = new ResourceValueSanitizer()->sanitize_object($payload['agent_feedback']);
+        }
+
+        if (is_array($payload['safe_fixes'] ?? null)) {
+            $clean['safe_fixes'] = array_values(array_filter(array_map(static function (mixed $fix): ?array {
+                if (!is_array($fix)) {
+                    return null;
+                }
+
+                return [
+                    'id' => sanitize_key((string) ($fix['id'] ?? '')),
+                    'description' => sanitize_textarea_field((string) ($fix['description'] ?? '')),
+                    'block_path' => sanitize_text_field((string) ($fix['block_path'] ?? '')),
+                    'before_hash' => sanitize_text_field((string) ($fix['before_hash'] ?? '')),
+                    'after_hash' => sanitize_text_field((string) ($fix['after_hash'] ?? '')),
+                    'applied' => filter_var($fix['applied'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                ];
+            }, $payload['safe_fixes'])));
+        }
+
+        if (is_array($payload['validation_findings'] ?? null)) {
+            $clean['validation_findings'] = array_values(array_filter(array_map(
+                static function (mixed $finding): ?array {
+                    if (!is_array($finding)) {
+                        return null;
+                    }
+
+                    return [
+                        'severity' => sanitize_key((string) ($finding['severity'] ?? 'warning')),
+                        'code' => sanitize_key((string) ($finding['code'] ?? '')),
+                        'message' => sanitize_textarea_field((string) ($finding['message'] ?? '')),
+                        'rule_id' => sanitize_key((string) ($finding['rule_id'] ?? '')),
+                        'block_path' => sanitize_text_field((string) ($finding['block_path'] ?? '')),
+                        'source' => sanitize_text_field((string) ($finding['source'] ?? '')),
+                        'suggestion' => sanitize_textarea_field((string) ($finding['suggestion'] ?? '')),
+                        'pack_id' => sanitize_key((string) ($finding['pack_id'] ?? '')),
+                        'expected' => is_scalar($finding['expected'] ?? null)
+                            ? sanitize_text_field((string) $finding['expected'])
+                            : '',
+                        'actual' => is_scalar($finding['actual'] ?? null)
+                            ? sanitize_text_field((string) $finding['actual'])
+                            : '',
+                        'docs' => sanitize_text_field((string) ($finding['docs'] ?? '')),
+                    ];
+                },
+                $payload['validation_findings'],
+            )));
+        }
+
+        if (is_array($payload['composition_manifest']['patterns'] ?? null)) {
+            $clean['composition_manifest'] = [
+                'patterns' => array_values(array_filter(array_map(static function (mixed $pattern): ?array {
+                    if (!is_array($pattern)) {
+                        return null;
+                    }
+
+                    $name = sanitize_text_field((string) ($pattern['name'] ?? ''));
+
+                    if ('' === $name) {
+                        return null;
+                    }
+
+                    return [
+                        'name' => $name,
+                        'block_path' => sanitize_text_field((string) ($pattern['block_path'] ?? '')),
+                        'mode' => sanitize_key((string) ($pattern['mode'] ?? '')),
+                        'source_hash' => sanitize_text_field((string) ($pattern['source_hash'] ?? '')),
+                        'pack_id' => sanitize_key((string) ($pattern['pack_id'] ?? '')),
+                        'pack_version' => sanitize_text_field((string) ($pattern['pack_version'] ?? '')),
+                    ];
+                }, $payload['composition_manifest']['patterns']))),
+            ];
+        }
 
         return $clean;
     }
@@ -143,6 +258,10 @@ final class ActionContentPayloadSanitizer {
 
         if (array_key_exists('affected', $payload)) {
             $clean['affected'] = sanitize_textarea_field((string) $payload['affected']);
+        }
+
+        if (array_key_exists('presentation_requires_h1', $payload)) {
+            $clean['presentation_requires_h1'] = true === $payload['presentation_requires_h1'];
         }
 
         if (array_key_exists('post_parent', $payload)) {
@@ -286,6 +405,43 @@ final class ActionContentPayloadSanitizer {
             }
 
             $clean['inserted_paths'] = $paths;
+        }
+
+        if (array_key_exists('batch_changes', $payload) && is_array($payload['batch_changes'])) {
+            $clean['batch_changes'] = array_values(array_filter(array_map(function (mixed $change): ?array {
+                if (!is_array($change)) {
+                    return null;
+                }
+
+                $kind = sanitize_key((string) ($change['kind'] ?? ''));
+                $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
+
+                if (!in_array($kind, ['update_attrs', 'replace_text', 'remove', 'insert'], true) || '' === $path) {
+                    return null;
+                }
+
+                $item = [
+                    'kind' => $kind,
+                    'block_path' => $path,
+                    'expected_fingerprint' => sanitize_text_field((string) ($change['expected_fingerprint'] ?? '')),
+                    'block_name' => sanitize_text_field((string) ($change['block_name'] ?? '')),
+                ];
+
+                if (is_array($change['attrs'] ?? null)) {
+                    $item['attrs'] = $this->sanitize_attrs_map($change['attrs']);
+                }
+
+                if (array_key_exists('content', $change)) {
+                    $item['content'] = wp_kses_post((string) $change['content']);
+                }
+
+                if ('insert' === $kind) {
+                    $item['position'] = sanitize_key((string) ($change['position'] ?? 'before'));
+                    $item['inner_html'] = wp_kses_post((string) ($change['inner_html'] ?? ''));
+                }
+
+                return $item;
+            }, $payload['batch_changes'])));
         }
 
         return $clean;

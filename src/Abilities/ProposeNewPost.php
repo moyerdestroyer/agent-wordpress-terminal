@@ -10,16 +10,24 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
+use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\PatternCompositionBuilder;
+use AWPT\Domain\PatternMaterializer;
+use AWPT\Domain\PatternStructureCompleter;
+use AWPT\Domain\PatternTemplateExpander;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PatternCompositionPolicy;
 use AWPT\Support\PatternFallbackPolicy;
 use AWPT\Support\PostCompositionNormalizer;
 use AWPT\Support\PostCompositionValidator;
+use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\StagedPostPreview;
+use AWPT\Support\ThemePostTitleStrategy;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -148,8 +156,23 @@ final class ProposeNewPost implements AbilityInterface {
                     'post_content' => [
                         'type' => 'string',
                         'description' => __(
-                            'Post body only. Do not repeat post_title as a leading markdown # heading, HTML h1, '
-                            . 'or "Title:" line — themes already display the title above the content.',
+                            'Post body only. For materialized pattern mode, optional supplemental Gutenberg blocks appended after the expanded pattern. For adapted/freeform mode, the complete body. Do not repeat post_title as a leading markdown # heading, HTML h1, or "Title:" line — themes already display the title above the content.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'content_replacements' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'search' => ['type' => 'string'],
+                                'replace' => ['type' => 'string'],
+                                'expected_count' => ['type' => 'integer'],
+                            ],
+                            'required' => ['search', 'replace'],
+                        ],
+                        'description' => __(
+                            'For a targeted revision with action_id, exact replacements to apply to the existing staged post_content. When supplied, AWPT ignores post_content and preserves every byte outside these replacements. Each search must match exactly once unless expected_count is provided.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -189,15 +212,71 @@ final class ProposeNewPost implements AbilityInterface {
                     'pattern_name' => [
                         'type' => 'string',
                         'description' => __(
-                            'Optional registered or reusable pattern name for provenance. With pattern_mode adapted (default when named), post_content is the full customized document and the raw pattern is not injected. With pattern_mode prepend, the server inserts the unchanged pattern and post_content must be a short body-only tail. Read the pattern with awpt/read-pattern before adapted.',
+                            'Optional registered or reusable pattern name. Named patterns default to materialized mode: AWPT expands the full pattern and applies compact replacements. Use adapted only when post_content intentionally contains the complete custom document. With prepend, AWPT inserts the unchanged pattern before a short tail.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_names' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'description' => __(
+                            'Optional ordered registered-pattern composition. In materialized mode AWPT expands and concatenates every exact name before applying path-addressed edits. There is no document-size or section-count limit.',
                             'agent-wordpress-terminal',
                         ),
                     ],
                     'pattern_mode' => [
                         'type' => 'string',
-                        'enum' => ['prepend', 'adapted'],
+                        'enum' => ['materialized', 'prepend', 'adapted'],
                         'description' => __(
-                            'adapted (default when pattern_name is set): post_content is the complete customized composition; pattern_name is provenance only. prepend: server inserts the unchanged pattern; pass only a short body tail in post_content — never a second filled layout.',
+                            'materialized: AWPT expands the selected full-page pattern and applies compact pattern_replacements, with optional post_content appended. Preferred for ordinary and vague page requests. adapted: post_content is the complete custom composition and pattern_name is provenance. prepend: server inserts the unchanged pattern before a short tail.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_replacements' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'search' => ['type' => 'string'],
+                                'replace' => ['type' => 'string'],
+                                'expected_count' => ['type' => 'integer'],
+                            ],
+                            'required' => ['search', 'replace'],
+                        ],
+                        'description' => __(
+                            'Exact text or markup replacements applied to the recursively expanded registered pattern in materialized mode. Use these to customize headings, copy, buttons, and small markup without resending the full pattern.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_text_updates' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'block_path' => ['type' => 'string'],
+                                'content' => ['type' => 'string'],
+                            ],
+                            'required' => ['block_path', 'content'],
+                        ],
+                        'description' => __(
+                            'Path-addressed rich-text updates applied to editable slots in a materialized pattern. Paths come from awpt/prepare-pattern-draft and preserve the pattern markup server-side.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'media_placements' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'attachment_id' => ['type' => 'integer'],
+                                'block_path' => ['type' => 'string'],
+                                'position' => ['type' => 'string', 'enum' => ['before', 'after', 'append']],
+                                'alt' => ['type' => 'string'],
+                            ],
+                            'required' => ['attachment_id', 'block_path', 'position'],
+                        ],
+                        'description' => __(
+                            'Intentional Media Library image placements against original materialized-pattern paths.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -227,14 +306,14 @@ final class ProposeNewPost implements AbilityInterface {
                     'required_minimum_library_images' => [
                         'type' => 'integer',
                         'description' => __(
-                            'Optional agent-declared minimum of distinct inline Media Library images; verified when supplied.',
+                            'Exact minimum of distinct Media Library images explicitly requested by the user. Omit when the user gave no number.',
                             'agent-wordpress-terminal',
                         ),
                     ],
                     'required_minimum_visuals' => [
                         'type' => 'integer',
                         'description' => __(
-                            'Optional agent-declared minimum of visible image, cover, icon, or featured-image placements.',
+                            'Exact minimum of visible placements explicitly requested by the user. Omit when the user gave no number.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -253,9 +332,8 @@ final class ProposeNewPost implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
-                    'pattern_read_verified' => ['type' => 'boolean'],
                 ],
-                'required' => ['session_id', 'title', 'description', 'post_title', 'post_content'],
+                'required' => ['session_id', 'title', 'description', 'post_title'],
             ],
             'output_schema' => ['type' => 'object'],
             'permission_callback' => [$this, 'can_propose'],
@@ -374,7 +452,66 @@ final class ProposeNewPost implements AbilityInterface {
      */
     private function prepare_payload(array $input, array $existing_payload): array|\WP_Error {
         $post_title = trim(sanitize_text_field((string) ($input['post_title'] ?? '')));
-        $post_content = trim((string) ($input['post_content'] ?? ''));
+        $post_content = $this->unwrap_content_transport((string) ($input['post_content'] ?? ''));
+        $replacements = is_array($input['content_replacements'] ?? null) ? $input['content_replacements'] : [];
+        $composition = new PatternCompositionPolicy();
+        $requested_pattern_names = $this->pattern_names($input, $existing_payload);
+        $requested_pattern_name = $requested_pattern_names[0] ?? sanitize_text_field(
+            (string) ($input['pattern_name'] ?? $existing_payload['pattern_name'] ?? ''),
+        );
+        $pattern_mode = $composition->resolve_mode(
+            (string) ($input['pattern_mode'] ?? ''),
+            $requested_pattern_name,
+            (string) ($existing_payload['pattern_mode'] ?? ''),
+        );
+
+        if ([] !== $replacements) {
+            $existing_content = (string) ($existing_payload['post_content'] ?? '');
+
+            if ('' === $existing_content) {
+                return new \WP_Error(
+                    'awpt_replacement_requires_revision',
+                    __(
+                        'Exact content replacements require an existing staged new-post proposal.',
+                        'agent-wordpress-terminal',
+                    ),
+                    ['status' => 400],
+                );
+            }
+
+            $post_content = $this->apply_content_replacements($existing_content, $replacements);
+
+            if (is_wp_error($post_content)) {
+                return $post_content;
+            }
+        } elseif (PatternCompositionPolicy::MODE_MATERIALIZED === $pattern_mode) {
+            if ('' === $requested_pattern_name) {
+                return new \WP_Error(
+                    'awpt_materialized_pattern_required',
+                    __('Materialized mode requires an exact registered pattern name.', 'agent-wordpress-terminal'),
+                    ['status' => 400],
+                );
+            }
+
+            $pattern_replacements = is_array($input['pattern_replacements'] ?? null)
+                ? $input['pattern_replacements']
+                : [];
+            $text_updates = is_array($input['pattern_text_updates'] ?? null) ? $input['pattern_text_updates'] : [];
+            $media_placements = is_array($input['media_placements'] ?? null) ? $input['media_placements'] : [];
+            $materialized = new PatternCompositionBuilder()->build(
+                $requested_pattern_names ?: [$requested_pattern_name],
+                $pattern_replacements,
+                $text_updates,
+                $media_placements,
+            );
+
+            if (is_wp_error($materialized)) {
+                return $materialized;
+            }
+
+            $supplemental = $post_content;
+            $post_content = trim($materialized . ('' !== $supplemental ? "\n\n" . $supplemental : ''));
+        }
 
         if ('' === $post_title || '' === $post_content) {
             return new \WP_Error(
@@ -410,10 +547,9 @@ final class ProposeNewPost implements AbilityInterface {
         $required_pattern_prefix = '' !== $input_pattern_prefix
             ? $input_pattern_prefix
             : sanitize_text_field((string) ($existing_payload['required_pattern_prefix'] ?? ''));
-        $input_pattern_name = sanitize_text_field((string) ($input['pattern_name'] ?? ''));
-        $pattern_name = '' !== $input_pattern_name
-            ? $input_pattern_name
-            : sanitize_text_field((string) ($existing_payload['pattern_name'] ?? ''));
+        $pattern_name = $requested_pattern_names[0] ?? sanitize_text_field(
+            (string) ($input['pattern_name'] ?? $existing_payload['pattern_name'] ?? ''),
+        );
         $input_fallback_reason = sanitize_textarea_field((string) ($input['pattern_fallback_reason'] ?? ''));
         $pattern_fallback_reason = '' !== $input_fallback_reason
             ? $input_fallback_reason
@@ -462,57 +598,19 @@ final class ProposeNewPost implements AbilityInterface {
             (int) ($input['required_minimum_visuals'] ?? $existing_payload['required_minimum_visuals'] ?? 0),
         ));
 
-        $composition = new PatternCompositionPolicy();
-        $pattern_mode = $composition->resolve_mode(
-            (string) ($input['pattern_mode'] ?? ''),
-            $pattern_name,
-            (string) ($existing_payload['pattern_mode'] ?? ''),
-        );
-
         if (!in_array(
             $pattern_mode,
             [
                 PatternCompositionPolicy::MODE_PREPEND,
                 PatternCompositionPolicy::MODE_ADAPTED,
+                PatternCompositionPolicy::MODE_MATERIALIZED,
             ],
             true,
         )) {
             return new \WP_Error(
                 'awpt_invalid_pattern_mode',
-                __('Pattern mode must be prepend or adapted.', 'agent-wordpress-terminal'),
+                __('Pattern mode must be materialized, prepend, or adapted.', 'agent-wordpress-terminal'),
                 ['status' => 400],
-            );
-        }
-
-        $existing_pattern_name = sanitize_text_field((string) ($existing_payload['pattern_name'] ?? ''));
-        // Revisions of an already-staged adapted pattern do not need another
-        // read-pattern for the same name. Only require a fresh read when the
-        // agent introduces or switches the pattern on this call.
-        $pattern_unchanged_on_revision = '' !== $existing_pattern_name && $existing_pattern_name === $pattern_name;
-        $pattern_read_required =
-            PatternCompositionPolicy::MODE_ADAPTED === $pattern_mode
-            && '' !== $pattern_name
-            && array_key_exists('pattern_read_verified', $input)
-            && !filter_var($input['pattern_read_verified'], FILTER_VALIDATE_BOOLEAN)
-            && !$pattern_unchanged_on_revision;
-
-        if ($pattern_read_required) {
-            return new \WP_Error(
-                'awpt_pattern_not_read',
-                __(
-                    'Read the selected pattern with awpt/read-pattern before staging an adapted composition.',
-                    'agent-wordpress-terminal',
-                ),
-                [
-                    'status' => 400,
-                    'recovery' => __(
-                        'Call awpt/read-pattern for the exact pattern name, then resubmit one awpt/propose-new-post with pattern_mode adapted and a single full customized composition in post_content.',
-                        'agent-wordpress-terminal',
-                    ),
-                    'recommended_next_tools' => [
-                        ['tool' => 'awpt/read-pattern', 'input' => ['name' => $pattern_name]],
-                    ],
-                ],
             );
         }
 
@@ -578,7 +676,8 @@ final class ProposeNewPost implements AbilityInterface {
             }
 
             if ($composition->should_prepend($pattern_mode, $pattern_content, $post_content)) {
-                $post_content = $pattern_content . "\n\n" . $post_content;
+                $post_content =
+                    new PatternMaterializer()->materialize($pattern_name, $pattern_content) . "\n\n" . $post_content;
             }
         }
 
@@ -594,6 +693,14 @@ final class ProposeNewPost implements AbilityInterface {
             return $fallback_error;
         }
 
+        $repairs_applied = [];
+        $normalization = new PostCompositionNormalizer()->normalize($post_content);
+        $post_content = $normalization['content'];
+        $repairs_applied = array_map(
+            static fn(array $repair): string => (string) ($repair['kind'] ?? ''),
+            $normalization['repairs'],
+        );
+
         $validator = new PostCompositionValidator();
         $syntax_error = $validator->validate_syntax($post_content);
 
@@ -601,17 +708,14 @@ final class ProposeNewPost implements AbilityInterface {
             return $syntax_error;
         }
 
-        $normalization = new PostCompositionNormalizer()->normalize($post_content);
-        $post_content = $normalization['content'];
-        $repairs_applied = $normalization['repairs'];
+        $media_integrity = new PostContentMediaIntegrity()->prepare($post_content);
 
-        // When required media is missing from post_content, insert an explicit
-        // Image block near the top rather than failing after the model forgot it.
-        if ([] !== $required_attachment_ids) {
-            $media = $this->ensure_inline_attachments($post_content, $required_attachment_ids);
-            $post_content = $media['content'];
-            $repairs_applied = [...$repairs_applied, ...$media['repairs']];
+        if (is_wp_error($media_integrity)) {
+            return $media_integrity;
         }
+
+        $post_content = $media_integrity['content'];
+        $repairs_applied = [...$repairs_applied, ...$media_integrity['repairs']];
 
         if ('' !== $pattern_content) {
             $twin_conflict = $composition->conflict_if_raw_pattern_twin($pattern_content, $post_content);
@@ -633,6 +737,16 @@ final class ProposeNewPost implements AbilityInterface {
                     return $twin_conflict;
                 }
             }
+        }
+
+        // Adapted patterns are editable, but their declared dynamic or
+        // structural dependencies are not optional. Restore exact source
+        // structure only when the model omitted it entirely; freeform drafts
+        // (no pattern_name) never enter this path.
+        if ('' !== $pattern_content && PatternCompositionPolicy::MODE_ADAPTED === $pattern_mode) {
+            $completion = new PatternStructureCompleter()->complete($pattern_name, $pattern_content, $post_content);
+            $post_content = $completion['content'];
+            $repairs_applied = [...$repairs_applied, ...$completion['repairs']];
         }
 
         $validation_error = $validator->validate(
@@ -662,6 +776,77 @@ final class ProposeNewPost implements AbilityInterface {
             return new \WP_Error($validation_error->get_error_code(), $validation_error->get_error_message(), $data);
         }
 
+        $domain_validation = new DomainValidationService();
+
+        $materializer = new PatternMaterializer();
+
+        if (
+            '' !== $pattern_name
+            && in_array(
+                $pattern_mode,
+                [PatternCompositionPolicy::MODE_ADAPTED, PatternCompositionPolicy::MODE_MATERIALIZED],
+                true,
+            )
+            && !$materializer->has_provenance($pattern_name, $post_content)
+        ) {
+            $post_content = $materializer->materialize($pattern_name, $post_content, false);
+        }
+
+        $title_strategy = new ThemePostTitleStrategy();
+        $requested_page_template = sanitize_text_field(
+            (string) ($input['page_template'] ?? $existing_payload['page_template'] ?? ''),
+        );
+
+        if (
+            ThemePostTitleStrategy::CONTENT_REQUIRED === $title_strategy->for_post_type(
+                $post_type,
+                $requested_page_template,
+            )
+            && !$title_strategy->content_has_h1($post_content)
+        ) {
+            return new \WP_Error(
+                'awpt_content_h1_required',
+                __(
+                    'The active template does not render the WordPress post title. Add exactly one level-1 core/heading for the page headline, then keep section headings at level 2 or deeper.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 400,
+                    'title_strategy' => ThemePostTitleStrategy::CONTENT_REQUIRED,
+                    'recovery' => __(
+                        'Change the main hero or page headline to a level-1 core/heading. Do not add a second H1.',
+                        'agent-wordpress-terminal',
+                    ),
+                ],
+            );
+        }
+
+        $domain_result = $domain_validation->evaluate(
+            $post_content,
+            [
+                'operation' => ActionOperations::NEW_POST,
+                'work_type' => 'compose',
+                'post_type' => $post_type,
+                'pattern_name' => $pattern_name,
+                'phase' => 'stage',
+            ],
+            true,
+        );
+        $post_content = $domain_result['content'];
+        $domain_findings = $domain_result['findings'];
+        $domain_error = $domain_validation->blocking_error($domain_findings);
+
+        if (null !== $domain_error) {
+            $domain_error->add_data([
+                'status' => 409,
+                'validation_findings' => $domain_findings,
+                'ruleset_hash' => $domain_result['ruleset_hash'],
+                'safe_fixes' => $domain_result['fixes'],
+                'agent_feedback' => $domain_result['agent_feedback'],
+            ]);
+            return $domain_error;
+        }
+
         $payload = [
             'operation' => ActionOperations::NEW_POST,
             'post_id' => (int) ($existing_payload['post_id'] ?? 0),
@@ -669,6 +854,8 @@ final class ProposeNewPost implements AbilityInterface {
             'post_status' => 'draft',
             'post_title' => $post_title,
             'post_content' => PostContentSanitizer::for_staged_update($post_content),
+            'ruleset_hash' => $domain_result['ruleset_hash'],
+            'agent_feedback' => AgentFeedback::validation($domain_findings, $domain_result['fixes'], true),
         ];
 
         if ('' !== $pattern_name) {
@@ -677,6 +864,32 @@ final class ProposeNewPost implements AbilityInterface {
             $payload['pattern_title'] = (string) ($pattern_summary['title'] ?? '');
             $payload['pattern_source'] = (string) ($pattern_summary['source'] ?? '');
             $payload['pattern_owner'] = $pattern_owner;
+            $payload['composition_manifest'] = new PatternMaterializer()->provenance(
+                $pattern_name,
+                $pattern_mode,
+                $pattern_content,
+            );
+
+            if (count($requested_pattern_names) > 1) {
+                $payload['pattern_names'] = $requested_pattern_names;
+                $payload['composition_manifest']['patterns'] = $this->composition_provenance(
+                    $requested_pattern_names,
+                    $pattern_mode,
+                    $post_type,
+                );
+            }
+        }
+
+        if ([] !== $domain_findings) {
+            $payload['validation_findings'] = $domain_findings;
+        }
+
+        if ([] !== $domain_result['fixes']) {
+            $payload['safe_fixes'] = $domain_result['fixes'];
+            $repairs_applied = [
+                ...$repairs_applied,
+                ...array_map(static fn(array $fix): string => (string) ($fix['id'] ?? ''), $domain_result['fixes']),
+            ];
         }
 
         if ('' !== $pattern_fallback_reason) {
@@ -749,7 +962,7 @@ final class ProposeNewPost implements AbilityInterface {
         $page_template = sanitize_text_field((string) ($input['page_template'] ?? ''));
 
         if ('' !== $page_template && 'default' !== $page_template) {
-            if ('page' !== $post_type || !array_key_exists($page_template, get_page_templates())) {
+            if ('page' !== $post_type || !array_key_exists($page_template, $this->available_page_templates())) {
                 return new \WP_Error(
                     'awpt_invalid_page_template',
                     __('The requested page template is not available in the active theme.', 'agent-wordpress-terminal'),
@@ -767,6 +980,104 @@ final class ProposeNewPost implements AbilityInterface {
         }
 
         return $this->preview->prepare_new_post_payload($payload);
+    }
+
+    /**
+     * Tool arguments are already JSON strings, but long-form models sometimes
+     * add an XML CDATA or Markdown fence around the complete Gutenberg document.
+     * Remove only a matching whole-value envelope; never rewrite inner markup.
+     */
+    private function unwrap_content_transport(string $content): string {
+        return PostContentSanitizer::unwrap_transport($content);
+    }
+
+    /** @return array<string, string> Template filename keyed to display name. */
+    private function available_page_templates(): array {
+        if (function_exists('get_page_templates')) {
+            return $this->normalize_page_templates(get_page_templates());
+        }
+
+        $theme = wp_get_theme();
+
+        if (!method_exists($theme, 'get_page_templates')) {
+            return [];
+        }
+
+        $templates = $theme->get_page_templates(null, 'page');
+
+        return is_array($templates) ? $this->normalize_page_templates($templates) : [];
+    }
+
+    /**
+     * @param array<array-key, mixed> $templates
+     * @return array<string, string>
+     */
+    private function normalize_page_templates(array $templates): array {
+        $normalized = [];
+
+        foreach ($templates as $filename => $label) {
+            if (!is_string($filename) || !is_string($label)) {
+                continue;
+            }
+
+            $normalized[$filename] = $label;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<array-key, mixed> $replacements
+     */
+    private function apply_content_replacements(string $content, array $replacements): string|\WP_Error {
+        foreach ($replacements as $index => $replacement) {
+            if (!is_array($replacement)) {
+                return new \WP_Error(
+                    'awpt_invalid_content_replacement',
+                    __('Content replacements must be objects.', 'agent-wordpress-terminal'),
+                    ['status' => 400],
+                );
+            }
+
+            $search = (string) ($replacement['search'] ?? '');
+            $replace = (string) ($replacement['replace'] ?? '');
+            $expected = max(1, (int) ($replacement['expected_count'] ?? 1));
+            $actual = '' !== $search ? substr_count($content, $search) : 0;
+
+            if ($actual !== $expected) {
+                return new \WP_Error(
+                    'awpt_content_replacement_mismatch',
+                    sprintf(
+                        __(
+                            'Replacement %1$d expected %2$d exact match(es), but found %3$d.',
+                            'agent-wordpress-terminal',
+                        ),
+                        (int) $index + 1,
+                        $expected,
+                        $actual,
+                    ),
+                    [
+                        'status' => 409,
+                        'replacement_index' => (int) $index,
+                        'expected' => $expected,
+                        'actual' => $actual,
+                    ],
+                );
+            }
+
+            $count = 0;
+            $content = str_replace($search, $replace, $content, $count);
+
+            if ($count !== $expected) {
+                return new \WP_Error(
+                    'awpt_content_replacement_failed',
+                    __('Could not apply an exact content replacement.', 'agent-wordpress-terminal'),
+                    ['status' => 409],
+                );
+            }
+        }
+
+        return $content;
     }
 
     /**
@@ -824,85 +1135,6 @@ final class ProposeNewPost implements AbilityInterface {
         return null;
     }
 
-    /**
-     * Prepend core/image blocks for required attachments missing from the composition.
-     *
-     * @param list<int> $attachment_ids
-     * @return array{content: string, repairs: list<array{kind: string, block_path: string, block_name: string, description: string}>}
-     */
-    private function ensure_inline_attachments(string $content, array $attachment_ids): array {
-        $repairs = [];
-        $prefix = [];
-
-        foreach ($attachment_ids as $attachment_id) {
-            $attachment_id = absint($attachment_id);
-
-            if ($attachment_id <= 0 || !wp_attachment_is_image($attachment_id)) {
-                continue;
-            }
-
-            if ($this->content_includes_attachment($content, $attachment_id)) {
-                continue;
-            }
-
-            $url = wp_get_attachment_image_url($attachment_id, 'large');
-
-            if (!is_string($url) || '' === $url) {
-                $url = (string) wp_get_attachment_url($attachment_id);
-            }
-
-            if ('' === $url) {
-                continue;
-            }
-
-            $alt = trim((string) get_post_meta($attachment_id, '_wp_attachment_image_alt', true));
-            $prefix[] = sprintf(
-                '<!-- wp:image {"id":%1$d,"sizeSlug":"large","linkDestination":"none"} -->'
-                . "\n"
-                . '<figure class="wp-block-image size-large"><img src="%2$s" alt="%3$s" class="wp-image-%1$d"/></figure>'
-                . "\n"
-                . '<!-- /wp:image -->',
-                $attachment_id,
-                esc_url($url),
-                esc_attr($alt),
-            );
-            $repairs[] = [
-                'kind' => 'injected_required_image',
-                'block_path' => '0',
-                'block_name' => 'core/image',
-                'description' => sprintf(
-                    /* translators: %d: attachment ID. */
-                    __(
-                        'Inserted required Media Library image #%d near the start of the draft.',
-                        'agent-wordpress-terminal',
-                    ),
-                    $attachment_id,
-                ),
-            ];
-        }
-
-        if ([] === $prefix) {
-            return ['content' => $content, 'repairs' => []];
-        }
-
-        return [
-            'content' => implode("\n\n", $prefix) . ('' !== trim($content) ? "\n\n" . ltrim($content) : ''),
-            'repairs' => $repairs,
-        ];
-    }
-
-    private function content_includes_attachment(string $content, int $attachment_id): bool {
-        $id = (string) $attachment_id;
-
-        return (
-            str_contains($content, 'wp-image-' . $id)
-            || str_contains($content, '"id":' . $id)
-            || str_contains($content, '"id": ' . $id)
-            || str_contains($content, '"mediaId":' . $id)
-            || str_contains($content, '"mediaId": ' . $id)
-        );
-    }
-
     /** @return array<string, mixed> */
     private function format_result(int $action_id, string $revision_kind): array {
         $action = $this->actions->format_action($action_id);
@@ -919,6 +1151,84 @@ final class ProposeNewPost implements AbilityInterface {
         }
 
         return $action;
+    }
+
+    /**
+     * Resolve the ordered server-side composition while preserving the legacy
+     * single-pattern input. The array intentionally has no count limit: compact
+     * authoring is a transport optimization, not a document-size policy.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $existing_payload
+     * @return list<string>
+     */
+    private function pattern_names(array $input, array $existing_payload): array {
+        $raw = array_key_exists('pattern_names', $input)
+            ? $input['pattern_names']
+            : $existing_payload['pattern_names'] ?? [];
+        $names = [];
+
+        if (is_array($raw)) {
+            foreach ($raw as $value) {
+                if (!is_scalar($value)) {
+                    continue;
+                }
+
+                $name = sanitize_text_field((string) $value);
+
+                if ('' !== $name && !in_array($name, $names, true)) {
+                    $names[] = $name;
+                }
+            }
+        }
+
+        $primary = sanitize_text_field((string) ($input['pattern_name'] ?? $existing_payload['pattern_name'] ?? ''));
+
+        if ('' !== $primary) {
+            $names = array_values(array_filter($names, static fn(string $name): bool => $name !== $primary));
+            array_unshift($names, $primary);
+        }
+
+        return $names;
+    }
+
+    /**
+     * Describe every materialized pattern and its starting root path.
+     *
+     * @param list<string> $pattern_names
+     * @return list<array<string, mixed>>
+     */
+    private function composition_provenance(array $pattern_names, string $mode, string $post_type): array {
+        $manifest = [];
+        $root_index = 0;
+        $materializer = new PatternMaterializer();
+
+        foreach ($pattern_names as $pattern_name) {
+            $pattern = $this->patterns->find($pattern_name);
+
+            if (null === $pattern) {
+                continue;
+            }
+
+            $source = (string) ($pattern['content'] ?? '');
+            $provenance = $materializer->provenance($pattern_name, $mode, $source);
+            $raw_entry = $provenance['patterns'][0] ?? null;
+            /** @var array<string, mixed> $entry */
+            $entry = is_array($raw_entry) ? $raw_entry : [];
+            $entry['block_path'] = (string) $root_index;
+            $entry['title'] = (string) ($this->patterns->summary($pattern, $post_type)['title'] ?? '');
+            $manifest[] = $entry;
+            $expanded = new PatternTemplateExpander()->expand($pattern_name);
+
+            if (!is_wp_error($expanded)) {
+                $root_index += count(array_filter(
+                    parse_blocks($expanded),
+                    static fn(array $block): bool => null !== ($block['blockName'] ?? null),
+                ));
+            }
+        }
+
+        return $manifest;
     }
 
     /** @return list<int> */

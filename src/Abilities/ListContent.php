@@ -97,6 +97,8 @@ final class ListContent implements AbilityInterface {
                     'status' => ['type' => 'string'],
                     'filters' => ['type' => 'object'],
                     'items' => ['type' => 'array'],
+                    'fallback_items' => ['type' => 'array'],
+                    'fallback_reason' => ['type' => 'string'],
                     'count' => ['type' => 'integer'],
                     'total' => ['type' => 'integer'],
                     'has_more' => ['type' => 'boolean'],

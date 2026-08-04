@@ -55,6 +55,11 @@ function test_design_context_uses_proportional_policy_levels(): void {
         'new page should use composition policy',
     );
     Assert::same(
+        SiteDesignContext::LEVEL_COMPOSITION,
+        $context->request_level('Improve this page.'),
+        'a generic focused-page improvement should receive full composition context',
+    );
+    Assert::same(
         SiteDesignContext::LEVEL_SECTION,
         $context->request_level('Add a call to action section below the schedule.'),
         'section additions should use section policy',

@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Database\ActionRepository;
 use AWPT\MCP\Adapter;
 use AWPT\Support\ArrayKey;
 use AWPT\Support\ProposalAbilities;
@@ -116,6 +117,14 @@ final class ProviderToolCallExecutor {
             ];
         }
 
+        $proposal_items = array_values(array_filter($items, static fn(array $item): bool => ProposalAbilities::is_proposal(
+            (string) ($item['tool_name'] ?? ''),
+        )));
+
+        if (count($proposal_items) > 1) {
+            return $this->reject_non_atomic_proposal_batch($items);
+        }
+
         $total = count($items);
         $turn_id = (string) ($turn_context['turn_id'] ?? '');
         $phase = sanitize_key((string) ($turn_context['progress_phase'] ?? 'tools'));
@@ -194,6 +203,76 @@ final class ProviderToolCallExecutor {
         ];
     }
 
+    /**
+     * Reject an entire provider batch before mutation when it contains competing
+     * proposals. Applying the first proposal would immediately make every later
+     * content proposal stale and can leave an auto-apply surface partially saved.
+     *
+     * @param list<array{index: int, tool_name: string, raw: array<string, mixed>}> $items
+     * @return array{
+     *     tool_calls: array<int, array<string, mixed>>,
+     *     messages: array<int, array<string, mixed>>,
+     *     parallel_batch_size: int
+     * }
+     */
+    private function reject_non_atomic_proposal_batch(array $items): array {
+        $requested_tools = array_values(array_map(
+            static fn(array $item): string => (string) ($item['tool_name'] ?? ''),
+            $items,
+        ));
+        $tool_calls = [];
+        $messages = [];
+
+        foreach ($items as $item) {
+            $raw = $item['raw'];
+            $function = ArrayKey::as_map($raw['function'] ?? null);
+            $provider_call_id = (string) ($raw['id'] ?? '');
+
+            if ('' === $provider_call_id) {
+                $provider_call_id = 'awpt_local_' . wp_generate_password(8, false);
+            }
+
+            $output = [
+                'error' => __(
+                    'Multiple staged proposals were requested in one model response. Consolidate the page change into one atomic proposal before anything is staged.',
+                    'agent-wordpress-terminal',
+                ),
+                'error_code' => 'awpt_multiple_proposals',
+                'error_data' => [
+                    'requested_tools' => $requested_tools,
+                    'recommended_next_tools' => [
+                        [
+                            'tool' => 'awpt/propose-content-update',
+                            'reason' => 'Use one complete content update when the page needs both insertions and coordinated existing-block changes.',
+                        ],
+                        [
+                            'tool' => 'awpt/propose-block-batch-update',
+                            'reason' => 'Use one block batch only when its supported operations fully express the change.',
+                        ],
+                    ],
+                ],
+            ];
+            $tool_calls[] = [
+                'tool' => (string) $item['tool_name'],
+                'input' => $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}')),
+                'output' => $output,
+                'status' => 'failed',
+                'provider_call_id' => $provider_call_id,
+            ];
+            $messages[] = [
+                'role' => 'tool',
+                'tool_call_id' => $provider_call_id,
+                'content' => $this->encoded_tool_output($output),
+            ];
+        }
+
+        return [
+            'tool_calls' => $tool_calls,
+            'messages' => $messages,
+            'parallel_batch_size' => 0,
+        ];
+    }
+
     private function progress_label(string $tool_name): string {
         return match ($tool_name) {
             'awpt/list-patterns' => __('Searching patterns', 'agent-wordpress-terminal'),
@@ -253,36 +332,46 @@ final class ProviderToolCallExecutor {
             $input['seen_queries'] = $this->knowledge_query_texts[$session_id] ?? [];
         }
 
+        if ('awpt/read-proposal' === $tool_name && (int) ($input['action_id'] ?? 0) <= 0) {
+            $action_id = new ActionRepository()->resolve_revisable_new_post_id($session_id);
+
+            if ($action_id > 0) {
+                $input['action_id'] = $action_id;
+            }
+        }
+
         if (in_array(
             $tool_name,
             [
                 'awpt/propose-new-post',
                 'awpt/propose-content-update',
                 'awpt/propose-block-attrs-update',
+                'awpt/propose-block-batch-update',
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
+                'awpt/propose-patterned-post',
             ],
             true,
         )) {
-            $input = ArrayKey::string_map(new ProposalRequestContext()->enrich($session_id, $input, $turn_context));
+            $input = ArrayKey::string_map(new ProposalRequestContext()->enrich(
+                $session_id,
+                $input,
+                $turn_context,
+                (string) $tool_name,
+            ));
         }
 
-        if (in_array($tool_name, ['awpt/propose-new-post', 'awpt/propose-content-update'], true)) {
-            $pattern_name = (string) ($input['pattern_name'] ?? '');
-            $pattern_mode = (string) ($input['pattern_mode'] ?? '');
-            // Omitted mode defaults to adapted when a pattern is named (server policy).
-            $requires_pattern_read =
-                '' !== $pattern_name
-                && (
-                    'awpt/propose-content-update' === $tool_name
-                    || 'adapted' === $pattern_mode
-                    || '' === $pattern_mode
-                );
+        if ('awpt/propose-patterned-post' === $tool_name) {
+            $preparation = ArrayKey::as_map($turn_context['pattern_preparation'] ?? null);
+            $pattern = ArrayKey::as_map($preparation['pattern'] ?? null);
+            $prepared_names = ArrayKey::list_of_strings($pattern['pattern_names'] ?? null);
 
-            if ($requires_pattern_read) {
-                $read_patterns = $this->read_patterns[$session_id] ?? [];
-                $input['pattern_read_verified'] = array_key_exists($pattern_name, $read_patterns);
+            if ([] !== $prepared_names) {
+                // Preparation is trusted runtime evidence. The provider fills
+                // slots; it cannot silently replace the verified composition.
+                $input['pattern_names'] = $prepared_names;
+                $input['pattern_name'] = $prepared_names[0];
             }
         }
 

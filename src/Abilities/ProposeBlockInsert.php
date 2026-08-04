@@ -13,6 +13,7 @@ namespace AWPT\Abilities;
 use AWPT\Database\ActionPayloadSanitizer;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\BlockTreeEditor;
@@ -191,6 +192,12 @@ final class ProposeBlockInsert implements AbilityInterface {
      * @return array<string, mixed>|\WP_Error
      */
     private function stage(int $session_id, array $input, array $payload): array|\WP_Error {
+        $payload = new CompositionProposalGuard()->prepare($payload, 'edit', $session_id);
+
+        if (is_wp_error($payload)) {
+            return $payload;
+        }
+
         $preview = $this->preview->preview_from_payload($payload);
 
         if (is_wp_error($preview)) {

@@ -24,6 +24,14 @@ function test_tool_registry_proposal_abilities(): void {
         ToolRegistry::is_proposal_ability('awpt/propose-new-post'),
         'is_proposal_ability should recognize awpt/propose-new-post',
     );
+    Assert::true(
+        ToolRegistry::is_proposal_ability('awpt/propose-navigation-change'),
+        'semantic navigation changes must surface as staged action cards',
+    );
+    Assert::true(
+        ToolRegistry::is_proposal_ability('awpt/propose-global-styles-patch'),
+        'partial Global Styles changes must surface as staged action cards',
+    );
     Assert::false(
         ToolRegistry::is_proposal_ability('awpt/sideload-media'),
         'non-proposal tools should not be treated as staged actions',
@@ -67,6 +75,11 @@ function test_tool_name_mapper_roundtrip(): void {
         'my-plugin/resource/sub/action',
         $mapper->to_tool_name('my_plugin__resource__sub__action'),
         'four-segment ability names reverse correctly',
+    );
+    Assert::same(
+        'awpt/propose-new-post',
+        $mapper->from_wordpress_ability_function_name('wpab__awpt__propose-new-post'),
+        'WordPress AI Client transport names must recover the canonical proposal ability',
     );
 }
 

@@ -147,7 +147,7 @@ final class PostCompositionValidator {
                 return $this->error('awpt_required_inline_media_missing', sprintf(
                     /* translators: %d: Media Library attachment ID. */
                     __(
-                        'Attachment #%d must appear in an inline Image or Cover block, not only as the featured image.',
+                        'Attachment #%d must appear in a supported inline media block, not only as the featured image.',
                         'agent-wordpress-terminal',
                     ),
                     $attachment_id,
@@ -331,6 +331,28 @@ final class PostCompositionValidator {
                                 'agent-wordpress-terminal',
                             ),
                             $size_class,
+                        ),
+                    );
+                }
+            }
+
+            if ('core/button' === $name) {
+                $has_wrapper = (bool) preg_match(
+                    '/^<div\b[^>]*\bclass=["\'][^"\']*wp-block-button(?:\s|["\'])[^>]*>/i',
+                    $inner_html,
+                );
+                $has_link = (bool) preg_match(
+                    '/<a\b[^>]*\bclass=["\'][^"\']*wp-block-button__link(?:\s|["\'])[^>]*>.*<\/a>\s*<\/div>\s*$/is',
+                    $inner_html,
+                );
+
+                if (!$has_wrapper || !$has_link) {
+                    return $this->static_markup_error(
+                        $path,
+                        $name,
+                        __(
+                            'Button text must be inside an anchor with the wp-block-button__link class.',
+                            'agent-wordpress-terminal',
                         ),
                     );
                 }
@@ -615,7 +637,7 @@ final class PostCompositionValidator {
             $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
             $inner_html = (string) ($block['innerHTML'] ?? '');
 
-            if (in_array($name, ['core/image', 'core/cover'], true)) {
+            if (in_array($name, ['core/image', 'core/cover', 'core/media-text'], true)) {
                 $block_id = (int) ($attrs['id'] ?? $attrs['mediaId'] ?? 0);
 
                 if (

@@ -45,6 +45,7 @@ final class FrontendInspector {
         $snippet_chars = max(1_000, min(8_000, $snippet_chars));
         $class_inventory = $this->class_inventory($body);
         $layout_signals = $this->layout_signals($body, $class_inventory);
+        $heading_evidence = $this->main_heading_evidence($body);
 
         return [
             'url' => $url,
@@ -55,10 +56,54 @@ final class FrontendInspector {
             'stylesheets' => $this->extract_stylesheets($body),
             'class_inventory' => array_slice($class_inventory, 0, 24),
             'layout_signals' => $layout_signals,
+            'main_heading_outline' => $heading_evidence['outline'],
+            'main_h1_count' => $heading_evidence['h1_count'],
             'selector' => $selector,
             'html_snippet' => $this->snippet_for_selector($body, $selector, $snippet_chars, $class_inventory),
             'body_excerpt' => mb_substr(wp_strip_all_tags($body), 0, 800, 'UTF-8'),
             'recommended_next_tools' => $this->recommended_next_tools($class_inventory, $layout_signals),
+        ];
+    }
+
+    /**
+     * Report content-region headings separately from site chrome. A document
+     * title or an H1 in the global header does not prove the page itself has a
+     * visible title.
+     *
+     * @return array{outline: list<array{level: int, text: string}>, h1_count: int}
+     */
+    private function main_heading_evidence(string $html): array {
+        $scope = $html;
+        $main = [];
+
+        if (preg_match('~<main\b[^>]*>(.*?)</main>~is', $html, $main)) {
+            $scope = (string) ($main[1] ?? '');
+        } else {
+            $body = [];
+
+            if (preg_match('~<body\b[^>]*>(.*?)</body>~is', $html, $body)) {
+                $scope = (string) ($body[1] ?? '');
+            }
+        }
+
+        $matches = [];
+        $outline = [];
+
+        if (preg_match_all('~<h([1-6])\b[^>]*>(.*?)</h\1>~is', $scope, $matches, PREG_SET_ORDER)) {
+            foreach (array_slice($matches, 0, 64) as $match) {
+                $text = trim(html_entity_decode(wp_strip_all_tags((string) ($match[2] ?? '')), ENT_QUOTES | ENT_HTML5));
+
+                if ('' === $text) {
+                    continue;
+                }
+
+                $outline[] = ['level' => (int) ($match[1] ?? 0), 'text' => mb_substr($text, 0, 180, 'UTF-8')];
+            }
+        }
+
+        return [
+            'outline' => $outline,
+            'h1_count' => count(array_filter($outline, static fn(array $heading): bool => 1 === $heading['level'])),
         ];
     }
 

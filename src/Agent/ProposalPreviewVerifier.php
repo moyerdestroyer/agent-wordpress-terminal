@@ -67,7 +67,7 @@ final class ProposalPreviewVerifier {
         $provider_output = new ToolResultTruncator()->for_provider('awpt/inspect-rendered-element', $result);
         $verification_instruction = true === ($result['rendered'] ?? false)
             ? "Review this rendered evidence against the user's exact request."
-            : 'A headless browser was unavailable, so this is static fallback evidence only. Do not claim that the preview was visually verified.';
+            : 'A headless browser was unavailable, so this is static fallback evidence only. Do not claim that the preview was visually verified. The reported main_heading_outline and main_h1_count are authoritative semantic evidence; revise the proposal if they contradict the requested hierarchy.';
         $text =
             "Automatic staged-preview inspection result:\n"
             . (string) wp_json_encode($provider_output)

@@ -42,12 +42,73 @@ final class ToolResultContentFormatter {
             'awpt/read-block-tree' => $this->format_read_block_tree($output),
             'awpt/read-pattern' => $this->format_read_pattern($output),
             'awpt/list-patterns' => $this->format_patterns($output),
+            'awpt/recommend-patterns' => $this->format_recommended_patterns($output),
+            'awpt/get-work-context' => $this->format_work_context($output),
+            'awpt/read-domain-guidance' => $this->format_domain_guidance($output),
+            'awpt/validate-composition' => $this->format_validation($output),
             'awpt/read-site-health' => $this->format_site_health($output),
             'awpt/read-theme-file' => $this->format_read_theme_file($output),
             'awpt/inspect-frontend' => $this->format_inspect_frontend($output),
             'awpt/list-knowledge-sources' => $this->format_list_knowledge_sources($output),
             default => '',
         };
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_work_context(array $output): string {
+        $workflow = is_array($output['workflow'] ?? null) ? $output['workflow'] : [];
+        $gates = $this->list_items($workflow['evidence_gates'] ?? []);
+        $guidance = $this->list_items($output['guidance'] ?? []);
+
+        return sprintf(
+            /* translators: 1: work type, 2: evidence gate count, 3: relevant guidance count */
+            __(
+                'Prepared %1$s work context: %2$d evidence gate(s), %3$d guidance reference(s).',
+                'agent-wordpress-terminal',
+            ),
+            (string) ($output['work_type'] ?? 'site'),
+            count($gates),
+            count($guidance),
+        );
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_domain_guidance(array $output): string {
+        return sprintf(
+            /* translators: 1: guidance label, 2: Domain Pack ID */
+            __('Read domain guidance “%1$s” from %2$s.', 'agent-wordpress-terminal'),
+            (string) ($output['label'] ?? $output['guidance_id'] ?? ''),
+            (string) ($output['pack_id'] ?? ''),
+        );
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_validation(array $output): string {
+        $feedback = is_array($output['agent_feedback'] ?? null) ? $output['agent_feedback'] : [];
+
+        return (string) ($feedback['summary'] ?? __('Composition validation completed.', 'agent-wordpress-terminal'));
+    }
+
+    /** @param array<array-key, mixed> $output */
+    private function format_recommended_patterns(array $output): string {
+        $recommendations = $this->list_items($output['recommendations'] ?? []);
+        $lines = [sprintf(
+            /* translators: 1: recommendation count, 2: ranking mode */
+            __('Recommended %1$d pattern(s) using %2$s ranking.', 'agent-wordpress-terminal'),
+            count($recommendations),
+            (string) ($output['ranking_mode'] ?? 'deterministic'),
+        )];
+
+        foreach (array_slice($recommendations, 0, 6) as $recommendation) {
+            $pattern = is_array($recommendation['pattern'] ?? null) ? $recommendation['pattern'] : [];
+            $lines[] = sprintf(
+                '- %s — %s',
+                (string) ($pattern['name'] ?? ''),
+                (string) ($recommendation['rationale'] ?? ''),
+            );
+        }
+
+        return implode("\n", $lines);
     }
 
     /** @param array<array-key, mixed> $output */

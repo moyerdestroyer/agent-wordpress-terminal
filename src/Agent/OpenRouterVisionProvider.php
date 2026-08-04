@@ -18,6 +18,8 @@ if (!defined('ABSPATH')) {
  * Uses OpenRouter Auto only for bounded, tool-free image understanding.
  */
 final class OpenRouterVisionProvider extends ChatCompletionsProvider {
+    private const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
+
     public function get_name(): string {
         return 'OpenRouter Vision';
     }
@@ -42,7 +44,14 @@ final class OpenRouterVisionProvider extends ChatCompletionsProvider {
     }
 
     protected function get_model(): string {
-        return 'openrouter/auto';
+        /** @var string $model */
+        $model = apply_filters('awpt_openrouter_vision_model', self::DEFAULT_MODEL);
+
+        return trim($model);
+    }
+
+    protected function allows_text_only_image_fallback(): bool {
+        return false;
     }
 
     /**

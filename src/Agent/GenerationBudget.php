@@ -119,6 +119,16 @@ final class GenerationBudget {
             return true;
         }
 
+        // Preservation constraints must not turn an in-place edit into a new
+        // composition request. For example, "do not add or remove content"
+        // is a guardrail on a heading change, not an instruction to add a new
+        // content section.
+        $positive_message = (string) preg_replace(
+            '/\b(?:do\s+not|don\'t|without|never)\s+(?:add|include|append|insert|update|revise|change|improve|expand|extend|rewrite|replace)\b[^.!?]*/i',
+            '',
+            $message,
+        );
+
         // Revisions of staged drafts are still full composition turns (complete
         // post_content + propose-new-post), even when the user only names a section.
         return (bool) preg_match(
@@ -128,7 +138,7 @@ final class GenerationBudget {
             . 'section|hero|pattern|block|paragraph|image|content|draft|proposal|page|post|layout|footer|header'
             . '|recent posts'
             . ')\b/i',
-            $message,
+            $positive_message,
         );
     }
 
@@ -165,7 +175,7 @@ final class GenerationBudget {
         // Soft cleanup verbs ("clean up page 410") must share the edit path so
         // they get the longer wall and content/block proposal tools.
         $edit_verbs =
-            'fix|format|reformat|update|revise|change|adjust|modify|edit|convert|restyle|resize|enlarge|shrink|'
+            'fix|format|reformat|update|revise|change|adjust|modify|edit|convert|promote|demote|restyle|resize|enlarge|shrink|'
             . 'increase|decrease|make|restore|correct|repair|clean\s*up|cleanup|tidy|polish|simplify';
         $edit_targets =
             'page|post|content|layout|formatting|paragraphs?|line\s*breaks?|spacing|wording|copy|typos?|'

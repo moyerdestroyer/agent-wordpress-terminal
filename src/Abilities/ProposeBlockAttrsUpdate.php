@@ -13,6 +13,7 @@ namespace AWPT\Abilities;
 use AWPT\Database\ActionPayloadSanitizer;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\StagedPostPreview;
@@ -67,8 +68,11 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
                     ],
                     'expected_fingerprint' => [
                         'type' => 'string',
+                        'minLength' => 64,
+                        'maxLength' => 64,
+                        'pattern' => '^[a-f0-9]{64}$',
                         'description' => __(
-                            'Optional fingerprint from awpt/read-block-tree to prevent stale proposals.',
+                            'Optional complete 64-character fingerprint copied verbatim from awpt/read-block-tree. Never abbreviate it.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -181,6 +185,11 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
                 $block_path,
             ),
         ];
+        $payload = new CompositionProposalGuard()->prepare($payload, 'edit', $session_id);
+
+        if (is_wp_error($payload)) {
+            return $payload;
+        }
 
         $preview = $this->preview->preview_from_payload($payload);
 

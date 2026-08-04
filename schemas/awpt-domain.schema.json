@@ -1,0 +1,43 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://awpt.dev/schemas/awpt-domain-v1.json",
+	"title": "AWPT Domain Pack",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schema_version", "id", "label", "version"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"schema_version": { "const": 1 },
+		"id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+		"label": { "type": "string", "minLength": 1 },
+		"version": { "type": "string", "minLength": 1 },
+		"guidance": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["id", "path"],
+				"properties": {
+					"id": { "type": "string" },
+					"label": { "type": "string" },
+					"path": { "type": "string" },
+					"applies_to": { "type": "array", "items": { "type": "string" } },
+					"priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+					"hard": { "type": "boolean" }
+				}
+			}
+		},
+		"patterns": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"namespace": { "type": "string" },
+				"catalog": { "type": "string" }
+			}
+		},
+		"validators": { "type": "array", "items": { "type": "string" } },
+		"recommenders": { "type": "array", "items": { "type": "string" } },
+		"materializers": { "type": "array", "items": { "type": "string" } },
+		"proposal_operations": { "type": "array", "items": { "type": "string" } }
+	}
+}

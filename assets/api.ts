@@ -2,6 +2,7 @@ import apiFetch from '@wordpress/api-fetch';
 import type {
 	ChatProgress,
 	ChatResponse,
+	DomainPacksResponse,
 	KnowledgeSettings,
 	KnowledgeStatus,
 	PreviewDetails,
@@ -41,11 +42,18 @@ export async function listSessions(): Promise<SessionSummary[]> {
 	return apiFetch<SessionSummary[]>({ path: path('/sessions') });
 }
 
-export async function createSession(title = 'New session'): Promise<SessionSummary> {
+export async function createSession(
+	title = 'New session',
+	options: { focusPostId?: number; reuseFocus?: boolean } = {},
+): Promise<SessionSummary> {
 	return apiFetch<SessionSummary>({
 		path: path('/sessions'),
 		method: 'POST',
-		data: { title },
+		data: {
+			title,
+			focus_post_id: options.focusPostId ?? 0,
+			reuse_focus: options.reuseFocus ?? false,
+		},
 	});
 }
 
@@ -77,6 +85,8 @@ export async function getSession(
 	focus?: import('./types').FocusSummary | null;
 	created_at: string;
 	updated_at: string;
+	last_turn_id?: string;
+	last_turn_outcome?: import('./types').TurnOutcome;
 	messages: Array<{ id: number; role: string; content: string; created_at: string }>;
 	tool_calls: ToolCall[];
 	actions: ProposedAction[];
@@ -141,7 +151,7 @@ export async function uploadAttachment(file: File): Promise<{
 
 export async function updateAction(
 	actionId: number,
-	operation: 'approve' | 'reject' | 'apply',
+	operation: 'approve' | 'reject' | 'apply' | 'rollback',
 ): Promise<ProposedAction> {
 	return apiFetch<ProposedAction>({
 		path: path(`/actions/${actionId}`),
@@ -177,6 +187,18 @@ export async function createPreviewCapture(
 
 export async function getKnowledgeStatus(): Promise<KnowledgeStatus> {
 	return apiFetch<KnowledgeStatus>({ path: path('/knowledge/status') });
+}
+
+export async function getDomainPacks(): Promise<DomainPacksResponse> {
+	return apiFetch<DomainPacksResponse>({ path: path('/domain-packs') });
+}
+
+export async function updateDomainPacks(disabled: string[]): Promise<DomainPacksResponse> {
+	return apiFetch<DomainPacksResponse>({
+		path: path('/domain-packs'),
+		method: 'POST',
+		data: { disabled },
+	});
 }
 
 export async function rebuildKnowledge(): Promise<{

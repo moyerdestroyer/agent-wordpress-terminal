@@ -99,8 +99,36 @@ function test_tool_result_truncator_removes_rendered_screenshot_bytes_but_keeps_
     );
 }
 
+function test_tool_result_truncator_uses_compact_revision_context_instead_of_raw_proposal_markup(): void {
+    $provider = new ToolResultTruncator()->for_provider('awpt/read-proposal', [
+        'id' => 9,
+        'payload' => [
+            'operation' => 'new_post',
+            'post_title' => 'Commander News',
+            'post_type' => 'page',
+            'post_content' => str_repeat('<!-- wp:group -->large<!-- /wp:group -->', 600),
+            'composition_manifest' => ['patterns' => array_fill(0, 20, ['name' => 'theme/section'])],
+        ],
+        'revision_context' => [
+            'mode' => 'path_updates',
+            'editable_slots' => [['block_path' => '0.1', 'current_text' => 'Commander News']],
+        ],
+    ]);
+
+    Assert::false(
+        array_key_exists('post_content', is_array($provider['payload'] ?? null) ? $provider['payload'] : []),
+        'raw staged markup should not bloat the revision planning round',
+    );
+    Assert::same(
+        '0.1',
+        $provider['revision_context']['editable_slots'][0]['block_path'] ?? '',
+        'compact editable paths should remain available to the model',
+    );
+}
+
 test_tool_result_truncator_clips_large_read_content_output();
 test_tool_result_truncator_keeps_proposal_outputs();
 test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider();
 test_tool_result_truncator_clips_theme_file_content();
 test_tool_result_truncator_removes_rendered_screenshot_bytes_but_keeps_geometry();
+test_tool_result_truncator_uses_compact_revision_context_instead_of_raw_proposal_markup();

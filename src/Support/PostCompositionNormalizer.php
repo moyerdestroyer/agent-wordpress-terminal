@@ -31,8 +31,20 @@ final class PostCompositionNormalizer {
             return ['content' => $content, 'repairs' => []];
         }
 
+        $attribute_repair = $this->repair_unclosed_attribute_json($content);
+        $content = $attribute_repair['content'];
+        $repairs = $attribute_repair['repaired']
+            ? [[
+                'kind' => 'block_attribute_json',
+                'block_path' => '',
+                'block_name' => '',
+                'description' => __(
+                    'Closed an unambiguous missing JSON object delimiter in a block comment.',
+                    'agent-wordpress-terminal',
+                ),
+            ]] : [];
+
         $blocks = BlockTree::from_content($content)->blocks();
-        $repairs = [];
         $blocks = $this->normalize_blocks($blocks, $repairs);
 
         if ([] === $repairs) {
@@ -40,6 +52,63 @@ final class PostCompositionNormalizer {
         }
 
         return ['content' => new BlockTreePathHelpers()->serialize($blocks), 'repairs' => $repairs];
+    }
+
+    /** @return array{content: string, repaired: bool} */
+    private function repair_unclosed_attribute_json(string $content): array {
+        $repaired = false;
+        $normalized = preg_replace_callback(
+            '/<!--\\s+wp:([^\\s]+)\\s+(\\{.*?\\})\\s*-->/s',
+            static function (array $match) use (&$repaired): string {
+                $json = (string) ($match[2] ?? '');
+
+                if (is_array(json_decode($json, true))) {
+                    return (string) $match[0];
+                }
+
+                $balance = 0;
+                $quoted = false;
+                $escaped = false;
+
+                foreach (str_split($json) as $char) {
+                    if ($quoted) {
+                        if (!$escaped && '\\' === $char) {
+                            $escaped = true;
+                            continue;
+                        }
+                        if (!$escaped && '"' === $char) {
+                            $quoted = false;
+                        }
+                        $escaped = false;
+                        continue;
+                    }
+                    if ('"' === $char) {
+                        $quoted = true;
+                    } elseif ('{' === $char) {
+                        ++$balance;
+                    } elseif ('}' === $char) {
+                        --$balance;
+                    }
+                }
+
+                if ($quoted || $balance < 1 || $balance > 3) {
+                    return (string) $match[0];
+                }
+
+                $candidate = $json . str_repeat('}', $balance);
+
+                if (!is_array(json_decode($candidate, true))) {
+                    return (string) $match[0];
+                }
+
+                $repaired = true;
+
+                return '<!-- wp:' . (string) $match[1] . ' ' . $candidate . ' -->';
+            },
+            $content,
+        );
+
+        return ['content' => is_string($normalized) ? $normalized : $content, 'repaired' => $repaired];
     }
 
     /**
@@ -59,6 +128,7 @@ final class PostCompositionNormalizer {
             }
 
             $repaired_attachment_id = $this->attachment_urls->normalize($block, $attrs, $name);
+            $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : $attrs;
 
             if ($repaired_attachment_id > 0) {
                 $repairs[] = [
@@ -92,6 +162,10 @@ final class PostCompositionNormalizer {
                 $this->normalize_list_items($block, $path, $repairs);
             }
 
+            if ('core/button' === $name) {
+                $this->normalize_button_link($block, $attrs, $path, $repairs);
+            }
+
             $inner_blocks = new BlockTreePathHelpers()->inner_blocks($block);
 
             if ([] !== $inner_blocks) {
@@ -102,6 +176,101 @@ final class PostCompositionNormalizer {
         }
 
         return $blocks;
+    }
+
+    /**
+     * Restore the canonical link element when a model puts a button label
+     * directly inside the core/button wrapper.
+     *
+     * @param array<string, mixed> $block
+     * @param array<array-key, mixed> $attrs
+     * @param list<array{kind: string, block_path: string, block_name: string, description: string}> $repairs
+     */
+    private function normalize_button_link(array &$block, array $attrs, string $path, array &$repairs): void {
+        $inner_html = (string) ($block['innerHTML'] ?? '');
+
+        if (str_contains($inner_html, 'wp-block-button__link')) {
+            return;
+        }
+
+        $match = [];
+
+        if (!preg_match(
+            '/^(\s*<div\b[^>]*\bclass=("|\')[^"\']*\bwp-block-button\b[^"\']*\2[^>]*>)(.*)(<\/div>\s*)$/is',
+            $inner_html,
+            $match,
+        )) {
+            return;
+        }
+
+        $label = trim((string) ($match[3] ?? ''));
+
+        if (
+            '' === $label
+            || preg_match(
+                '/<(?:address|article|aside|blockquote|div|footer|form|h[1-6]|header|main|nav|ol|p|section|table|ul)\b/i',
+                $label,
+            )
+        ) {
+            return;
+        }
+
+        $classes = ['wp-block-button__link'];
+        $text_color = sanitize_key((string) ($attrs['textColor'] ?? ''));
+        $background_color = sanitize_key((string) ($attrs['backgroundColor'] ?? ''));
+        $gradient = sanitize_key((string) ($attrs['gradient'] ?? ''));
+
+        if ('' !== $text_color) {
+            $classes[] = 'has-' . $text_color . '-color';
+            $classes[] = 'has-text-color';
+        }
+
+        if ('' !== $background_color) {
+            $classes[] = 'has-' . $background_color . '-background-color';
+            $classes[] = 'has-background';
+        }
+
+        if ('' !== $gradient) {
+            $classes[] = 'has-' . $gradient . '-gradient-background';
+            $classes[] = 'has-background';
+        }
+
+        $classes[] = 'wp-element-button';
+        $anchor_attributes = ' class="' . esc_attr(implode(' ', array_values(array_unique($classes)))) . '"';
+        $url = trim((string) ($attrs['url'] ?? ''));
+
+        if ('' !== $url) {
+            $anchor_attributes .= ' href="' . esc_url($url) . '"';
+        }
+
+        if ('_blank' === (string) ($attrs['linkTarget'] ?? '')) {
+            $anchor_attributes .= ' target="_blank"';
+        }
+
+        $rel = trim((string) ($attrs['rel'] ?? ''));
+
+        if ('' !== $rel) {
+            $anchor_attributes .= ' rel="' . esc_attr($rel) . '"';
+        }
+
+        $replacement =
+            (string) ($match[1] ?? '') . '<a' . $anchor_attributes . '>' . $label . '</a>' . (string) ($match[4] ?? '');
+
+        // A Button is a leaf block. Rebuild its static slots together so both
+        // WordPress's parser and lightweight test parsers serialize it once.
+        $block['innerBlocks'] = [];
+        $block['innerHTML'] = $replacement;
+        $block['innerContent'] = [$replacement];
+
+        $repairs[] = [
+            'kind' => 'button_link_markup',
+            'block_path' => $path,
+            'block_name' => 'core/button',
+            'description' => __(
+                'Wrapped the button label in the canonical button link element.',
+                'agent-wordpress-terminal',
+            ),
+        ];
     }
 
     /**

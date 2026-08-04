@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [
 		v4wp({
-			input: 'assets/admin.tsx',
+			input: ['assets/admin.tsx', 'assets/reviewBridge.tsx'],
 			outDir: 'build',
 		}),
 		wp_scripts(),

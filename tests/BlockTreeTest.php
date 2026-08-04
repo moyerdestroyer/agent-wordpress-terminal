@@ -39,6 +39,17 @@ function test_block_tree_paths_and_updates(): void {
         );
     }
 
+    $heading = BlockTree::from_content('<!-- wp:heading {"level":4} --><h4>Question</h4><!-- /wp:heading -->');
+    $heading_block = $heading->normalized()[0] ?? [];
+    $promoted = $heading->update_attrs('0', ['level' => 2], (string) ($heading_block['fingerprint'] ?? ''));
+    Assert::false(is_wp_error($promoted), 'heading attribute update should succeed');
+    if (!is_wp_error($promoted)) {
+        Assert::true(
+            str_contains($promoted['content'], '<h2>Question</h2>'),
+            'heading attribute update must serialize the matching semantic HTML tag',
+        );
+    }
+
     $stale = $tree->update_attrs('1', ['width' => '220'], str_repeat('0', 64));
     Assert::true(is_wp_error($stale), 'stale block fingerprints should be rejected');
 }
@@ -161,6 +172,53 @@ function test_block_tree_insert_composition_in_order(): void {
     }
 }
 
+function test_block_tree_nested_insert_updates_wordpress_inner_content_placeholders(): void {
+    $paragraph = static fn(string $text): array => [
+        'blockName' => 'core/paragraph',
+        'attrs' => [],
+        'innerBlocks' => [],
+        'innerHTML' => '<p>' . $text . '</p>',
+        'innerContent' => ['<p>' . $text . '</p>'],
+    ];
+    $inner = [
+        'blockName' => 'core/group',
+        'attrs' => [],
+        'innerBlocks' => [$paragraph('First'), $paragraph('Second')],
+        'innerHTML' => '<div><p>First</p><p>Second</p></div>',
+        'innerContent' => ['<div>', null, null, '</div>'],
+    ];
+    $outer = [
+        'blockName' => 'core/group',
+        'attrs' => [],
+        'innerBlocks' => [$paragraph('Intro'), $inner],
+        'innerHTML' => '<section><p>Intro</p><div><p>First</p><p>Second</p></div></section>',
+        'innerContent' => ['<section>', null, null, '</section>'],
+    ];
+    $image = [
+        'blockName' => 'core/image',
+        'attrs' => ['id' => 5],
+        'innerBlocks' => [],
+        'innerHTML' => '<figure><img class="wp-image-5"/></figure>',
+        'innerContent' => ['<figure><img class="wp-image-5"/></figure>'],
+    ];
+
+    $inserted = new BlockTree([$outer])->insert_block('0.1.0', $image, BlockTree::POSITION_AFTER);
+
+    Assert::false(is_wp_error($inserted), 'a nested insertion should serialize');
+
+    if (!is_wp_error($inserted)) {
+        $content = $inserted['content'];
+        $first = strpos($content, '<p>First</p>');
+        $placed = strpos($content, 'wp-image-5');
+        $second = strpos($content, '<p>Second</p>');
+        Assert::true(
+            is_int($first) && is_int($placed) && is_int($second) && $first < $placed && $placed < $second,
+            'the new child placeholder should preserve its requested nested position',
+        );
+    }
+}
+
 test_block_tree_paths_and_updates();
 test_block_tree_insert_and_remove();
 test_block_tree_insert_composition_in_order();
+test_block_tree_nested_insert_updates_wordpress_inner_content_placeholders();

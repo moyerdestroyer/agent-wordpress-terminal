@@ -74,6 +74,14 @@ final class AgentRuntime {
 
         $session_update = ['updated_at' => $now];
         $session_formats = ['%s'];
+        $outcome = is_array($response['turn_outcome'] ?? null) ? $response['turn_outcome'] : [];
+
+        if ([] !== $outcome) {
+            $session_update['last_turn_id'] = sanitize_key((string) ($turn_context['turn_id'] ?? ''));
+            $session_update['last_outcome_json'] = (string) wp_json_encode($outcome);
+            $session_formats[] = '%s';
+            $session_formats[] = '%s';
+        }
         $suggested_title = new SessionTitleSuggester()->suggest(
             $stored_message,
             $this->sessions->get_summary($session_id),

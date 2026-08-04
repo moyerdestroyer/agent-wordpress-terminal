@@ -175,7 +175,18 @@ final class ToolRegistry {
         if (class_exists('WP_AI_Client_Ability_Function_Resolver') && str_starts_with($function_name, 'wpab__')) {
             $ability_name = \WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name($function_name);
 
-            return $this->can_auto_execute($ability_name) ? $ability_name : null;
+            if ($this->can_auto_execute($ability_name)) {
+                return $ability_name;
+            }
+
+            // WordPress AI Client's resolver is optional and has changed its
+            // reverse-name behavior across releases. Keep its canonical result
+            // when it works, then fall back to the documented wpab__ transport
+            // form so a retry can never turn a valid proposal into an unknown
+            // function name.
+            $fallback = $this->names->from_wordpress_ability_function_name($function_name);
+
+            return $this->can_auto_execute($fallback) ? $fallback : null;
         }
 
         $tool_name = $this->names->to_tool_name($function_name);

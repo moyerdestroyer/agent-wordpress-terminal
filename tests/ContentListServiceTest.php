@@ -215,7 +215,32 @@ function test_content_list_service_maps_published_attachment_browse_to_inherit()
     );
 }
 
+function test_content_list_service_returns_recent_media_when_named_search_is_empty(): void {
+    awpt_test_reset_state();
+    awpt_test_list_post(88, 'image', 'image', 'attachment', 'inherit');
+    $GLOBALS['awpt_test_attachment_urls'][88] = 'https://example.test/uploads/teferi.png';
+
+    $result = new ContentListService()->list([
+        'post_type' => 'attachment',
+        'search' => 'Teferi',
+        'limit' => 10,
+    ]);
+
+    Assert::same(0, $result['count'] ?? null, 'the named attachment search should remain honestly empty');
+    Assert::same(
+        88,
+        $result['fallback_items'][0]['id'] ?? 0,
+        'recent generic assets should be returned as fallback evidence',
+    );
+    Assert::same(
+        'https://example.test/uploads/teferi.png',
+        $result['fallback_items'][0]['media_url'] ?? '',
+        'fallback media should include its canonical URL',
+    );
+}
+
 test_content_list_service_includes_totals_by_type_for_all();
 test_content_list_service_skips_totals_when_filtered();
 test_content_list_service_hides_staging_drafts();
 test_content_list_service_maps_published_attachment_browse_to_inherit();
+test_content_list_service_returns_recent_media_when_named_search_is_empty();

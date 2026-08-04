@@ -54,4 +54,16 @@ final class ToolNameMapper {
 
         return implode('/', $segments);
     }
+
+    /**
+     * Convert the optional WordPress AI Client transport form back to AWPT's
+     * canonical ability name without depending on its resolver implementation.
+     */
+    public function from_wordpress_ability_function_name(string $function_name): string {
+        if (!str_starts_with($function_name, 'wpab__')) {
+            return '';
+        }
+
+        return $this->to_tool_name(substr($function_name, strlen('wpab__')));
+    }
 }

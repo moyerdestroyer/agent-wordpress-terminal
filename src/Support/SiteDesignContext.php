@@ -99,7 +99,7 @@ final class SiteDesignContext {
         }
 
         if ((bool) preg_match(
-            '/\b(create|generate|make|build|design|draft|redesign|rewrite)\b.*\b('
+            '/\b(create|generate|make|build|design|draft|redesign|rewrite|improve|polish)\b.*\b('
             . 'page|landing|homepage|post|article|template|layout'
             . ')\b/i',
             $message,

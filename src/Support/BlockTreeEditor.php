@@ -202,6 +202,7 @@ final class BlockTreeEditor {
 
             $current_attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
             $block['attrs'] = array_merge($current_attrs, $attrs);
+            $this->synchronize_saved_markup($block, $attrs);
 
             return $block;
         }
@@ -211,5 +212,33 @@ final class BlockTreeEditor {
             __('Block path was not found.', 'agent-wordpress-terminal'),
             404,
         );
+    }
+
+    /**
+     * Gutenberg's parsed attrs and saved HTML are both used when a block is
+     * serialized. Keep the HTML in sync for semantic heading-level changes so
+     * the front end does not continue rendering the old tag.
+     *
+     * @param array<string, mixed> $block
+     * @param array<string, mixed> $changed_attrs
+     */
+    private function synchronize_saved_markup(array &$block, array $changed_attrs): void {
+        if ('core/heading' !== (string) ($block['blockName'] ?? '') || !array_key_exists('level', $changed_attrs)) {
+            return;
+        }
+
+        $saved_attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
+        $level = max(1, min(6, (int) ($saved_attrs['level'] ?? 2)));
+        $replace = static function (string $markup) use ($level): string {
+            $markup = (string) preg_replace('/<h[1-6](\\b[^>]*)>/i', '<h' . $level . '$1>', $markup, 1);
+
+            return (string) preg_replace('/<\\/h[1-6]>/i', '</h' . $level . '>', $markup, 1);
+        };
+
+        $block['innerHTML'] = $replace((string) ($block['innerHTML'] ?? ''));
+        $inner_content = is_array($block['innerContent'] ?? null) ? $block['innerContent'] : [];
+        $block['innerContent'] = array_map(static fn(mixed $part): mixed => is_string($part)
+            ? $replace($part)
+            : $part, $inner_content);
     }
 }

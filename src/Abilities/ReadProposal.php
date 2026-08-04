@@ -11,6 +11,8 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
+use AWPT\Domain\PatternEditableSlots;
+use AWPT\Support\BlockTree;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -78,6 +80,44 @@ final class ReadProposal implements AbilityInterface {
                 ['status' => 404],
             );
         }
+
+        $payload = is_array($action['payload'] ?? null) ? $action['payload'] : [];
+        $content = (string) ($payload['post_content'] ?? '');
+        $manifest = is_array($payload['composition_manifest'] ?? null) ? $payload['composition_manifest'] : [];
+        $patterns = is_array($manifest['patterns'] ?? null) ? $manifest['patterns'] : [];
+        $pattern_names = [];
+
+        foreach ($patterns as $pattern) {
+            if (!(is_array($pattern) && is_string($pattern['name'] ?? null))) {
+                continue;
+            }
+
+            $name = trim((string) $pattern['name']);
+
+            if ('' !== $name) {
+                $pattern_names[] = $name;
+            }
+        }
+
+        if ([] === $pattern_names && '' !== (string) ($payload['pattern_name'] ?? '')) {
+            $pattern_names[] = (string) $payload['pattern_name'];
+        }
+
+        $tree = BlockTree::from_content($content);
+        $action['revision_context'] = [
+            'action_id' => $action_id,
+            'mode' => 'path_updates',
+            'post_title' => (string) ($payload['post_title'] ?? ''),
+            'post_type' => (string) ($payload['post_type'] ?? ''),
+            'pattern_names' => array_values(array_unique($pattern_names)),
+            'content_chars' => strlen($content),
+            'editable_slots' => new PatternEditableSlots()->from_content($content),
+            'image_blocks' => $tree->flat_list('core/image', 40),
+            'instruction' => __(
+                'For ordinary revisions, use awpt/propose-patterned-post with this action_id and only the path-addressed text or media changes. Do not pass this action ID to post-reading abilities. Use awpt/propose-new-post with full post_content only for an explicitly from-scratch redesign.',
+                'agent-wordpress-terminal',
+            ),
+        ];
 
         return $action;
     }

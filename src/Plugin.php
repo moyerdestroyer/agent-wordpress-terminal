@@ -11,6 +11,9 @@ declare(strict_types=1);
 namespace AWPT;
 
 use AWPT\Database\Installer;
+use AWPT\Domain\DomainPackRegistry;
+use AWPT\Domain\KnowledgeOverrideMeta;
+use AWPT\Knowledge\DufresneKnowledgeRefresh;
 use AWPT\Knowledge\KnowledgeIndexer;
 use AWPT\Support\Diagnostics\RenderedPreviewAuthenticator;
 use AWPT\Support\Environment;
@@ -49,6 +52,7 @@ final class Plugin {
      */
     public function boot(): void {
         $this->services = new ServiceProvider();
+        DomainPackRegistry::instance()->boot();
         RenderedPreviewAuthenticator::register();
         add_action('admin_notices', [Environment::class, 'render_admin_notices']);
         add_action('init', [$this, 'init']);
@@ -60,7 +64,9 @@ final class Plugin {
      */
     public function init(): void {
         Installer::maybe_upgrade();
+        KnowledgeOverrideMeta::register();
         KnowledgeIndexer::register_content_hooks();
+        DufresneKnowledgeRefresh::register();
         $this->services->page()->init();
         $this->services->register_abilities()->init();
         $this->services->mcp_bridge()->init();

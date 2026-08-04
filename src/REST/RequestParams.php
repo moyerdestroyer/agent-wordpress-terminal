@@ -38,4 +38,24 @@ final class RequestParams {
 
         return is_numeric($value) ? (int) $value : 0;
     }
+
+    public static function boolean(\WP_REST_Request $request, string $key, bool $default = false): bool {
+        $value = $request->get_param($key);
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return 1 === (int) $value;
+        }
+
+        if (is_string($value)) {
+            $parsed = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+            return null === $parsed ? $default : $parsed;
+        }
+
+        return $default;
+    }
 }

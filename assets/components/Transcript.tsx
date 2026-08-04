@@ -2,9 +2,10 @@ import { Button } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { actionMetadata, canPreviewAction } from '../actionDisplay';
-import { formatElapsed, formatTimingStrip, type PhaseTimings } from '../lib/turnTiming';
+import { formatElapsed } from '../lib/turnTiming';
 import type { ChatProgress, JsonValue, Message, ProposedAction, ToolCall } from '../types';
 import { ActionDiffView } from './ActionDiffView';
+import { AgentTurnStatus } from './AgentTurnStatus';
 
 export interface TurnSummary {
 	durationMs: number;
@@ -18,7 +19,10 @@ interface TranscriptProps {
 	isWorking?: boolean;
 	progress?: ChatProgress | null;
 	turnSummary?: TurnSummary | null;
-	onActionOperation: (action: ProposedAction, operation: 'approve' | 'reject' | 'apply') => void;
+	onActionOperation: (
+		action: ProposedAction,
+		operation: 'approve' | 'reject' | 'apply' | 'rollback',
+	) => void;
 	onActionPreview: (action: ProposedAction) => void;
 }
 
@@ -29,136 +33,6 @@ type TranscriptItem =
 
 function jsonObject(value: JsonValue | undefined): { [key: string]: JsonValue } | null {
 	return null !== value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-}
-
-function useTurnTiming(
-	active: boolean,
-	phase: string,
-): {
-	totalMs: number;
-	timingStrip: string;
-} {
-	const [now, setNow] = useState(() => Date.now());
-	const turnStartedAt = useRef<number | null>(null);
-	const phaseStartedAt = useRef<number | null>(null);
-	const activePhase = useRef('');
-	const closedPhaseMs = useRef<PhaseTimings>({});
-
-	useEffect(() => {
-		if (!active) {
-			turnStartedAt.current = null;
-			phaseStartedAt.current = null;
-			activePhase.current = '';
-			closedPhaseMs.current = {};
-			return;
-		}
-
-		const started = Date.now();
-		turnStartedAt.current = started;
-		phaseStartedAt.current = started;
-		activePhase.current = phase || 'starting';
-		closedPhaseMs.current = {};
-		setNow(started);
-
-		const timer = window.setInterval(() => setNow(Date.now()), 100);
-
-		return () => window.clearInterval(timer);
-	}, [active]);
-
-	useEffect(() => {
-		if (!active || !phase) {
-			return;
-		}
-
-		const previous = activePhase.current;
-
-		if (previous === phase) {
-			return;
-		}
-
-		if (previous !== '' && phaseStartedAt.current !== null) {
-			const elapsed = Math.max(0, Date.now() - phaseStartedAt.current);
-			closedPhaseMs.current = {
-				...closedPhaseMs.current,
-				[previous]: (closedPhaseMs.current[previous] ?? 0) + elapsed,
-			};
-		}
-
-		activePhase.current = phase;
-		phaseStartedAt.current = Date.now();
-	}, [active, phase]);
-
-	if (!active || turnStartedAt.current === null || phaseStartedAt.current === null) {
-		return { totalMs: 0, timingStrip: '' };
-	}
-
-	const totalMs = Math.max(0, now - turnStartedAt.current);
-	const activePhaseElapsedMs = Math.max(0, now - phaseStartedAt.current);
-	const currentPhase = activePhase.current || phase || 'starting';
-
-	return {
-		totalMs,
-		timingStrip: formatTimingStrip(
-			closedPhaseMs.current,
-			currentPhase,
-			activePhaseElapsedMs,
-			totalMs,
-		),
-	};
-}
-
-/** Live in-stream agent turn — full-width stream row, not a toast chip. */
-function AgentTurnStatus({ progress }: { progress?: ChatProgress | null }): JSX.Element {
-	const phase = progress?.phase || 'starting';
-	const label =
-		progress?.label ||
-		(phase === 'tools'
-			? __('Running tools', 'agent-wordpress-terminal')
-			: __('Working', 'agent-wordpress-terminal'));
-	const detail = progress?.detail ?? '';
-	const hasTotal = (progress?.total ?? 0) > 0;
-	const completed = Math.min(progress?.completed ?? 0, progress?.total ?? 0);
-	const percentage = hasTotal ? Math.max(4, (completed / (progress?.total ?? 1)) * 100) : 0;
-	const { timingStrip } = useTurnTiming(true, phase);
-
-	return (
-		<div
-			className="awpt-message awpt-message--assistant awpt-message--working"
-			role="status"
-			aria-live="polite"
-			aria-busy="true"
-		>
-			<div className="awpt-turn-status">
-				<div className="awpt-turn-status__primary">
-					<strong>{__('Agent', 'agent-wordpress-terminal')}:</strong>
-					<span className="awpt-turn-status__label">{label}</span>
-					{detail ? <span className="awpt-turn-status__detail">{detail}</span> : null}
-				</div>
-				{timingStrip ? <div className="awpt-turn-status__timing">{timingStrip}</div> : null}
-				{hasTotal ? (
-					<div
-						className="awpt-turn-status__track is-determinate"
-						role="progressbar"
-						aria-label={label}
-						aria-valuemin={0}
-						aria-valuemax={progress?.total}
-						aria-valuenow={completed}
-					>
-						<span style={{ width: `${percentage}%` }} />
-					</div>
-				) : (
-					<div
-						className="awpt-turn-status__track"
-						role="progressbar"
-						aria-label={label}
-						aria-valuetext={label}
-					>
-						<span />
-					</div>
-				)}
-			</div>
-		</div>
-	);
 }
 
 function TurnSummaryLine({ summary }: { summary: TurnSummary }): JSX.Element {
@@ -223,7 +97,10 @@ function actionIdFromToolCall(call: ToolCall): number | null {
 
 function isResolvedAction(action: ProposedAction): boolean {
 	return (
-		action.status === 'applied' || action.status === 'rejected' || action.status === 'superseded'
+		action.status === 'applied' ||
+		action.status === 'rejected' ||
+		action.status === 'superseded' ||
+		action.status === 'rolled_back'
 	);
 }
 
@@ -410,7 +287,10 @@ function ActionCard({
 	onPreview,
 }: {
 	action: ProposedAction;
-	onOperation: (action: ProposedAction, operation: 'approve' | 'reject' | 'apply') => void;
+	onOperation: (
+		action: ProposedAction,
+		operation: 'approve' | 'reject' | 'apply' | 'rollback',
+	) => void;
 	onPreview: (action: ProposedAction) => void;
 }): JSX.Element {
 	const [showDiff, setShowDiff] = useState(false);
@@ -421,6 +301,13 @@ function ActionCard({
 	const manifest = action.payload?.proposal_manifest;
 	const decisionTrace = action.payload?.decision_trace ?? [];
 	const repairsApplied = action.payload?.repairs_applied ?? [];
+	const validationFindings = action.payload?.validation_findings ?? [];
+	const safeFixes = action.payload?.safe_fixes ?? [];
+	const feedback = action.payload?.agent_feedback;
+	const canRollback =
+		action.status === 'applied' &&
+		Boolean(action.payload?.domain_pack_id) &&
+		!action.payload?.domain_irreversible;
 
 	return (
 		<div className="awpt-action-card">
@@ -443,6 +330,7 @@ function ActionCard({
 				<br />
 				{action.description}
 			</p>
+			{feedback?.summary ? <p className="awpt-action-card__context">{feedback.summary}</p> : null}
 			{metadata.length > 0 ? (
 				<dl className="awpt-action-card__meta">
 					{metadata.map((item) => (
@@ -495,6 +383,29 @@ function ActionCard({
 					</ul>
 				</details>
 			) : null}
+			{safeFixes.length > 0 ? (
+				<details className="awpt-action-card__rationale-details">
+					<summary>{__('Safe fixes applied', 'agent-wordpress-terminal')}</summary>
+					<ul>
+						{safeFixes.map((fix) => (
+							<li key={`${fix.id}-${fix.after_hash ?? ''}`}>{fix.description}</li>
+						))}
+					</ul>
+				</details>
+			) : null}
+			{validationFindings.length > 0 ? (
+				<div className="awpt-action-card__rationale">
+					<strong>{__('Domain validation', 'agent-wordpress-terminal')}</strong>
+					<ul>
+						{validationFindings.map((finding) => (
+							<li key={`${finding.pack_id}-${finding.code}-${finding.block_path}`}>
+								{`${finding.severity.toUpperCase()}: ${finding.message}`}
+								{finding.suggestion ? ` — ${finding.suggestion}` : ''}
+							</li>
+						))}
+					</ul>
+				</div>
+			) : null}
 			<div className="awpt-action-card__buttons">
 				<Button variant="secondary" onClick={() => onPreview(action)} disabled={!canPreview}>
 					{__('Preview', 'agent-wordpress-terminal')}
@@ -507,6 +418,11 @@ function ActionCard({
 				<Button variant="primary" onClick={() => onOperation(action, 'apply')} disabled={!canApply}>
 					{__('Apply', 'agent-wordpress-terminal')}
 				</Button>
+				{canRollback ? (
+					<Button variant="secondary" onClick={() => onOperation(action, 'rollback')}>
+						{__('Roll back', 'agent-wordpress-terminal')}
+					</Button>
+				) : null}
 				<Button
 					variant="tertiary"
 					onClick={() => onOperation(action, 'reject')}
@@ -523,10 +439,20 @@ function ActionCard({
 function ActionRecord({
 	action,
 	onPreview,
+	onOperation,
 }: {
 	action: ProposedAction;
 	onPreview: (action: ProposedAction) => void;
+	onOperation: (
+		action: ProposedAction,
+		operation: 'approve' | 'reject' | 'apply' | 'rollback',
+	) => void;
 }): JSX.Element {
+	const canRollback =
+		action.status === 'applied' &&
+		Boolean(action.payload?.domain_pack_id) &&
+		!action.payload?.domain_irreversible;
+
 	return (
 		<div className="awpt-action-record">
 			<span className={`awpt-action-record__status awpt-action-card__status--${action.status}`}>
@@ -536,6 +462,11 @@ function ActionRecord({
 			{action.payload && canPreviewAction(action.payload) ? (
 				<Button variant="link" onClick={() => onPreview(action)}>
 					{__('Preview', 'agent-wordpress-terminal')}
+				</Button>
+			) : null}
+			{canRollback ? (
+				<Button variant="link" onClick={() => onOperation(action, 'rollback')}>
+					{__('Roll back', 'agent-wordpress-terminal')}
 				</Button>
 			) : null}
 		</div>
@@ -584,6 +515,7 @@ export function Transcript({
 								action={item.action}
 								key={`action-record-${item.action.id ?? item.action.title}`}
 								onPreview={onActionPreview}
+								onOperation={onActionOperation}
 							/>
 						);
 					}
@@ -619,7 +551,12 @@ export function Transcript({
 				})
 			)}
 
-			{isWorking ? <AgentTurnStatus progress={progress} /> : null}
+			{isWorking ? (
+				<AgentTurnStatus
+					progress={progress}
+					className="awpt-message awpt-message--assistant awpt-message--working"
+				/>
+			) : null}
 			{!isWorking && turnSummary ? <TurnSummaryLine summary={turnSummary} /> : null}
 
 			{pendingActions.map((action) => (

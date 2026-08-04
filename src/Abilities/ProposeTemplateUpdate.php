@@ -6,6 +6,7 @@ namespace AWPT\Abilities;
 
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\PostContentSanitizer;
 
@@ -98,6 +99,12 @@ final class ProposeTemplateUpdate implements AbilityInterface {
             'template_area' => (string) get_post_meta($post->ID, 'area', true),
             'affected' => sanitize_textarea_field((string) ($input['affected'] ?? $post->post_name)),
         ];
+        $payload = new CompositionProposalGuard()->prepare($payload, 'template');
+
+        if (is_wp_error($payload)) {
+            return $payload;
+        }
+
         $action_id = $this->actions->create(
             $session_id,
             sanitize_text_field((string) $input['title']),

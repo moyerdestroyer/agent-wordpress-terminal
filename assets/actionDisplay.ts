@@ -70,13 +70,37 @@ export function canPreviewAction(payload?: ActionPayload): boolean {
 		payload?.operation === 'block_attrs_update' ||
 		payload?.operation === 'block_insert' ||
 		payload?.operation === 'block_remove' ||
-		payload?.operation === 'new_post'
+		payload?.operation === 'new_post' ||
+		Boolean(payload?.domain_previewable)
 	);
 }
 
 export function actionMetadata(payload?: ActionPayload): Array<{ label: string; value: string }> {
 	if (!payload) {
 		return [];
+	}
+
+	if (payload.domain_pack_id) {
+		return [
+			{
+				label: __('Domain Pack', 'agent-wordpress-terminal'),
+				value: payload.domain_pack_id,
+			},
+			{
+				label: __('Operation', 'agent-wordpress-terminal'),
+				value: titleCase(payload.operation ?? ''),
+			},
+			{
+				label: __('Affected', 'agent-wordpress-terminal'),
+				value: payload.affected ?? '',
+			},
+			{
+				label: __('Rollback', 'agent-wordpress-terminal'),
+				value: payload.domain_irreversible
+					? __('Unavailable', 'agent-wordpress-terminal')
+					: __('Available after apply', 'agent-wordpress-terminal'),
+			},
+		].filter((item) => item.value !== '');
 	}
 
 	if (payload.operation === 'site_settings_update') {
@@ -445,7 +469,9 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 		label:
 			payload.operation === 'template_update'
 				? __('Template', 'agent-wordpress-terminal')
-				: __('Content', 'agent-wordpress-terminal'),
+				: payload.operation === 'navigation_update'
+					? __('Navigation', 'agent-wordpress-terminal')
+					: __('Content', 'agent-wordpress-terminal'),
 		before,
 		after,
 		emptyBeforeLabel: __('(no previous content)', 'agent-wordpress-terminal'),
