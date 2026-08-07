@@ -16,6 +16,7 @@ use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -95,6 +96,7 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    ...PatternUnfitInput::schema_properties(),
                 ],
                 'required' => ['session_id', 'post_id', 'block_path', 'attrs', 'title', 'description'],
             ],
@@ -142,7 +144,6 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
                 data: ['status' => 404],
             );
         }
-
         $attrs = is_array($input['attrs'] ?? null) ? $input['attrs'] : [];
         $attrs = new ActionPayloadSanitizer()->sanitize_attrs_map($attrs);
 
@@ -185,6 +186,7 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
                 $block_path,
             ),
         ];
+        $payload = PatternUnfitInput::persist_on_payload($payload, $input);
         $payload = new CompositionProposalGuard()->prepare($payload, 'edit', $session_id);
 
         if (is_wp_error($payload)) {

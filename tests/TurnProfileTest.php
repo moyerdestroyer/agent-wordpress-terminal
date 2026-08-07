@@ -116,39 +116,61 @@ function test_turn_profile_edit_and_diagnose(): void {
 function test_presentation_edit_is_inferred_from_prompt_and_focus(): void {
     $profile = TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
 
-    Assert::true($profile->presentation_edit, 'presentation intent should be inferred without a surface signal');
-    Assert::true($profile->content_edit_turn, 'presentation edits should receive the full edit budget');
-    Assert::false($profile->content_turn, 'a focused presentation edit must not enter new-page preparation');
-    Assert::same(TurnProfile::TOOL_EDIT, $profile->tool_profile, 'a focused presentation request edits the page');
+    Assert::same(TurnProfile::MODE_REDESIGN, $profile->work_mode, 'focused presentable requests are redesign mode');
+    Assert::true($profile->is_redesign(), 'is_redesign should match work_mode');
+    Assert::true($profile->presentation_edit, 'presentation_edit remains a redesign compat alias');
+    Assert::true($profile->content_edit_turn, 'redesign should receive the full edit budget');
+    Assert::false($profile->content_turn, 'a focused redesign must not enter new-page preparation');
+    Assert::same(TurnProfile::TOOL_EDIT, $profile->tool_profile, 'a focused redesign uses the edit tool surface');
     Assert::true(
         in_array('awpt/analyze-page', $profile->explore_allowlist(), true),
-        'presentation edits should inspect complete page structure',
+        'redesign should inspect complete page structure',
     );
     Assert::true(
-        in_array('awpt/inspect-rendered-element', $profile->explore_allowlist(), true),
-        'presentation edits should inspect the rendered current page',
+        in_array('awpt/prepare-pattern-draft', $profile->explore_allowlist(), true),
+        'redesign should reuse create pattern preparation',
+    );
+    Assert::true(
+        in_array('awpt/propose-content-update', $profile->compose_allowlist(), true),
+        'redesign should stage full content updates',
     );
     Assert::true(
         in_array('awpt/propose-block-batch-update', $profile->compose_allowlist(), true),
-        'presentation edits should be able to stage coordinated surgical changes atomically',
+        'redesign may still use surgical batch tools',
     );
 
+    $create = TurnProfile::from_message('Create a landing page for our garden club using theme patterns.');
+    Assert::same(TurnProfile::MODE_CREATE, $create->work_mode, 'greenfield creation is create mode');
+    Assert::true($create->is_create(), 'is_create should match work_mode');
+
     $documentation = TurnProfile::from_message('Turn this into a documentation-style page.', [], ['has_focus' => true]);
-    Assert::true($documentation->presentation_edit, 'documentation-style requests use the same universal policy');
-    Assert::same(TurnProfile::TOOL_EDIT, $documentation->tool_profile, 'documentation styling edits focused content');
+    Assert::true($documentation->is_redesign(), 'documentation-style requests are redesign');
+    Assert::same(TurnProfile::TOOL_EDIT, $documentation->tool_profile, 'documentation redesign edits focused content');
 
     $polish = TurnProfile::from_message('Polish this page.', [], ['has_focus' => true]);
-    Assert::true($polish->presentation_edit, 'concise polish requests should receive presentation inspection');
+    Assert::true($polish->is_redesign(), 'concise polish requests are redesign');
 
     $generic = TurnProfile::from_message('Improve this page.', [], ['has_focus' => true]);
-    Assert::true($generic->presentation_edit, 'the literal generic terminal prompt should use presentation inspection');
+    Assert::true($generic->is_redesign(), 'generic improve is redesign');
     Assert::same(TurnProfile::TOOL_EDIT, $generic->tool_profile, 'generic focused improvements edit the current page');
 
+    $guided = TurnProfile::from_message(
+        'Redesign this focused page using active-theme patterns. Read the current page, recommend a fitting theme pattern.',
+        [],
+        ['has_focus' => true],
+    );
+    Assert::true($guided->is_redesign(), 'the shared redesign brief must classify as redesign');
+    Assert::true(
+        in_array('awpt/recommend-patterns', $guided->explore_allowlist(), true),
+        'redesign briefs should offer pattern recommendation tools',
+    );
+
     $copy = TurnProfile::from_message('Change this page title to Filing Guide.', [], ['has_focus' => true]);
-    Assert::false($copy->presentation_edit, 'ordinary copy edits should not require presentation inspection');
+    Assert::false($copy->is_redesign(), 'ordinary copy edits are surgical edit mode');
+    Assert::same(TurnProfile::MODE_EDIT, $copy->work_mode, 'ordinary copy edits use edit mode');
 
     $unfocused = TurnProfile::from_message('Make this page more presentable.');
-    Assert::false($unfocused->presentation_edit, 'presentation editing requires an existing focused post');
+    Assert::false($unfocused->is_redesign(), 'redesign requires an existing focused post');
 }
 
 function test_turn_profile_open_proposal_revision_uses_compose(): void {

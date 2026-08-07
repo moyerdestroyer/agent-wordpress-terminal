@@ -16,6 +16,17 @@ if (!defined('ABSPATH')) {
 
 final class KnowledgeRunRepository {
     /**
+     * Maximum attempts before a job is force-failed as a crash loop.
+     *
+     * {@see fail_job()} retries up to 3 times for caught exceptions, but jobs
+     * that trigger PHP fatal errors (memory exhaustion, timeout) bypass the
+     * catch block entirely — {@see recover_processing_jobs()} resets them to
+     * 'queued' on every batch, creating an infinite crash loop. This cap
+     * force-fails such jobs after a small number of extra attempts.
+     */
+    public const MAX_CRASH_ATTEMPTS = 5;
+
+    /**
      * @param list<array<string, mixed>> $sources
      */
     public function create(string $profile, array $sources, string $now): int {
@@ -106,8 +117,41 @@ final class KnowledgeRunRepository {
         return is_array($rows) ? $rows : [];
     }
 
-    public function recover_processing_jobs(int $run_id, string $now): void {
+    /**
+     * Reset jobs stuck in 'processing' back to 'queued'.
+     *
+     * Jobs that have exceeded {@see MAX_CRASH_ATTEMPTS} are force-failed
+     * instead — they are in a fatal-error crash loop that the normal
+     * {@see fail_job()} retry cap cannot catch.
+     *
+     * @return int Number of jobs force-failed as crash loops.
+     */
+    public function recover_processing_jobs(int $run_id, string $now): int {
         $wpdb = WpDb::get();
+
+        $force_failed = (int) $wpdb->query($wpdb->prepare(
+            "UPDATE %i SET status = 'failed',
+                error_text = %s,
+                updated_at = %s
+             WHERE run_id = %d AND status = 'processing' AND attempts >= %d",
+            $wpdb->prefix . 'awpt_knowledge_jobs',
+            __('Source processing repeatedly crashed; skipped after too many attempts.', 'agent-wordpress-terminal'),
+            $now,
+            $run_id,
+            self::MAX_CRASH_ATTEMPTS,
+        ));
+
+        if ($force_failed > 0) {
+            $wpdb->query($wpdb->prepare(
+                'UPDATE %i SET failed_sources = failed_sources + %d, processed_sources = processed_sources + %d
+                 WHERE id = %d',
+                $wpdb->prefix . 'awpt_knowledge_runs',
+                $force_failed,
+                $force_failed,
+                $run_id,
+            ));
+        }
+
         $wpdb->query($wpdb->prepare(
             "UPDATE %i SET status = 'queued', updated_at = %s
              WHERE run_id = %d AND status = 'processing'",
@@ -115,6 +159,8 @@ final class KnowledgeRunRepository {
             $now,
             $run_id,
         ));
+
+        return $force_failed;
     }
 
     public function begin_job(int $job_id, string $now): void {

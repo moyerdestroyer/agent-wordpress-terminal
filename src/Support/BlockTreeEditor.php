@@ -63,6 +63,25 @@ final class BlockTreeEditor {
     }
 
     /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{
+     *   content: string,
+     *   blocks: array<int, array<string, mixed>>,
+     *   paths: list<string>,
+     *   removed: array<string, mixed>
+     * }|\WP_Error
+     */
+    public function replace_blocks(
+        array $blocks,
+        string $path,
+        array $new_blocks,
+        string $expected_fingerprint = '',
+    ): array|\WP_Error {
+        return new BlockTreeMutator()->replace_blocks($blocks, $path, $new_blocks, $expected_fingerprint);
+    }
+
+    /**
      * @param array<string, mixed> $block
      * @return array<string, mixed>
      */

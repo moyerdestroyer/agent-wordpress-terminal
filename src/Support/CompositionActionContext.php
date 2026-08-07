@@ -27,6 +27,7 @@ final class CompositionActionContext {
         ActionOperations::BLOCK_INSERT,
         ActionOperations::BLOCK_REMOVE,
         ActionOperations::PATTERN_INSERT,
+        ActionOperations::PATTERN_REPLACE,
         ActionOperations::NEW_POST,
         ActionOperations::TEMPLATE_UPDATE,
         ActionOperations::GLOBAL_STYLES_UPDATE,

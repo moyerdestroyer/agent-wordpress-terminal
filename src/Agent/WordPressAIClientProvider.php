@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\AiLogger;
 use AWPT\Support\ConnectorCatalog;
 
 if (!defined('ABSPATH')) {
@@ -34,19 +35,27 @@ final class WordPressAIClientProvider implements ProviderInterface {
      * @return array<string, mixed>|\WP_Error
      */
     public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error {
+        $started_at = microtime(true);
+
         if (!function_exists('wp_ai_client_prompt')) {
-            return $this->response(
+            $error = $this->response(
                 'WordPress AI Client is not available. Select OpenRouter or install a WordPress AI connector plugin.',
             );
+            $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+            return $error;
         }
 
         $catalog = new ConnectorCatalog();
 
         if (!$catalog->is_valid_provider($this->connector_id)) {
-            return $this->response(__(
+            $error = $this->response(__(
                 'The selected AI connector is not available. Choose another connector in AWPT settings.',
                 'agent-wordpress-terminal',
             ));
+            $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+            return $error;
         }
 
         foreach ($catalog->list_installed_connectors() as $connector) {
@@ -55,7 +64,7 @@ final class WordPressAIClientProvider implements ProviderInterface {
             }
 
             if (!$connector['ready']) {
-                return $this->response(sprintf(
+                $error = $this->response(sprintf(
                     /* translators: 1: connector name, 2: connector status */
                     __(
                         'The %1$s connector is not ready (%2$s). Configure it under Settings > Connectors.',
@@ -64,6 +73,9 @@ final class WordPressAIClientProvider implements ProviderInterface {
                     $connector['name'],
                     $connector['status_label'],
                 ));
+                $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+                return $error;
             }
 
             break;
@@ -89,7 +101,7 @@ final class WordPressAIClientProvider implements ProviderInterface {
         );
 
         if ($result['no_text_generation_model']) {
-            return new \WP_Error(
+            $error = new \WP_Error(
                 'awpt_connector_no_text_generation',
                 '' !== $result['content']
                     ? $result['content']
@@ -98,9 +110,18 @@ final class WordPressAIClientProvider implements ProviderInterface {
                         'agent-wordpress-terminal',
                     ),
             );
+            $this->log_complete($messages, $tools, $options, $error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'connector_id' => $this->connector_id,
+                    'ability_names' => $ability_names,
+                ],
+            ]);
+
+            return $error;
         }
 
-        return [
+        $success = [
             'content' => $result['content'],
             'raw_tool_calls' => $result['raw_tool_calls'],
             'message' => [
@@ -111,6 +132,40 @@ final class WordPressAIClientProvider implements ProviderInterface {
             'model' => $result['model'],
             'usage' => [],
         ];
+        $this->log_complete($messages, $tools, $options, $success, [
+            'started_at' => $started_at,
+            'meta' => [
+                'connector_id' => $this->connector_id,
+                'ability_names' => $ability_names,
+            ],
+        ]);
+
+        return $success;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $messages
+     * @param array<int, array<string, mixed>> $tools
+     * @param array<string, mixed>             $options
+     * @param array<string, mixed>|\WP_Error   $result
+     * @param array{started_at?: float, meta?: array<string, mixed>} $context
+     */
+    private function log_complete(
+        array $messages,
+        array $tools,
+        array $options,
+        array|\WP_Error $result,
+        array $context = [],
+    ): void {
+        AiLogger::log_provider_complete([
+            'provider' => $this->get_name(),
+            'messages' => $messages,
+            'tools' => $tools,
+            'options' => $options,
+            'result' => $result,
+            'started_at' => is_float($context['started_at'] ?? null) ? $context['started_at'] : microtime(true),
+            'meta' => is_array($context['meta'] ?? null) ? $context['meta'] : [],
+        ]);
     }
 
     public function get_name(): string {

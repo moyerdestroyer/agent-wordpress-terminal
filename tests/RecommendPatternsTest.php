@@ -94,5 +94,78 @@ function test_recommend_patterns_weights_curated_semantics(): void {
     rmdir($root);
 }
 
+function test_recommend_patterns_boosts_target_role_section_matches(): void {
+    awpt_test_reset_state();
+    $root = sys_get_temp_dir() . '/awpt-recommend-role-' . bin2hex(random_bytes(6));
+    mkdir($root);
+    file_put_contents($root . '/patterns.json', wp_json_encode([
+        'patterns' => [
+            'demo/layout-page-home' => [
+                'role' => 'page-layout',
+                'summary' => 'Full home page layout.',
+                'intents' => ['home', 'landing'],
+                'search_terms' => ['home', 'landing'],
+            ],
+            'demo/faq-accordion' => [
+                'role' => 'faq',
+                'summary' => 'Frequently asked questions accordion.',
+                'intents' => ['faq', 'questions'],
+                'search_terms' => ['faq', 'accordion'],
+            ],
+        ],
+    ]));
+    file_put_contents($root . '/awpt-domain.json', wp_json_encode([
+        'schema_version' => 1,
+        'id' => 'demo-role',
+        'label' => 'Demo Role',
+        'version' => '1.0.0',
+        'patterns' => ['catalog' => 'patterns.json'],
+    ]));
+
+    $GLOBALS['awpt_test_registered_patterns'] = [
+        [
+            'name' => 'demo/layout-page-home',
+            'title' => 'Home Layout Page',
+            'description' => 'Full landing page layout.',
+            'content' => '<!-- wp:group --><div class="wp-block-group"></div><!-- /wp:group -->',
+        ],
+        [
+            'name' => 'demo/faq-accordion',
+            'title' => 'FAQ Accordion',
+            'description' => 'Section FAQ pattern.',
+            'content' => '<!-- wp:group --><div class="wp-block-group"><!-- wp:heading --><h2>FAQ</h2><!-- /wp:heading --></div><!-- /wp:group -->',
+        ],
+    ];
+
+    $registry = new DomainPackRegistry();
+    $registry->load_manifest($root);
+    $catalog = new PatternCatalog(null, new PatternMetadataCatalog($registry));
+    $result = new RecommendPatterns($catalog, $registry)->execute([
+        'intent' => 'refresh this area',
+        'post_type' => 'page',
+        'max' => 2,
+        'semantic' => false,
+        'target_role' => 'faq',
+        'prefer_section_scope' => true,
+    ]);
+    $recommendations = $result['recommendations'] ?? [];
+
+    Assert::same('faq', $result['target_role'] ?? null, 'target_role echoed');
+    Assert::same(
+        'demo/faq-accordion',
+        $recommendations[0]['pattern']['name'] ?? '',
+        'FAQ role should outrank full-page layout when target_role=faq',
+    );
+    Assert::true(
+        str_contains((string) ($recommendations[0]['rationale'] ?? ''), 'section role'),
+        'rationale mentions section role boost',
+    );
+
+    unlink($root . '/patterns.json');
+    unlink($root . '/awpt-domain.json');
+    rmdir($root);
+}
+
 test_recommend_patterns_ignores_generic_request_words();
 test_recommend_patterns_weights_curated_semantics();
+test_recommend_patterns_boosts_target_role_section_matches();

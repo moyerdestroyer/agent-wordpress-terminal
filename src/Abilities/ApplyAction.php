@@ -22,7 +22,7 @@ use AWPT\Database\ActionRepository;
 use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Domain\DomainPackRegistry;
 use AWPT\Domain\DomainProposalManager;
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\ArrayKey;
 use AWPT\Support\ResourceChangeManager;
@@ -234,7 +234,7 @@ final class ApplyAction implements AbilityInterface {
         }
 
         if (array_key_exists('post_content', $payload)) {
-            $validation = new DomainValidationService();
+            $validation = new CompositionGate();
             $validation_result = $validation->evaluate((string) $payload['post_content'], [
                 'operation' => $operation,
                 'work_type' => $this->work_type($operation),

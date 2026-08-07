@@ -40,24 +40,38 @@ final class DiscoveryPolicy {
         }
 
         $coverage = $this->coverage($all_calls);
+        // Redesign: know the page, then require pattern *structure* (or honest empty/fallback).
+        // Recommend alone is not enough when recommendations were non-empty (Ollie-inspired).
         $presentation_edit = true === ($context['presentation_edit'] ?? false);
-        if (
-            $presentation_edit
-            && (!in_array('page_analysis', $coverage, true) || !in_array('rendered_inspection', $coverage, true))
-        ) {
-            return ['compose' => false, 'reason' => '', 'coverage' => $coverage];
-        }
-        if (
-            $presentation_edit
-            && in_array('pattern_recommendation', $coverage, true)
-            && !in_array('pattern_structure', $coverage, true)
-        ) {
-            return ['compose' => false, 'reason' => '', 'coverage' => $coverage];
-        }
         if ($presentation_edit) {
+            $knows_page =
+                in_array('page_analysis', $coverage, true)
+                || in_array('content_read', $coverage, true)
+                || in_array('block_tree', $coverage, true);
+            $has_structure =
+                in_array('pattern_structure', $coverage, true)
+                || in_array('pattern_draft', $coverage, true);
+            $honest_empty_catalog =
+                in_array('pattern_consulted', $coverage, true)
+                && !in_array('pattern_recommendation', $coverage, true);
+            $custom_fallback = in_array('custom_fallback', $coverage, true);
+            $pattern_ready = $has_structure || $custom_fallback || $honest_empty_catalog;
+
+            if (!$knows_page || !$pattern_ready) {
+                return ['compose' => false, 'reason' => '', 'coverage' => $coverage];
+            }
+
+            $reason = $has_structure
+                ? 'The focused page and loaded theme pattern structure are available for a theme-enhanced redesign.'
+                : (
+                    $custom_fallback
+                        ? 'Pattern preparation returned custom_fallback; a bespoke redesign may be staged.'
+                        : 'Pattern consultation returned no suitable recommendations; a bespoke redesign may be staged.'
+                );
+
             return [
                 'compose' => true,
-                'reason' => 'The focused page structure and current rendered presentation have been inspected.',
+                'reason' => $reason,
                 'coverage' => $coverage,
             ];
         }
@@ -176,6 +190,7 @@ final class DiscoveryPolicy {
             } elseif ('awpt/list-patterns' === $tool) {
                 $coverage['pattern_inventory'] = true;
             } elseif ('awpt/recommend-patterns' === $tool) {
+                $coverage['pattern_consulted'] = true;
                 $output = is_array($call['output'] ?? null) ? $call['output'] : [];
 
                 if ([] !== ($output['recommendations'] ?? [])) {
@@ -189,6 +204,21 @@ final class DiscoveryPolicy {
                     $coverage['pattern_inventory'] = true;
                     $coverage['pattern_structure'] = true;
                     $coverage['pattern_draft'] = true;
+
+                    if ([] !== ($output['media'] ?? [])) {
+                        $coverage['media_inventory'] = true;
+                    }
+                } elseif ('custom_fallback' === $mode) {
+                    $coverage['custom_fallback'] = true;
+                }
+            } elseif ('awpt/prepare-pattern-change' === $tool) {
+                $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+                $mode = sanitize_key((string) ($output['mode'] ?? ''));
+
+                if (in_array($mode, ['replace', 'insert'], true)) {
+                    $coverage['pattern_inventory'] = true;
+                    $coverage['pattern_structure'] = true;
+                    $coverage['pattern_change'] = true;
 
                     if ([] !== ($output['media'] ?? [])) {
                         $coverage['media_inventory'] = true;

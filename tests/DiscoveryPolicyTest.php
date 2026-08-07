@@ -181,6 +181,38 @@ function test_discovery_policy_composes_immediately_from_staged_revision_context
     );
 }
 
+function awpt_presentation_discovery_base(bool $with_empty_recommend = false, bool $with_nonempty_recommend = false): array {
+    $calls = [
+        awpt_discovery_call('awpt/analyze-page'),
+        [
+            'tool' => 'awpt/inspect-rendered-element',
+            'input' => ['post_id' => 580, 'include_screenshot' => true],
+            'output' => ['rendered' => false, 'warning' => 'headless_browser_unavailable'],
+            'status' => 'success',
+        ],
+    ];
+
+    if ($with_empty_recommend) {
+        $calls[] = [
+            'tool' => 'awpt/recommend-patterns',
+            'input' => ['intent' => 'committee roster'],
+            'output' => ['recommendations' => []],
+            'status' => 'success',
+        ];
+    }
+
+    if ($with_nonempty_recommend) {
+        $calls[] = [
+            'tool' => 'awpt/recommend-patterns',
+            'input' => ['intent' => 'documentation guide'],
+            'output' => ['recommendations' => [['pattern' => ['name' => 'civicpress/layout-page-documentation']]]],
+            'status' => 'success',
+        ];
+    }
+
+    return $calls;
+}
+
 function test_presentation_edit_requires_structure_and_render_attempt(): void {
     $analysis = [awpt_discovery_call('awpt/analyze-page')];
     $incomplete = new DiscoveryPolicy()->decide('Make this page more presentable.', $analysis, $analysis, 5, [
@@ -188,37 +220,34 @@ function test_presentation_edit_requires_structure_and_render_attempt(): void {
         'presentation_edit' => true,
     ]);
 
-    Assert::false($incomplete['compose'], 'presentation edits should wait for a render inspection attempt');
+    Assert::false($incomplete['compose'], 'redesign should wait for pattern consultation');
 
-    $calls = [
-        ...$analysis,
-        [
-            'tool' => 'awpt/inspect-rendered-element',
-            'input' => ['post_id' => 594, 'include_screenshot' => true],
-            'output' => ['rendered' => false, 'warning' => 'headless_browser_unavailable'],
-            'status' => 'success',
-        ],
-    ];
-    $complete = new DiscoveryPolicy()->decide('Make this page more presentable.', $calls, [end($calls)], 8, [
+    $calls = awpt_presentation_discovery_base();
+    $without_recommend = new DiscoveryPolicy()->decide('Make this page more presentable.', $calls, [end($calls)], 8, [
         'content_turn' => true,
         'presentation_edit' => true,
     ]);
 
-    Assert::true($complete['compose'], 'static render fallback still completes presentation discovery');
-    Assert::true(in_array('page_analysis', $complete['coverage'], true), 'page analysis should be tracked');
-    Assert::true(
-        in_array('rendered_inspection', $complete['coverage'], true),
-        'render inspection attempt should be tracked',
+    Assert::false(
+        $without_recommend['compose'],
+        'redesign must consult patterns before compose',
     );
+    Assert::true(in_array('page_analysis', $without_recommend['coverage'], true), 'page analysis should be tracked');
 }
 
 function test_presentation_edit_accepts_complete_block_tree_as_structural_analysis(): void {
     $calls = [
         awpt_discovery_call('awpt/read-block-tree'),
         [
-            'tool' => 'awpt/inspect-rendered-element',
-            'input' => ['post_id' => 580, 'include_screenshot' => true],
-            'output' => ['rendered' => false, 'warning' => 'headless_browser_unavailable'],
+            'tool' => 'awpt/recommend-patterns',
+            'input' => ['intent' => 'docs'],
+            'output' => ['recommendations' => [['pattern' => ['name' => 'fixture/layout']]]],
+            'status' => 'success',
+        ],
+        [
+            'tool' => 'awpt/read-pattern',
+            'input' => ['name' => 'fixture/layout'],
+            'output' => ['name' => 'fixture/layout', 'composition_scope' => 'layout'],
             'status' => 'success',
         ],
     ];
@@ -229,7 +258,7 @@ function test_presentation_edit_accepts_complete_block_tree_as_structural_analys
 
     Assert::true(
         $decision['compose'],
-        'a complete block-tree read should satisfy structural inspection without a redundant analyze-page call',
+        'block-tree + recommend + read-pattern unlocks redesign compose',
     );
 }
 
@@ -240,9 +269,9 @@ function test_presentation_edit_accepts_equivalent_complete_content_reads(): voi
         $calls = [
             awpt_discovery_call($structural_tool),
             [
-                'tool' => 'awpt/inspect-rendered-element',
-                'input' => ['post_id' => 580, 'include_screenshot' => true],
-                'output' => ['rendered' => false, 'warning' => 'headless_browser_unavailable'],
+                'tool' => 'awpt/recommend-patterns',
+                'input' => ['intent' => 'page redesign'],
+                'output' => ['recommendations' => []],
                 'status' => 'success',
             ],
         ];
@@ -253,29 +282,36 @@ function test_presentation_edit_accepts_equivalent_complete_content_reads(): voi
 
         Assert::true(
             $decision['compose'],
-            $structural_tool . ' should satisfy structural inspection without redundant analysis calls',
+            $structural_tool . ' + empty recommend (honest empty catalog) unlocks redesign compose',
         );
     }
 }
 
 test_presentation_edit_accepts_equivalent_complete_content_reads();
 
+function test_presentation_edit_empty_recommendations_unlock_compose(): void {
+    $calls = awpt_presentation_discovery_base(with_empty_recommend: true);
+    $decision = new DiscoveryPolicy()->decide('Make this page more presentable.', $calls, [end($calls)], 8, [
+        'content_turn' => true,
+        'presentation_edit' => true,
+    ]);
+
+    Assert::true($decision['compose'], 'empty recommend-patterns results allow honest bespoke redesign');
+    Assert::true(in_array('pattern_consulted', $decision['coverage'], true), 'consultation should be tracked');
+    Assert::false(
+        in_array('pattern_recommendation', $decision['coverage'], true),
+        'empty results must not claim non-empty recommendations',
+    );
+    Assert::true(
+        str_contains($decision['reason'], 'no suitable') || str_contains($decision['reason'], 'bespoke'),
+        'compose reason should describe empty-catalog bespoke path',
+    );
+}
+
+test_presentation_edit_empty_recommendations_unlock_compose();
+
 function test_presentation_edit_reads_recommended_pattern_before_composing(): void {
-    $calls = [
-        awpt_discovery_call('awpt/read-content'),
-        [
-            'tool' => 'awpt/inspect-rendered-element',
-            'input' => ['post_id' => 580, 'include_screenshot' => true],
-            'output' => ['rendered' => false, 'warning' => 'headless_browser_unavailable'],
-            'status' => 'success',
-        ],
-        [
-            'tool' => 'awpt/recommend-patterns',
-            'input' => ['intent' => 'documentation guide'],
-            'output' => ['recommendations' => [['pattern' => ['name' => 'civicpress/layout-page-documentation']]]],
-            'status' => 'success',
-        ],
-    ];
+    $calls = awpt_presentation_discovery_base(with_nonempty_recommend: true);
     $unread = new DiscoveryPolicy()->decide('Make this page more presentable.', $calls, $calls, 5, [
         'content_turn' => true,
         'presentation_edit' => true,
@@ -291,8 +327,10 @@ function test_presentation_edit_reads_recommended_pattern_before_composing(): vo
         'presentation_edit' => true,
     ]);
 
-    Assert::false($unread['compose'], 'pattern metadata alone must not authorize an attributed layout rewrite');
-    Assert::true($read['compose'], 'reading the selected recommended pattern should unlock composition');
+    Assert::false($unread['compose'], 'nonempty recommend alone must not unlock redesign compose');
+    Assert::true(in_array('pattern_consulted', $unread['coverage'], true), 'nonempty recommend still counts as consulted');
+    Assert::true($read['compose'], 'reading the selected recommended pattern unlocks compose');
+    Assert::true(in_array('pattern_structure', $read['coverage'], true), 'read-pattern tracks structure coverage');
 }
 
 test_presentation_edit_reads_recommended_pattern_before_composing();

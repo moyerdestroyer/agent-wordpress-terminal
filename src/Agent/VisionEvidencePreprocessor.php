@@ -149,6 +149,9 @@ final class VisionEvidencePreprocessor {
                 [],
                 [
                     'session_id' => $session_id,
+                    'turn_id' => $turn_id,
+                    'tool_round' => 0,
+                    'log_phase' => 'vision_preprocess',
                     'max_completion_tokens' => self::MAX_COMPLETION_TOKENS,
                     'timeout' => $timeout,
                 ],

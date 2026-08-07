@@ -57,9 +57,18 @@ final class MediaBlockIntegrityValidator {
                                 'block_name' => $name,
                                 'url' => $url,
                                 'recovery' => __(
-                                    'Use a verified Media Library attachment ID or its exact canonical URL. AWPT will not guess an image from a filename or featured image.',
+                                    'Do not invent Media Library IDs or keep unresolved same-site /wp-content/uploads/ URLs. Prefer: (1) omit optional image/cover media when no verified attachment exists, or (2) declare pattern_unfit_code media_unavailable and adapt without those photos. Only use a verified attachment ID with its exact canonical URL from Media Library evidence. AWPT will not guess an image from a filename or featured image.',
                                     'agent-wordpress-terminal',
                                 ),
+                                'recommended_next_tools' => [
+                                    [
+                                        'tool' => 'awpt/propose-content-update',
+                                        'reason' => __(
+                                            'Retry without unresolved local media URLs: omit optional images, or use pattern_unfit_code media_unavailable for text-only adaptation.',
+                                            'agent-wordpress-terminal',
+                                        ),
+                                    ],
+                                ],
                             ],
                         );
                     }

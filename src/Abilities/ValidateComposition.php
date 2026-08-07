@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AWPT\Abilities;
 
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -43,7 +43,7 @@ final class ValidateComposition implements AbilityInterface {
      * @return array<string, mixed>
      */
     public function execute(array $input): array {
-        $result = new DomainValidationService()->evaluate(
+        $result = new CompositionGate()->evaluate(
             (string) $input['content'],
             [
                 'post_type' => sanitize_key((string) ($input['post_type'] ?? '')),

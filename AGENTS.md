@@ -88,6 +88,38 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 - Do not store large model payloads in post meta/options — use custom tables (`wp_awpt_*`).
 - Treat the agent as untrusted: ability `permission_callback`s use minimum WordPress caps (no redundant `manage_options` double-gates on content/media/theme/plugin ops). Diagnostics and site-settings stay admin-only. `awpt/apply-action` stays human-only. Discovered abilities/MCP tools are auto-offered unless disabled in the Tools UI (`awpt_disabled_tools`).
 
+## Layers and plugin/theme boundaries
+
+| Layer | Owns |
+|-------|------|
+| `src/Domain/` | Domain Packs, pack-aware pattern semantics, composition validation gate, theme vocabulary |
+| `src/Support/` | WordPress primitives (blocks, posts, media, connectors) without hardcoding a product theme |
+| `src/Agent/` | Provider loop, tools, turn policy |
+| Active theme Domain Pack | Pattern namespaces, thrash aliases, rules, guidance, optional PHP validators |
+
+**Theme vocabulary never belongs in AWPT core.** Pattern name aliases and theme-specific thrash recovery live in the active pack’s manifest (`patterns.namespace`, `patterns.aliases`). AWPT only applies generic, namespace-agnostic heuristics.
+
+**Pattern-native redesign (Ollie-inspired, AWPT tools only):** Prefer **`prepare-pattern-change` → `propose-pattern-replace`** for existing section swaps and **`propose-pattern-insert`** for additions (server-materialized). Full-document freehand `propose-content-update` remains available when needed; claiming `pattern_name` still requires structure evidence (`read-pattern` / prep). Reject dishonest `pattern_unfit_code: no_recommendations` when recommendations were non-empty. Create: `prepare-pattern-draft` → `propose-patterned-post`. Surgical block ops stay exempt.
+
+**Review-queue Improve:** Two **internal** AWPT turns (evaluate plan → act), still **one button**. Prompts live in `ImprovePagePrompt` (PHP SoT). Dufresne only mounts `AWPTReviewAssistant` — no tools, prompts, or plan schema in Dufresne. Evaluate turns are read-only (`[awpt:improve_evaluate]` marker → investigate tools). CLI: `bin/queue-improve-one.php` (default two-step; `one-shot` for legacy).
+
+**Dufresne contracts** (string-stable; prefer `Hooks` constants on the Dufresne side):
+
+| Hook / surface | Purpose |
+|----------------|---------|
+| `dufresne_wp_plugin_run_completed` | Schedule knowledge rebuild after successful import |
+| `dufresne_wp_plugin_after_rollback` | Mark knowledge stale / coalesce rebuild after rollback |
+| `dufresne_wp_plugin_enqueue_review_assets` | Enqueue AWPT review bridge (preferred over hard-coded admin page hooks) |
+| `window.AWPTReviewAssistant` | Versioned mount API (`version`, `mount`) for the Review queue UI |
+
+**Stack PHP:** AWPT requires PHP 8.4+. Sites running AWPT + Dufresne together must use 8.4+.
+
+**Ollie / `ol/`:** Offline reference and parity evaluation only. Not a product dependency; never import or require it from runtime code. See `evaluation/README.md`.
+
+**Schema upgrades:** Bump `Installer::SCHEMA_VERSION` only with either pure additive `dbDelta` table definitions or an explicit `version_compare` step in `maybe_upgrade()`. Do not rely on silent full recreate for data renames or backfills.
+
+**Domain Pack schemas:** v1 manifests still load; new packs must use v2 (`schemas/awpt-domain-v2.schema.json`). Do not remove v1 before 0.4.0 without a deprecation notice in release notes.
+
 ## Key files
 
 | File | Role |
@@ -109,6 +141,7 @@ Out of scope for now: full autonomous editing, multi-agent orchestration, remote
 - New REST route → add controller in `src/REST/`, register in `Plugin::register_rest_routes()`.
 - New ability → class in `src/Abilities/`, hook from `RegisterAbilities`.
 - New UI panel → component under `assets/components/`, wire in `Terminal.tsx`.
-- Schema change → update `Database/Installer.php` (migration strategy TBD).
+- Schema change → update `Database/Installer.php` (`SCHEMA_VERSION` + additive `dbDelta` and/or explicit `version_compare` step).
+- Domain Pack theme vocabulary (aliases, namespaces) → theme `awpt-domain.json`, not AWPT core constants.
 - After PHP edits: `composer run format` then `composer run check`.
 - After TSX edits: `npm run lint:fix` then `npm run build` before testing in WP admin.

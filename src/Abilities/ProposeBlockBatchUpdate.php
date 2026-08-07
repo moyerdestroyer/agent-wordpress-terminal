@@ -15,6 +15,7 @@ use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockBatchUpdater;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -28,7 +29,7 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             'name' => 'awpt/propose-block-batch-update',
             'label' => __('Propose Block Batch Update', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages one atomic existing-page update containing multiple verified attribute, rich-text, removal, or insertion changes. Use paths and fingerprints from awpt/read-block-tree when two or more blocks need coordinated edits. Insertions must use a verified anchor path and before/after position.',
+                'Stages one atomic existing-page update containing multiple verified attribute, rich-text, removal, or insertion changes. Use paths and fingerprints from the compose evidence pack content_reads block tree (from awpt/read-block-tree or server-side synthesis) when two or more blocks need coordinated edits. Insertions must use a verified anchor path and before/after position.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -55,7 +56,7 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                                     'maxLength' => 64,
                                     'pattern' => '^[a-f0-9]{64}$',
                                     'description' => __(
-                                        'Copy the complete 64-character fingerprint verbatim from analyze-page or read-block-tree. Never abbreviate, truncate, or invent it.',
+                                        'Copy the complete 64-character fingerprint verbatim from the verified evidence pack content_reads block tree. Never abbreviate, truncate, invent, or zero-fill it.',
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
@@ -82,6 +83,7 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                     ],
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
+                    ...PatternUnfitInput::schema_properties(),
                 ],
                 'required' => ['session_id', 'post_id', 'changes', 'title', 'description'],
             ],
@@ -116,7 +118,6 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                 'status' => 404,
             ]);
         }
-
         $raw_changes = is_array($input['changes'] ?? null) ? array_values($input['changes']) : [];
         /** @var list<array<string, mixed>> $changes */
         $changes = array_values(array_filter($raw_changes, 'is_array'));
@@ -127,29 +128,32 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             return $update;
         }
 
-        $payload = new CompositionProposalGuard()->prepare(
-            [
-                'operation' => ActionOperations::CONTENT_UPDATE,
-                'post_id' => $post_id,
-                'post_type' => $post->post_type,
-                'post_status' => $post->post_status,
-                'original_post_title' => $post->post_title,
-                'original_post_content' => $post->post_content,
-                'original_post_status' => $post->post_status,
-                'post_content' => $update['content'],
-                'batch_changes' => $update['changes'],
-                'presentation_requires_h1' => true === ($input['presentation_requires_h1'] ?? false),
-                'affected' => sprintf(
-                    /* translators: %d: number of block changes. */
-                    _n(
-                        '%d verified block change',
-                        '%d verified block changes',
-                        count($update['changes']),
-                        'agent-wordpress-terminal',
-                    ),
+        $payload = [
+            'operation' => ActionOperations::CONTENT_UPDATE,
+            'post_id' => $post_id,
+            'post_type' => $post->post_type,
+            'post_status' => $post->post_status,
+            'original_post_title' => $post->post_title,
+            'original_post_content' => $post->post_content,
+            'original_post_status' => $post->post_status,
+            'post_content' => $update['content'],
+            'batch_changes' => $update['changes'],
+            'presentation_requires_h1' => true === ($input['presentation_requires_h1'] ?? false),
+            'affected' => sprintf(
+                /* translators: %d: number of block changes. */
+                _n(
+                    '%d verified block change',
+                    '%d verified block changes',
                     count($update['changes']),
+                    'agent-wordpress-terminal',
                 ),
-            ],
+                count($update['changes']),
+            ),
+        ];
+        $payload = PatternUnfitInput::persist_on_payload($payload, $input);
+
+        $payload = new CompositionProposalGuard()->prepare(
+            $payload,
             'edit',
             $session_id,
         );

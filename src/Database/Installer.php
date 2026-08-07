@@ -23,7 +23,7 @@ final class Installer {
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '10';
+    private const SCHEMA_VERSION = '11';
 
     /**
      * Plugin activation hook.
@@ -49,15 +49,33 @@ final class Installer {
         }
 
         try {
+            // Additive schema: dbDelta creates/alters tables for the current definitions.
             self::create_tables();
 
-            update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
+            // Per-version data steps (backfills, renames, option migrations).
+            // Add a new block when SCHEMA_VERSION requires more than additive tables.
+            self::run_version_steps($installed_version);
 
-            if ('' !== $installed_version && version_compare($installed_version, '9', '<')) {
-                update_option('awpt_knowledge_stale', '1', false);
-            }
+            update_option('awpt_schema_version', self::SCHEMA_VERSION, false);
         } finally {
             delete_option(self::UPGRADE_LOCK_OPTION);
+        }
+    }
+
+    /**
+     * Run explicit data migrations for upgrades from $installed_version toward SCHEMA_VERSION.
+     *
+     * Prefer additive dbDelta-only bumps when possible. When a bump needs data
+     * transforms, add a version_compare block here and document it in AGENTS.md.
+     */
+    private static function run_version_steps(string $installed_version): void {
+        if ('' === $installed_version) {
+            return;
+        }
+
+        // v9+: knowledge tables reshaped; force a rebuild of the index.
+        if (version_compare($installed_version, '9', '<')) {
+            update_option('awpt_knowledge_stale', '1', false);
         }
     }
 
@@ -134,6 +152,27 @@ final class Installer {
 			PRIMARY KEY  (id),
 			KEY session_id (session_id),
 			KEY turn_id (turn_id)
+		) {$charset_collate};";
+
+        $ai_logs = "CREATE TABLE {$prefix}ai_logs (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			session_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			event varchar(64) NOT NULL DEFAULT '',
+			provider varchar(100) NOT NULL DEFAULT '',
+			model varchar(191) NOT NULL DEFAULT '',
+			turn_id varchar(64) NULL,
+			tool_round int unsigned NOT NULL DEFAULT 0,
+			outcome varchar(30) NOT NULL DEFAULT 'success',
+			error_code varchar(100) NOT NULL DEFAULT '',
+			duration_ms int unsigned NOT NULL DEFAULT 0,
+			request_json longtext NULL,
+			response_json longtext NULL,
+			meta_json longtext NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY session_id (session_id),
+			KEY turn_id (turn_id),
+			KEY created_at (created_at)
 		) {$charset_collate};";
 
         $context_items = "CREATE TABLE {$prefix}context_items (
@@ -286,6 +325,7 @@ final class Installer {
         dbDelta($messages);
         dbDelta($tool_calls);
         dbDelta($provider_calls);
+        dbDelta($ai_logs);
         dbDelta($context_items);
         dbDelta($actions);
         dbDelta($knowledge_index);

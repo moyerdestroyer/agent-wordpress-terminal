@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Support\BlockTree;
+use AWPT\Support\PageSectionModel;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -83,11 +84,21 @@ final class ReadBlockTree implements AbilityInterface {
         }
 
         $tree = BlockTree::from_content($post->post_content);
+        $normalized = $tree->normalized();
+        $top_level = PageSectionModel::from_tree($tree, [
+            'title' => (string) ($post->post_title ?? ''),
+            'post_type' => (string) ($post->post_type ?? ''),
+        ]);
 
         return [
-            'blocks' => $tree->normalized(),
+            'blocks' => $normalized,
             'count' => $tree->count(),
             'path_format' => __('Dotted zero-based visible block path, e.g. 0 or 2.1.', 'agent-wordpress-terminal'),
+            'top_level_sections' => $top_level,
+            'prepare_pattern_change_hint' => __(
+                'For awpt/prepare-pattern-change (mode=replace), set target_path and expected_fingerprint from top_level_sections (fingerprint may be omitted; the server fills it from the live block). Use role / heading / preserve_by_default as soft guidance when choosing a section.',
+                'agent-wordpress-terminal',
+            ),
         ];
     }
 }

@@ -17,6 +17,7 @@ use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\BlockTreeEditor;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -82,6 +83,7 @@ final class ProposeBlockInsert implements AbilityInterface {
                     ],
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
+                    ...PatternUnfitInput::schema_properties(),
                 ],
                 'required' => ['session_id', 'post_id', 'block_name', 'title', 'description'],
             ],
@@ -129,7 +131,6 @@ final class ProposeBlockInsert implements AbilityInterface {
                 data: ['status' => 404],
             );
         }
-
         $block_name = sanitize_text_field((string) ($input['block_name'] ?? ''));
 
         if ('' === $block_name || !preg_match('/^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/', $block_name)) {

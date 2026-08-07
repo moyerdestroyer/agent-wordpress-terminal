@@ -16,21 +16,13 @@ if (!defined('ABSPATH')) {
 
 final class PostContentMediaIntegrity {
     public function __construct(
-        private readonly PostCompositionNormalizer $normalizer = new PostCompositionNormalizer(),
-        private readonly MediaBlockIntegrityValidator $validator = new MediaBlockIntegrityValidator(),
+        private readonly PostContentStagingPipeline $pipeline = new PostContentStagingPipeline(),
     ) {}
 
     /**
      * @return array{content: string, repairs: list<array{kind: string, block_path: string, block_name: string, description: string}>}|\WP_Error
      */
     public function prepare(string $content): array|\WP_Error {
-        $normalized = $this->normalizer->normalize($content);
-        $error = $this->validator->validate($normalized['content']);
-
-        if ($error instanceof \WP_Error) {
-            return $error;
-        }
-
-        return $normalized;
+        return $this->pipeline->prepare($content);
     }
 }

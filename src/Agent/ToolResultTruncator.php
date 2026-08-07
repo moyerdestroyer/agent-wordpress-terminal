@@ -31,16 +31,19 @@ final class ToolResultTruncator {
             unset($output['blocks']);
         }
 
-        return $this->truncate($tool, $output, self::PROVIDER_MAX_CHARS);
+        return $this->truncate($tool, $output, self::PROVIDER_MAX_CHARS, 'provider');
     }
 
     /**
      */
     public function for_storage(string $tool, mixed $output): mixed {
-        return $this->truncate($tool, $output, self::STORAGE_MAX_CHARS);
+        return $this->truncate($tool, $output, self::STORAGE_MAX_CHARS, 'storage');
     }
 
-    private function truncate(string $tool, mixed $output, int $max_chars): mixed {
+    /**
+     * @param 'provider'|'storage' $channel
+     */
+    private function truncate(string $tool, mixed $output, int $max_chars, string $channel): mixed {
         if (ToolRegistry::is_proposal_ability($tool) && is_array($output)) {
             return $output;
         }
@@ -53,7 +56,7 @@ final class ToolResultTruncator {
             return $output;
         }
 
-        $output = $this->shrink($tool, $output);
+        $output = $this->shrink($tool, $output, $channel);
         $encoded = (string) wp_json_encode($output);
 
         if (mb_strlen($encoded, 'UTF-8') <= $max_chars) {
@@ -65,9 +68,10 @@ final class ToolResultTruncator {
 
     /**
      * @param array<array-key, mixed> $output
+     * @param 'provider'|'storage'    $channel
      * @return array<array-key, mixed>
      */
-    private function shrink(string $tool, array $output): array {
+    private function shrink(string $tool, array $output, string $channel): array {
         if (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
             $output['content'] = $this->clip_string((string) ($output['content'] ?? ''), 6_000);
             $output['content_raw'] = $this->clip_string((string) ($output['content_raw'] ?? ''), 6_000);
@@ -81,7 +85,47 @@ final class ToolResultTruncator {
         }
 
         if ('awpt/read-block-tree' === $tool) {
-            $output['blocks'] = $this->clip_array_items($output['blocks'] ?? [], 40);
+            $blocks = is_array($output['blocks'] ?? null) ? $output['blocks'] : [];
+            $compact = new \AWPT\Support\BlockTreeView()->compact_for_evidence(
+                \AWPT\Support\ArrayKey::list_of_maps($blocks),
+                self::PROVIDER_MAX_CHARS - 500,
+            );
+            $output['blocks'] = $compact['blocks'];
+            $output['count'] = (int) ($compact['count'] ?? $output['count'] ?? 0);
+
+            if (!empty($compact['flat_index'])) {
+                $output['flat_index'] = true;
+            }
+        }
+
+        if ('awpt/analyze-page' === $tool) {
+            // Keep the presentation brief for explore. Storage retains a compact
+            // tree so compose packs can reuse fingerprints without a re-fetch.
+            $output['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 1_500);
+
+            if ('storage' === $channel) {
+                $blocks = is_array($output['block_tree'] ?? null) ? $output['block_tree'] : [];
+
+                if ([] !== $blocks) {
+                    $compact = new \AWPT\Support\BlockTreeView()->compact_for_evidence(
+                        \AWPT\Support\ArrayKey::list_of_maps($blocks),
+                        8_000,
+                    );
+                    $output['block_tree'] = $compact['blocks'];
+
+                    if (!empty($compact['flat_index'])) {
+                        $output['block_tree_flat_index'] = true;
+                    }
+                }
+            } else {
+                unset($output['block_tree'], $output['block_tree_flat_index']);
+            }
+
+            foreach (['headings', 'shortcodes', 'forms', 'custom_blocks', 'recommended_next_actions'] as $key) {
+                if (array_key_exists($key, $output)) {
+                    $output[$key] = $this->clip_array_items($output[$key] ?? [], 24);
+                }
+            }
         }
 
         if ('awpt/read-proposal' === $tool) {
@@ -180,6 +224,18 @@ final class ToolResultTruncator {
                 (string) ($output['plain_text'] ?? $output['content_raw'] ?? $output['content_rendered'] ?? ''),
                 1_500,
             );
+        }
+
+        if ('awpt/analyze-page' === $tool) {
+            foreach (['headings', 'risk_level', 'recommended_next_actions'] as $key) {
+                if (array_key_exists($key, $output)) {
+                    $summary[$key] = is_array($output[$key])
+                        ? $this->clip_array_items($output[$key], 16)
+                        : $output[$key];
+                }
+            }
+
+            $summary['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 800);
         }
 
         if ('awpt/list-content' === $tool) {

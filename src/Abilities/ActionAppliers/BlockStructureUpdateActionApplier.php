@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Applies staged block insert/remove operations.
+ * Applies staged block insert/remove/replace operations.
  *
  * @package AWPT
  */
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Rebuilds post content for staged block insert or remove.
+ * Rebuilds post content for staged block insert, remove, or pattern replace.
  */
 final class BlockStructureUpdateActionApplier {
     /**
@@ -66,6 +66,22 @@ final class BlockStructureUpdateActionApplier {
                 $path,
                 $blocks,
                 (string) ($payload['position'] ?? BlockTree::POSITION_APPEND),
+            );
+
+            return is_wp_error($result) ? $result : $result['content'];
+        }
+
+        if (ActionOperations::PATTERN_REPLACE === $operation) {
+            $blocks = [];
+
+            foreach (\AWPT\Support\ArrayKey::list_of_maps($payload['blocks'] ?? null) as $raw) {
+                $blocks[] = new BlockTreeEditor()->normalize_block($raw);
+            }
+
+            $result = $tree->replace_blocks(
+                $path,
+                $blocks,
+                (string) ($payload['expected_fingerprint'] ?? ''),
             );
 
             return is_wp_error($result) ? $result : $result['content'];

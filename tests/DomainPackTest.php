@@ -84,7 +84,14 @@ function test_domain_pack_loads_scoped_manifest_and_catalog(): void {
                 'applies_to' => ['compose'],
             ],
         ],
-        'patterns' => ['catalog' => 'agent/patterns.json'],
+        'patterns' => [
+            'namespace' => 'demo',
+            'catalog' => 'agent/patterns.json',
+            'aliases' => [
+                'demo/page-header' => 'demo/header-page',
+                'demo/team-directory' => 'demo/section-team-member-directory',
+            ],
+        ],
     ]));
 
     $registry = new DomainPackRegistry();
@@ -118,6 +125,15 @@ function test_domain_pack_loads_scoped_manifest_and_catalog(): void {
         ['primary', 'image'],
         $metadata->get('demo/hero')['design']['background_roles'] ?? [],
         'v2 design intent should survive sanitization',
+    );
+    Assert::same(
+        'demo/header-page',
+        $registry->pattern_aliases()['demo/page-header'] ?? '',
+        'pack aliases should load from the manifest',
+    );
+    Assert::true(
+        in_array('demo', $registry->pattern_namespaces(), true),
+        'pack namespace should be discoverable for bare-slug resolution',
     );
 
     awpt_remove_domain_test_directory($root);

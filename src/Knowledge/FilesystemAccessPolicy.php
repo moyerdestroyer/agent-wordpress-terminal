@@ -154,7 +154,7 @@ final class FilesystemAccessPolicy {
             return !str_ends_with($basename, '.min.css');
         }
 
-        // Theme author docs (CivicPress docs/, AGENTS guides, pattern write-ups).
+        // Theme author docs (docs/, AGENTS guides, pattern write-ups).
         if (
             in_array($extension, ['txt', 'md', 'markdown'], true)
             && preg_match('~^(docs|documentation|doc)/~', $relative)

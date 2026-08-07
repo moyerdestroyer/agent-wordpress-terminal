@@ -48,6 +48,7 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_attached_files'] = [];
     $GLOBALS['awpt_test_attachment_mime_types'] = [];
     $GLOBALS['awpt_test_trashed_posts'] = [];
+    $GLOBALS['awpt_test_scheduled'] = [];
     $GLOBALS['awpt_test_users'] = [];
     $GLOBALS['awpt_test_filters'] = [];
     $GLOBALS['awpt_test_abilities'] = [];
@@ -340,6 +341,39 @@ if (!function_exists('trailingslashit')) {
     }
 }
 
+if (!function_exists('wp_upload_dir')) {
+    /**
+     * @return array{basedir: string, baseurl: string, error: false|string}
+     */
+    function wp_upload_dir(): array {
+        $basedir = is_string($GLOBALS['awpt_test_upload_basedir'] ?? null)
+            ? (string) $GLOBALS['awpt_test_upload_basedir']
+            : sys_get_temp_dir() . '/awpt-test-uploads';
+
+        return [
+            'basedir' => $basedir,
+            'baseurl' => 'https://example.test/uploads',
+            'error' => false,
+        ];
+    }
+}
+
+if (!function_exists('wp_mkdir_p')) {
+    function wp_mkdir_p(string $target): bool {
+        if (is_dir($target)) {
+            return true;
+        }
+
+        return mkdir($target, 0755, true) || is_dir($target);
+    }
+}
+
+if (!function_exists('do_action')) {
+    function do_action(string $hook_name, mixed ...$args): void {
+        unset($hook_name, $args);
+    }
+}
+
 if (!class_exists('WP_Theme_JSON')) {
     class WP_Theme_JSON {
         /** @param array<string, mixed> $data */
@@ -397,6 +431,32 @@ if (!function_exists('update_option')) {
     function update_option(string $name, mixed $value, ?bool $autoload = null): bool {
         unset($autoload);
         $GLOBALS['awpt_test_options'][$name] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_clear_scheduled_hook')) {
+    function wp_clear_scheduled_hook(string $hook, array $args = [], bool $wp_error = false): int {
+        unset($args, $wp_error);
+        $before = count($GLOBALS['awpt_test_scheduled'] ?? []);
+        $GLOBALS['awpt_test_scheduled'] = array_values(array_filter(
+            $GLOBALS['awpt_test_scheduled'] ?? [],
+            static fn(array $event): bool => ($event['hook'] ?? '') !== $hook,
+        ));
+
+        return max(0, $before - count($GLOBALS['awpt_test_scheduled']));
+    }
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(int $timestamp, string $hook, array $args = [], bool $wp_error = false): bool {
+        unset($wp_error);
+        $GLOBALS['awpt_test_scheduled'][] = [
+            'timestamp' => $timestamp,
+            'hook' => $hook,
+            'args' => $args,
+        ];
 
         return true;
     }

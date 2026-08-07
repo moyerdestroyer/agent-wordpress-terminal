@@ -21,6 +21,11 @@ declare global {
 			version: string;
 			nonce: string;
 			proposalTools?: string[];
+			improvePagePrompt?: string;
+			improvePageEvaluatePrompt?: string;
+			improvePageActPrompt?: string;
+			reviewBridgeVersion?: number;
+			hasActiveDomainPack?: boolean;
 			environment?: import('./types').EnvironmentStatus;
 			connection?: {
 				id: string;

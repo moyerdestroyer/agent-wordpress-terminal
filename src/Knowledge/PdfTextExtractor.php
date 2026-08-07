@@ -16,8 +16,17 @@ if (!defined('ABSPATH')) {
 
 /**
  * Extracts plain text from PDFs without a hard Composer dependency.
+ *
+ * Pathological PDFs can hang or fatal inside smalot/pdfparser (FlateDecode loops)
+ * and blow PHP max_execution_time. The PHP parser path therefore runs in an
+ * isolated subprocess with a hard wall-clock timeout whenever possible.
  */
 final class PdfTextExtractor {
+    private const PHP_PARSER_MAX_BYTES = 15_000_000;
+    private const PHP_PARSER_TIMEOUT_SECONDS = 8;
+    private const PHP_PARSER_MAX_PAGES = 100;
+    private const CLI_TIMEOUT_SECONDS = 12;
+
     public function extract(string $path): string {
         return $this->extract_with_metadata($path)['text'];
     }
@@ -84,7 +93,7 @@ final class PdfTextExtractor {
 
         // Preserve form-feed page boundaries so callers can paginate and cite pages.
         $command = sprintf('%s -layout -q %s - 2>/dev/null', escapeshellcmd($binary), escapeshellarg($path));
-        $output = shell_exec($command);
+        $output = $this->shell_with_timeout($command, self::CLI_TIMEOUT_SECONDS);
 
         return is_string($output) ? trim($output) : '';
     }
@@ -145,15 +154,106 @@ final class PdfTextExtractor {
 
         $bytes = filesize($path);
 
-        if (false === $bytes || $bytes <= 0 || $bytes > 25_000_000) {
+        if (false === $bytes || $bytes <= 0 || $bytes > self::PHP_PARSER_MAX_BYTES) {
             return '';
         }
 
+        $isolated = $this->via_php_parser_isolated($path);
+
+        if (null !== $isolated) {
+            return $isolated;
+        }
+
+        // Refuse in-process parsing under a finite max_execution_time — smalot
+        // FlateDecode loops can fatal the HTTP worker past any try/catch.
+        if ((int) ini_get('max_execution_time') > 0) {
+            return '';
+        }
+
+        return $this->via_php_parser_in_process($path);
+    }
+
+    /**
+     * Run smalot in a child PHP process killed by `timeout` so FlateDecode loops
+     * cannot fatal the Apache/FPM worker.
+     *
+     * @return string|null Extracted text, empty string on soft failure, or null when isolation is unavailable.
+     */
+    private function via_php_parser_isolated(string $path): ?string {
+        if (!function_exists('shell_exec') || !is_callable('shell_exec') || !is_executable('/usr/bin/timeout')) {
+            return null;
+        }
+
+        $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
+        $php = $this->php_cli_binary();
+
+        if (!is_readable($autoload) || null === $php) {
+            return null;
+        }
+
+        $script = tempnam(sys_get_temp_dir(), 'awpt-pdf-parser-');
+
+        if (!is_string($script)) {
+            return null;
+        }
+
+        $script_file = $script . '.php';
+
+        if (!rename($script, $script_file)) {
+            $this->delete_temp($script);
+
+            return null;
+        }
+
+        $max_pages = self::PHP_PARSER_MAX_PAGES;
+        $runner = implode("\n", [
+            '<?php',
+            'declare(strict_types=1);',
+            '$autoload = $argv[1] ?? \'\';',
+            '$path = $argv[2] ?? \'\';',
+            '$max_pages = max(1, (int) ($argv[3] ?? 100));',
+            'if (!is_readable($autoload) || !is_readable($path)) { exit(2); }',
+            'require $autoload;',
+            'try {',
+            '    $document = (new Smalot\\PdfParser\\Parser())->parseFile($path);',
+            '    $pages = [];',
+            '    foreach (array_slice($document->getPages(), 0, $max_pages) as $page) {',
+            '        $pages[] = trim($page->getText());',
+            '    }',
+            '    echo implode("\\f", $pages);',
+            '} catch (Throwable) {',
+            '    exit(3);',
+            '}',
+            '',
+        ]);
+
+        if (false === file_put_contents($script_file, $runner)) {
+            $this->delete_temp($script_file);
+
+            return null;
+        }
+
+        $command = sprintf(
+            '/usr/bin/timeout %ds %s %s %s %s %d 2>/dev/null',
+            self::PHP_PARSER_TIMEOUT_SECONDS,
+            escapeshellarg($php),
+            escapeshellarg($script_file),
+            escapeshellarg($autoload),
+            escapeshellarg($path),
+            $max_pages,
+        );
+        $stdout = shell_exec($command);
+        $this->delete_temp($script_file);
+
+        return is_string($stdout) ? trim($stdout) : '';
+    }
+
+    private function via_php_parser_in_process(string $path): string {
         try {
             $document = new \Smalot\PdfParser\Parser()->parseFile($path);
             $pages = [];
 
-            foreach (array_slice($document->getPages(), 0, 250) as $page) {
+            foreach (array_slice($document->getPages(), 0, self::PHP_PARSER_MAX_PAGES) as $page) {
                 $pages[] = trim($page->getText());
             }
 
@@ -165,6 +265,10 @@ final class PdfTextExtractor {
 
     private function via_ocr(string $path): string {
         if (!function_exists('shell_exec') || !is_callable('shell_exec')) {
+            return '';
+        }
+
+        if (!$this->has_request_budget(self::CLI_TIMEOUT_SECONDS + 2)) {
             return '';
         }
 
@@ -183,7 +287,7 @@ final class PdfTextExtractor {
 
         unlink($base);
 
-        if (!mkdir($base, 0700)) {
+        if (!mkdir($base, 0o700)) {
             return '';
         }
 
@@ -194,7 +298,7 @@ final class PdfTextExtractor {
             escapeshellarg($path),
             escapeshellarg($prefix),
         );
-        shell_exec($render);
+        $this->shell_with_timeout($render, self::CLI_TIMEOUT_SECONDS);
         $pages = glob($prefix . '-*.png');
         $text = [];
         /** @var mixed $filtered_languages */
@@ -203,13 +307,17 @@ final class PdfTextExtractor {
         $languages = is_string($languages) && '' !== $languages ? $languages : 'eng';
 
         foreach (is_array($pages) ? $pages : [] as $page) {
+            if (!$this->has_request_budget(3)) {
+                break;
+            }
+
             $command = sprintf(
                 '%s %s stdout -l %s --psm 3 2>/dev/null',
                 escapeshellcmd($ocr),
                 escapeshellarg($page),
                 escapeshellarg($languages),
             );
-            $output = shell_exec($command);
+            $output = $this->shell_with_timeout($command, 8);
 
             if (is_string($output) && '' !== trim($output)) {
                 $text[] = trim($output);
@@ -236,6 +344,73 @@ final class PdfTextExtractor {
         $found = shell_exec('command -v ' . escapeshellarg($command) . ' 2>/dev/null');
 
         return is_string($found) && '' !== trim($found) ? trim($found) : null;
+    }
+
+    private function shell_with_timeout(string $command, int $seconds): ?string {
+        $seconds = max(1, $seconds);
+
+        if (is_executable('/usr/bin/timeout')) {
+            $command = sprintf('/usr/bin/timeout %ds %s', $seconds, $command);
+        }
+
+        $output = shell_exec($command);
+
+        return is_string($output) ? $output : null;
+    }
+
+    /**
+     * Resolve a CLI PHP binary. Under mod_php, PHP_BINARY is often the Apache
+     * SAPI binary and cannot run scripts as CLI.
+     */
+    private function php_cli_binary(): ?string {
+        /** @var list<string> $candidates */
+        $candidates = array_values(array_filter(
+            [PHP_BINARY, '/usr/local/bin/php', '/usr/bin/php', 'php'],
+            static fn(string $candidate): bool => '' !== $candidate,
+        ));
+
+        foreach ($candidates as $candidate) {
+            if ('php' === $candidate) {
+                $which = shell_exec('command -v php 2>/dev/null');
+
+                if (is_string($which) && '' !== trim($which) && $this->looks_like_php_cli(trim($which))) {
+                    return trim($which);
+                }
+
+                continue;
+            }
+
+            if (is_executable($candidate) && $this->looks_like_php_cli($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function looks_like_php_cli(string $binary): bool {
+        $base = strtolower(basename($binary));
+
+        return str_starts_with($base, 'php') && !str_contains($base, 'apache') && !str_contains($base, 'fpm');
+    }
+
+    private function delete_temp(string $path): void {
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
+
+    private function has_request_budget(int $needed_seconds): bool {
+        $max = (int) ini_get('max_execution_time');
+
+        if ($max <= 0) {
+            return true;
+        }
+
+        $started = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? $_SERVER['REQUEST_TIME'] ?? microtime(true));
+        $remaining = $max - (microtime(true) - $started);
+
+        return $remaining >= $needed_seconds;
     }
 
     private function has_meaningful_text(string $text): bool {

@@ -54,12 +54,19 @@ final class Page {
     ];
 
     /**
+     * Review bridge protocol version (must match assets/reviewBridge.tsx).
+     */
+    public const REVIEW_BRIDGE_VERSION = 1;
+
+    /**
      * Hook admin integration.
      */
     public function init(): void {
         add_action('admin_menu', [$this, 'register_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+        // Preferred Dufresne contract; slug-based enqueue remains for one release as fallback.
+        add_action('dufresne_wp_plugin_enqueue_review_assets', [$this, 'enqueue_review_bridge'], 10, 1);
     }
 
     /**
@@ -114,30 +121,23 @@ final class Page {
     /**
      * Enqueue admin assets on the terminal page.
      *
+     * Legacy fallback: also load the review bridge when the Dufresne Review
+     * admin hook matches the historical slug. Prefer
+     * `dufresne_wp_plugin_enqueue_review_assets` once both plugins ship that action.
+     *
      * @param string $hook_suffix Current admin page hook suffix.
      */
     public function enqueue_assets(string $hook_suffix): void {
         $is_terminal_page = 'settings_page_' . self::SLUG === $hook_suffix;
-        $is_dufresne_review = 'dufresne-wp-plugin_page_dufresne-wp-plugin-review' === $hook_suffix;
+        $is_legacy_dufresne_review = 'dufresne-wp-plugin_page_dufresne-wp-plugin-review' === $hook_suffix;
 
-        if (!$is_terminal_page && !$is_dufresne_review) {
+        if ($is_legacy_dufresne_review && !did_action('dufresne_wp_plugin_enqueue_review_assets')) {
+            $this->enqueue_review_bridge($hook_suffix);
+
             return;
         }
 
-        if ($is_dufresne_review) {
-            $selection = new ConnectorSelection();
-            Vite\enqueue_asset(AWPT_PLUGIN_DIR . 'build', 'assets/reviewBridge.tsx', [
-                'handle' => 'awpt-review-bridge',
-                'dependencies' => ['wp-components', 'wp-element', 'wp-api-fetch', 'wp-i18n'],
-                'in-footer' => true,
-            ]);
-            wp_localize_script('awpt-review-bridge', 'awptSettings', [
-                'apiNamespace' => AWPT_REST_NAMESPACE,
-                'pluginUrl' => AWPT_PLUGIN_URL,
-                'version' => AWPT_VERSION,
-                'nonce' => wp_create_nonce('wp_rest'),
-                'connection' => $selection->active_connection_summary(),
-            ]);
+        if (!$is_terminal_page) {
             return;
         }
 
@@ -157,6 +157,47 @@ final class Page {
             'environment' => Environment::status(),
             'connection' => $selection->active_connection_summary(),
             'proposalTools' => ProposalAbilities::names(),
+        ]);
+    }
+
+    /**
+     * Enqueue the focused-post review bridge (Dufresne Review and compatible hosts).
+     *
+     * @param string $hook_suffix Current admin page hook suffix (unused; reserved for hosts).
+     */
+    public function enqueue_review_bridge(string $hook_suffix = ''): void {
+        unset($hook_suffix);
+
+        if (wp_script_is('awpt-review-bridge', 'enqueued') || wp_script_is('awpt-review-bridge', 'registered')) {
+            // Still allow localize if Vite registered the handle without our data.
+            if (!wp_scripts()->get_data('awpt-review-bridge', 'data')) {
+                $this->localize_review_bridge();
+            }
+
+            return;
+        }
+
+        Vite\enqueue_asset(AWPT_PLUGIN_DIR . 'build', 'assets/reviewBridge.tsx', [
+            'handle' => 'awpt-review-bridge',
+            'dependencies' => ['wp-components', 'wp-element', 'wp-api-fetch', 'wp-i18n'],
+            'in-footer' => true,
+        ]);
+        $this->localize_review_bridge();
+    }
+
+    private function localize_review_bridge(): void {
+        $selection = new ConnectorSelection();
+        wp_localize_script('awpt-review-bridge', 'awptSettings', [
+            'apiNamespace' => AWPT_REST_NAMESPACE,
+            'pluginUrl' => AWPT_PLUGIN_URL,
+            'version' => AWPT_VERSION,
+            'nonce' => wp_create_nonce('wp_rest'),
+            'connection' => $selection->active_connection_summary(),
+            'reviewBridgeVersion' => self::REVIEW_BRIDGE_VERSION,
+            'improvePagePrompt' => \AWPT\Support\ImprovePagePrompt::text(),
+            'improvePageEvaluatePrompt' => \AWPT\Support\ImprovePagePrompt::evaluate_text(),
+            'improvePageActPrompt' => \AWPT\Support\ImprovePagePrompt::act_text(),
+            'hasActiveDomainPack' => [] !== \AWPT\Domain\DomainPackRegistry::instance()->active(),
         ]);
     }
 

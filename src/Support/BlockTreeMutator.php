@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Block tree structure mutations (insert / remove / append).
+ * Block tree structure mutations (insert / remove / replace / append).
  *
  * @package AWPT
  */
@@ -36,17 +36,66 @@ final class BlockTreeMutator {
         string $position = BlockTree::POSITION_AFTER,
     ): array|\WP_Error {
         $position = strtolower(trim($position));
+        $position = match ($position) {
+            'prepend', 'start', 'above' => BlockTree::POSITION_BEFORE,
+            'end', 'bottom', 'below' => BlockTree::POSITION_APPEND,
+            default => $position,
+        };
         $allowed = [
             BlockTree::POSITION_BEFORE,
             BlockTree::POSITION_AFTER,
             BlockTree::POSITION_APPEND,
         ];
 
+        if ('replace' === $position) {
+            return new \WP_Error(
+                'awpt_pattern_replace_requires_content',
+                __(
+                    'position "replace" is not a block insert. Use awpt/prepare-pattern-change with mode=replace, then awpt/propose-pattern-replace.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 400,
+                    'allowed_positions' => $allowed,
+                    'received_position' => 'replace',
+                    'recommended_next_tools' => [[
+                        'tool' => 'awpt/prepare-pattern-change',
+                        'reason' => __(
+                            'Prepare a section replacement with a verified target path and fingerprint, then stage with propose-pattern-replace.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ], [
+                        'tool' => 'awpt/propose-pattern-replace',
+                        'reason' => __(
+                            'Stage a server-materialized section replacement without freehand markup.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ]],
+                    'recovery' => __(
+                        'Do not retry propose-pattern-insert with position replace. Call prepare-pattern-change (mode=replace) then propose-pattern-replace.',
+                        'agent-wordpress-terminal',
+                    ),
+                ],
+            );
+        }
+
         if (!in_array($position, $allowed, true)) {
-            return $this->paths->error('awpt_invalid_block_position', __(
-                'Insert position must be before, after, or append.',
-                'agent-wordpress-terminal',
-            ));
+            return new \WP_Error(
+                'awpt_invalid_block_position',
+                __(
+                    'Insert position must be before, after, or append.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 400,
+                    'allowed_positions' => $allowed,
+                    'received_position' => $position,
+                    'recovery' => __(
+                        'Use before, after, or append. For a full layout rewrite use awpt/propose-content-update with pattern_name and post_content instead of position replace.',
+                        'agent-wordpress-terminal',
+                    ),
+                ],
+            );
         }
 
         if (!BlockTree::has_block_name($new_block)) {
@@ -167,6 +216,73 @@ final class BlockTreeMutator {
 
         return [
             'content' => $this->paths->serialize($working),
+            'removed' => $removed,
+        ];
+    }
+
+    /**
+     * Replace one named block with one or more blocks at the same path index.
+     *
+     * Multi-root patterns expand in place: a single section path can become N
+     * sibling blocks without rewriting unrelated sections.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{
+     *   content: string,
+     *   blocks: array<int, array<string, mixed>>,
+     *   paths: list<string>,
+     *   removed: array<string, mixed>
+     * }|\WP_Error
+     */
+    public function replace_blocks(
+        array $blocks,
+        string $path,
+        array $new_blocks,
+        string $expected_fingerprint = '',
+    ): array|\WP_Error {
+        if ([] === $new_blocks) {
+            return $this->paths->error('awpt_empty_block_composition', __(
+                'A pattern must contain at least one block.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
+        $segments = $this->paths->path_segments($path);
+
+        if ([] === $segments) {
+            return $this->paths->error('awpt_invalid_block_path', __(
+                'Block path must be a dotted numeric path such as 0 or 2.1.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
+        /** @var list<array<string, mixed>> $normalized */
+        $normalized = [];
+
+        foreach ($new_blocks as $raw) {
+            if (!is_array($raw) || !BlockTree::has_block_name($raw)) {
+                return $this->paths->error('awpt_invalid_block', __(
+                    'Replacement blocks must include a blockName.',
+                    'agent-wordpress-terminal',
+                ));
+            }
+
+            $normalized[] = $this->normalize_block($raw);
+        }
+
+        $working = $blocks;
+        $result_paths = [];
+        $removed = $this->replace_at($working, $segments, $normalized, $expected_fingerprint, $result_paths, '');
+
+        if (is_wp_error($removed)) {
+            return $removed;
+        }
+
+        return [
+            'content' => $this->paths->serialize($working),
+            'blocks' => $normalized,
+            'paths' => $result_paths,
             'removed' => $removed,
         ];
     }
@@ -482,5 +598,102 @@ final class BlockTreeMutator {
 
     /**
      * @param array<int|string, array<string, mixed>> $blocks
+     * @param list<int>                               $segments
+     * @param list<array<string, mixed>>              $new_blocks
+     * @param list<string>                            $result_paths
+     * @return array<string, mixed>|\WP_Error
      */
+    private function replace_at(
+        array &$blocks,
+        array $segments,
+        array $new_blocks,
+        string $expected_fingerprint,
+        array &$result_paths,
+        string $parent_prefix,
+    ): array|\WP_Error {
+        $target = array_shift($segments);
+
+        if (null === $target) {
+            return $this->paths->error('awpt_invalid_block_path', __(
+                'Block path is empty.',
+                'agent-wordpress-terminal',
+            ));
+        }
+
+        if ([] !== $segments) {
+            $visible_index = 0;
+
+            foreach ($blocks as &$block) {
+                if (!BlockTree::has_block_name($block)) {
+                    continue;
+                }
+
+                if ($visible_index !== $target) {
+                    ++$visible_index;
+                    continue;
+                }
+
+                $inner = $this->paths->inner_blocks($block);
+                $prefix = '' === $parent_prefix ? (string) $target : $parent_prefix . '.' . $target;
+                $before_count = count($inner);
+                $leaf_index = $segments[0] ?? 0;
+                $removed = $this->replace_at(
+                    $inner,
+                    $segments,
+                    $new_blocks,
+                    $expected_fingerprint,
+                    $result_paths,
+                    $prefix,
+                );
+                $block['innerBlocks'] = $inner;
+
+                if (!is_wp_error($removed) && count($inner) !== $before_count) {
+                    // Nested multi-root replace can add siblings; keep innerContent aligned
+                    // using the leaf visible index (not this parent path segment).
+                    $delta = count($inner) - $before_count;
+
+                    for ($i = 0; $i < $delta; ++$i) {
+                        $this->insert_inner_content_placeholder($block, $leaf_index + 1 + $i);
+                    }
+                }
+
+                return $removed;
+            }
+
+            return $this->paths->error(
+                'awpt_block_not_found',
+                __('Block path was not found.', 'agent-wordpress-terminal'),
+                404,
+            );
+        }
+
+        $raw_index = $this->paths->raw_index_for_visible($blocks, $target);
+
+        if (null === $raw_index) {
+            return $this->paths->error(
+                'awpt_block_not_found',
+                __('Block path was not found.', 'agent-wordpress-terminal'),
+                404,
+            );
+        }
+
+        $block = $blocks[$raw_index];
+
+        if ('' !== $expected_fingerprint && !hash_equals($expected_fingerprint, BlockTreeView::fingerprint($block))) {
+            return $this->paths->error(
+                'awpt_block_fingerprint_mismatch',
+                __('The target block changed since the proposal was staged.', 'agent-wordpress-terminal'),
+                409,
+            );
+        }
+
+        array_splice($blocks, $raw_index, 1, $new_blocks);
+
+        for ($i = 0; $i < count($new_blocks); ++$i) {
+            $visible = $target + $i;
+            $result_paths[] = '' === $parent_prefix ? (string) $visible : $parent_prefix . '.' . $visible;
+        }
+
+        return $block;
+    }
 }

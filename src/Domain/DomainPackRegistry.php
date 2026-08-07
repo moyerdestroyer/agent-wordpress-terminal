@@ -389,6 +389,79 @@ final class DomainPackRegistry {
     }
 
     /**
+     * Pattern namespaces declared by active packs (and active stylesheet as fallback).
+     *
+     * @return list<string>
+     */
+    public function pattern_namespaces(): array {
+        $this->ensure_loaded();
+        $namespaces = [];
+
+        foreach ($this->active() as $pack) {
+            $pattern_config = ArrayKey::as_map($pack['patterns'] ?? null);
+            $namespace = sanitize_key((string) ($pattern_config['namespace'] ?? ''));
+
+            if ('' !== $namespace) {
+                $namespaces[] = $namespace;
+            }
+
+            if ('' === $namespace && '' !== (string) ($pack['id'] ?? '')) {
+                $namespaces[] = sanitize_key((string) $pack['id']);
+            }
+        }
+
+        if (function_exists('get_stylesheet')) {
+            $stylesheet = sanitize_key((string) get_stylesheet());
+
+            if ('' !== $stylesheet) {
+                $namespaces[] = $stylesheet;
+            }
+        }
+
+        if (function_exists('get_template')) {
+            $template = sanitize_key((string) get_template());
+
+            if ('' !== $template) {
+                $namespaces[] = $template;
+            }
+        }
+
+        return array_values(array_unique(array_filter($namespaces, static fn(string $value): bool => '' !== $value)));
+    }
+
+    /**
+     * Pattern thrash aliases from active packs (requested name → canonical registered slug).
+     *
+     * @return array<string, string>
+     */
+    public function pattern_aliases(): array {
+        $this->ensure_loaded();
+        $aliases = [];
+
+        foreach ($this->active() as $pack) {
+            $pattern_config = ArrayKey::as_map($pack['patterns'] ?? null);
+            $pack_aliases = ArrayKey::as_map($pattern_config['aliases'] ?? null);
+
+            foreach ($pack_aliases as $from => $to) {
+                if (!is_string($from) || !is_string($to)) {
+                    continue;
+                }
+
+                $from = mb_strtolower(trim($from));
+                $to = sanitize_text_field($to);
+
+                if ('' === $from || '' === $to || !str_contains($to, '/')) {
+                    continue;
+                }
+
+                $aliases[$from] = $to;
+            }
+        }
+
+        return $aliases;
+    }
+
+    /**
      * Read a bounded file referenced by a validated manifest.
      */
     public function read_pack_file(array $pack, string $relative, int $max_bytes = 65_536): string {
@@ -464,6 +537,12 @@ final class DomainPackRegistry {
             $patterns['catalog'] = $this->safe_relative_path((string) $patterns['catalog'], $root);
         }
 
+        if (array_key_exists('namespace', $patterns)) {
+            $patterns['namespace'] = sanitize_key((string) $patterns['namespace']);
+        }
+
+        $patterns['aliases'] = $this->validate_aliases($patterns['aliases'] ?? null);
+
         $manifest['patterns'] = $patterns;
         $rules = ArrayKey::as_map($manifest['rules'] ?? null);
         $rules['_root'] = $root;
@@ -538,6 +617,38 @@ final class DomainPackRegistry {
         $real = realpath(trailingslashit($root) . $relative);
 
         return is_string($real) && str_starts_with($real, trailingslashit($root)) ? $relative : '';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function validate_aliases(mixed $aliases): array {
+        if (!is_array($aliases)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach ($aliases as $from => $to) {
+            if (!is_string($from) || !(is_string($to) || is_scalar($to))) {
+                continue;
+            }
+
+            $from_key = mb_strtolower(trim($from));
+            $to_value = sanitize_text_field((string) $to);
+
+            if ('' === $from_key || '' === $to_value || !str_contains($to_value, '/')) {
+                continue;
+            }
+
+            if (count($clean) >= 200) {
+                break;
+            }
+
+            $clean[$from_key] = $to_value;
+        }
+
+        return $clean;
     }
 
     /**

@@ -114,6 +114,25 @@ final class BlockTree {
     }
 
     /**
+     * Replace one block path with one or more blocks (multi-root patterns expand in place).
+     *
+     * @param array<int, array<string, mixed>> $new_blocks
+     * @return array{
+     *   content: string,
+     *   blocks: array<int, array<string, mixed>>,
+     *   paths: list<string>,
+     *   removed: array<string, mixed>
+     * }|\WP_Error
+     */
+    public function replace_blocks(
+        string $path,
+        array $new_blocks,
+        string $expected_fingerprint = '',
+    ): array|\WP_Error {
+        return new BlockTreeEditor()->replace_blocks($this->blocks, $path, $new_blocks, $expected_fingerprint);
+    }
+
+    /**
      * Flatten named blocks for list views.
      *
      * @return array<int, array<string, mixed>>

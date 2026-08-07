@@ -26,6 +26,7 @@ final class KnowledgeIndexer {
     private const START_LOCK_OPTION = 'awpt_knowledge_start_lock';
     private const WORKER_LOCK_OPTION = 'awpt_knowledge_worker_lock';
     private const LOCK_TTL = 60;
+    private const STALLED_HEARTBEAT_SECONDS = 120;
     private const JOBS_PER_BATCH = 5;
     private const BATCH_TIME_LIMIT = 12.0;
 
@@ -102,6 +103,8 @@ final class KnowledgeIndexer {
         $active = $this->runs->active();
 
         if (is_array($active)) {
+            $this->maybe_recover_stalled_run($active);
+
             return [
                 'in_progress' => true,
                 'run_id' => (int) ($active['id'] ?? 0),
@@ -164,6 +167,12 @@ final class KnowledgeIndexer {
     public function process_batch(int $run_id = 0): array {
         if (!self::acquire_lock(self::WORKER_LOCK_OPTION)) {
             return ['in_progress' => true, 'run_id' => $run_id];
+        }
+
+        // PDF extraction (and similar) can burn wall clock even with per-tool timeouts;
+        // keep the HTTP worker above PHP's default 30s so one bad source cannot 500 the batch.
+        if (function_exists('set_time_limit')) {
+            set_time_limit(120);
         }
 
         try {
@@ -467,6 +476,20 @@ final class KnowledgeIndexer {
 
     public static function retrieval_is_available(): bool {
         return new KnowledgeIndexRepository()->count_chunks() > 0;
+    }
+
+    /**
+     * @param array<string, mixed> $run
+     */
+    private function maybe_recover_stalled_run(array $run): void {
+        $heartbeat = strtotime((string) ($run['heartbeat_at'] ?? ''));
+
+        if (false === $heartbeat || (time() - $heartbeat) < self::STALLED_HEARTBEAT_SECONDS) {
+            return;
+        }
+
+        self::release_lock(self::WORKER_LOCK_OPTION);
+        self::schedule((int) ($run['id'] ?? 0));
     }
 
     private function sync_progress(int $run_id, string $state): void {

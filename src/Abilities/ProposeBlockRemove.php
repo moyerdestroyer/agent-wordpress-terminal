@@ -15,6 +15,7 @@ use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -68,6 +69,7 @@ final class ProposeBlockRemove implements AbilityInterface {
                     ],
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
+                    ...PatternUnfitInput::schema_properties(),
                 ],
                 'required' => ['session_id', 'post_id', 'block_path', 'title', 'description'],
             ],
@@ -115,7 +117,6 @@ final class ProposeBlockRemove implements AbilityInterface {
                 data: ['status' => 404],
             );
         }
-
         $block_path = sanitize_text_field((string) ($input['block_path'] ?? ''));
         $expected_fingerprint = sanitize_text_field((string) ($input['expected_fingerprint'] ?? ''));
         $update = BlockTree::from_content($post->post_content)->remove_block($block_path, $expected_fingerprint);

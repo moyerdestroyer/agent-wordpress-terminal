@@ -57,6 +57,163 @@ final class BlockTreeView {
     }
 
     /**
+     * Compact a normalized block tree for compose evidence while retaining
+     * every path + fingerprint needed for batch updates.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @return array{blocks: list<array<string, mixed>>, count: int, truncated_excerpts?: bool}
+     */
+    public function compact_for_evidence(array $blocks, int $max_encoded_bytes = 12_000): array {
+        $max_encoded_bytes = max(2_000, $max_encoded_bytes);
+        $excerpt_limit = 120;
+        $truncated_excerpts = false;
+
+        for ($attempt = 0; $attempt < 4; ++$attempt) {
+            $compacted = $this->compact_nodes($blocks, $excerpt_limit, true);
+            $encoded = wp_json_encode($compacted);
+            $size = is_string($encoded) ? strlen($encoded) : $max_encoded_bytes + 1;
+
+            if ($size <= $max_encoded_bytes) {
+                return [
+                    'blocks' => $compacted,
+                    'count' => $this->count_normalized($compacted),
+                    'truncated_excerpts' => $truncated_excerpts,
+                ];
+            }
+
+            $excerpt_limit = max(0, (int) floor($excerpt_limit / 2));
+            $truncated_excerpts = true;
+        }
+
+        // Last resort: fingerprint-complete flat index (paths encode hierarchy).
+        // Drop excerpts/attrs so path+name+fingerprint fit denser pages.
+        $flat = $this->flat_from_normalized($blocks, 500, true);
+
+        return [
+            'blocks' => $flat,
+            'count' => count($flat),
+            'truncated_excerpts' => true,
+            'flat_index' => true,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $blocks Already-normalized nodes.
+     * @return list<array<string, mixed>>
+     */
+    private function compact_nodes(array $blocks, int $excerpt_limit, bool $prefer_summary_attrs): array {
+        $out = [];
+
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $node = [
+                'path' => (string) ($block['path'] ?? ''),
+                'name' => (string) ($block['name'] ?? ''),
+                'fingerprint' => (string) ($block['fingerprint'] ?? ''),
+            ];
+
+            $summary = is_array($block['attributes_summary'] ?? null)
+                ? $block['attributes_summary']
+                : [];
+            $attrs = is_array($block['attributes'] ?? null) ? $block['attributes'] : [];
+
+            if ($prefer_summary_attrs && [] !== $summary) {
+                $node['attributes_summary'] = $summary;
+            } elseif ([] !== $attrs) {
+                // Keep full attrs only when summary is empty (non-scalar style edits).
+                $node['attributes'] = $attrs;
+            } elseif ([] !== $summary) {
+                $node['attributes_summary'] = $summary;
+            }
+
+            $excerpt = trim((string) ($block['text_excerpt'] ?? ''));
+
+            if ('' !== $excerpt && $excerpt_limit > 0) {
+                $node['text_excerpt'] = mb_substr($excerpt, 0, $excerpt_limit, 'UTF-8');
+            }
+
+            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+
+            if ([] !== $inner) {
+                $node['inner'] = $this->compact_nodes($inner, $excerpt_limit, $prefer_summary_attrs);
+            }
+
+            $out[] = $node;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     */
+    private function count_normalized(array $blocks): int {
+        $count = 0;
+
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            ++$count;
+            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+            $count += $this->count_normalized($inner);
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @return list<array<string, mixed>>
+     */
+    private function flat_from_normalized(array $blocks, int $max, bool $minimal = false): array {
+        $items = [];
+        $this->collect_flat_normalized($blocks, $max, $items, $minimal);
+
+        return $items;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @param list<array<string, mixed>>      $items
+     */
+    private function collect_flat_normalized(array $blocks, int $max, array &$items, bool $minimal = false): void {
+        foreach ($blocks as $block) {
+            if (count($items) >= $max || !is_array($block)) {
+                return;
+            }
+
+            $entry = [
+                'path' => (string) ($block['path'] ?? ''),
+                'name' => (string) ($block['name'] ?? ''),
+                'fingerprint' => (string) ($block['fingerprint'] ?? ''),
+            ];
+
+            if (!$minimal) {
+                $summary = is_array($block['attributes_summary'] ?? null) ? $block['attributes_summary'] : [];
+
+                if ([] !== $summary) {
+                    $entry['attributes_summary'] = $summary;
+                }
+
+                $excerpt = trim((string) ($block['text_excerpt'] ?? ''));
+
+                if ('' !== $excerpt) {
+                    $entry['text_excerpt'] = mb_substr($excerpt, 0, 40, 'UTF-8');
+                }
+            }
+
+            $items[] = $entry;
+            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+            $this->collect_flat_normalized($inner, $max, $items, $minimal);
+        }
+    }
+
+    /**
      * @param array<string, mixed> $block
      */
     public static function fingerprint(array $block): string {

@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ImprovePagePrompt;
 use AWPT\Support\SiteDesignContext;
 
 if (!defined('ABSPATH')) {
@@ -33,13 +34,34 @@ final class TurnProfile {
 
     public const TOOL_DIAGNOSE = 'diagnose';
 
+    /** Greenfield page/post composition (placeholders OK). */
+    public const MODE_CREATE = 'create';
+
+    /** Full structural redesign of a focused post (lossy mapping allowed). */
+    public const MODE_REDESIGN = 'redesign';
+
+    /** Surgical text/attrs/section changes on existing content. */
+    public const MODE_EDIT = 'edit';
+
+    public const MODE_INVESTIGATE = 'investigate';
+
+    public const MODE_DIAGNOSE = 'diagnose';
+
+    public const MODE_CHAT = 'chat';
+
     public readonly string $message;
 
     public readonly bool $content_turn;
 
     public readonly bool $content_edit_turn;
 
+    /**
+     * @deprecated Use work_mode === MODE_REDESIGN. Kept for runtime compatibility.
+     */
     public readonly bool $presentation_edit;
+
+    /** Primary work mode: create | redesign | edit | investigate | diagnose | chat. */
+    public readonly string $work_mode;
 
     public readonly string $design_level;
 
@@ -71,6 +93,7 @@ final class TurnProfile {
      *     content_turn: bool,
      *     content_edit_turn: bool,
      *     presentation_edit: bool,
+     *     work_mode: string,
      *     design_level: string,
      *     tool_profile: string,
      *     auto_retrieve_knowledge: bool,
@@ -92,11 +115,25 @@ final class TurnProfile {
         $this->content_turn = $state['content_turn'];
         $this->content_edit_turn = $state['content_edit_turn'];
         $this->presentation_edit = $state['presentation_edit'];
+        $this->work_mode = $state['work_mode'];
         $this->design_level = $state['design_level'];
         $this->tool_profile = $state['tool_profile'];
         $this->auto_retrieve_knowledge = $state['auto_retrieve_knowledge'];
         $this->history_limit = $state['history_limit'];
         $this->flags = $state['flags'];
+    }
+
+    public function is_redesign(): bool {
+        return self::MODE_REDESIGN === $this->work_mode;
+    }
+
+    public function is_create(): bool {
+        return self::MODE_CREATE === $this->work_mode;
+    }
+
+    /** Improve evaluate-only turn (plan; no propose tools). */
+    public function is_improve_evaluate(): bool {
+        return ImprovePagePrompt::is_evaluate_message($this->message);
     }
 
     /**
@@ -115,15 +152,41 @@ final class TurnProfile {
         $has_open_incidents = $session['has_open_incidents'] ?? false;
         $has_focus = $session['has_focus'] ?? false;
 
+        // Improve evaluate: read-only plan turn — never stage proposals.
+        if (ImprovePagePrompt::is_evaluate_message($message)) {
+            return new self([
+                'message' => $message,
+                'content_turn' => false,
+                'content_edit_turn' => false,
+                'presentation_edit' => false,
+                'work_mode' => self::MODE_INVESTIGATE,
+                'design_level' => SiteDesignContext::LEVEL_SECTION,
+                'tool_profile' => self::TOOL_INVESTIGATE,
+                'auto_retrieve_knowledge' => true,
+                'history_limit' => 16,
+                'flags' => [
+                    'site_data' => false,
+                    'frontend' => false,
+                    'diagnosis' => $has_open_incidents,
+                    'settings_or_theme' => false,
+                    'template_or_styles' => true,
+                    'has_open_proposals' => $has_open_proposals,
+                    'has_focus' => $has_focus,
+                ],
+            ]);
+        }
+
         $budget = new GenerationBudget();
         $content_turn = $budget->is_content_request($message, $budget_context);
-        $presentation_edit = $has_focus && self::looks_like_presentation_edit($message);
-        $content_edit_turn = $presentation_edit || $budget->is_content_edit_request($message, $budget_context);
+        $redesign = $has_focus && self::looks_like_redesign($message);
+        // Compat alias: presentation_edit historically meant focused redesign/polish.
+        $presentation_edit = $redesign;
+        $content_edit_turn = $redesign || $budget->is_content_edit_request($message, $budget_context);
 
         // Broad creation language includes phrases such as "make this page".
-        // Once a real focused post and an edit request are present, that wording
-        // must not activate the new-post preparation pipeline unless the admin
-        // explicitly asked for a separate new page or post.
+        // Once a real focused post and an edit/redesign request are present, that
+        // wording must not activate the new-post preparation pipeline unless the
+        // admin explicitly asked for a separate new page or post.
         if ($has_focus && $content_edit_turn && !self::explicit_new_page_request($message)) {
             $content_turn = false;
         }
@@ -146,12 +209,14 @@ final class TurnProfile {
                     ),
             'content_turn' => $content_turn,
             'content_edit_turn' => $content_edit_turn,
+            'redesign' => $redesign,
             'has_open_proposals' => $has_open_proposals,
             'has_focus' => $has_focus,
             'design_level' => $design_level,
         ];
 
         $tool_profile = self::resolve_tool_profile($message, $signals);
+        $work_mode = self::resolve_work_mode($tool_profile, $signals);
         $history_limit = match ($tool_profile) {
             self::TOOL_CHAT => 10,
             self::TOOL_COMPOSE, self::TOOL_EDIT => 30,
@@ -164,6 +229,7 @@ final class TurnProfile {
             'content_turn' => $content_turn,
             'content_edit_turn' => $content_edit_turn,
             'presentation_edit' => $presentation_edit,
+            'work_mode' => $work_mode,
             'design_level' => $design_level,
             'tool_profile' => $tool_profile,
             'auto_retrieve_knowledge' => self::should_auto_retrieve_knowledge($signals),
@@ -248,6 +314,11 @@ final class TurnProfile {
      * Whether this turn uses the hard explore→compose phase machine.
      */
     public function uses_explore_compose_phases(): bool {
+        // Evaluate-only Improve turns stay on investigate tools (no compose).
+        if ($this->is_improve_evaluate()) {
+            return false;
+        }
+
         return (
             self::TOOL_COMPOSE === $this->tool_profile
             || self::TOOL_EDIT === $this->tool_profile
@@ -263,6 +334,20 @@ final class TurnProfile {
      * @return list<string>
      */
     public function tool_allowlist(): array {
+        // Improve evaluate: tight read set so the model plans quickly (not a full redesign thrash).
+        if ($this->is_improve_evaluate()) {
+            return [
+                'core/get-site-info',
+                'awpt/read-content',
+                'awpt/read-block-tree',
+                'awpt/analyze-page',
+                'awpt/get-work-context',
+                'awpt/recommend-patterns',
+                'awpt/list-domain-packs',
+                'awpt/read-domain-guidance',
+            ];
+        }
+
         return match ($this->tool_profile) {
             self::TOOL_CHAT => [
                 'core/get-site-info',
@@ -325,6 +410,7 @@ final class TurnProfile {
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
+                'awpt/propose-pattern-replace',
                 'awpt/propose-new-post',
             ],
             self::TOOL_DIAGNOSE => [
@@ -399,7 +485,7 @@ final class TurnProfile {
      * @return list<string>
      */
     public function explore_allowlist_for_edit(): array {
-        return [
+        $tools = [
             'core/get-site-info',
             'awpt/list-content',
             'awpt/search-content',
@@ -418,6 +504,7 @@ final class TurnProfile {
             'awpt/list-patterns',
             'awpt/recommend-patterns',
             'awpt/read-pattern',
+            'awpt/prepare-pattern-change',
             'awpt/list-domain-packs',
             'awpt/read-domain-guidance',
             'awpt/validate-composition',
@@ -426,6 +513,13 @@ final class TurnProfile {
             'awpt/preview-post',
             'awpt/read-proposal',
         ];
+
+        // Redesign reuses create's pattern-prep path for theme-enhanced structure.
+        if ($this->is_redesign()) {
+            array_unshift($tools, 'awpt/prepare-pattern-draft');
+        }
+
+        return $tools;
     }
 
     /**
@@ -438,8 +532,22 @@ final class TurnProfile {
             return ['awpt/propose-patterned-post', 'awpt/propose-new-post'];
         }
 
+        if ($this->is_redesign()) {
+            // Prefer server-materialized section ops before freehand full-document rewrites.
+            return [
+                'awpt/propose-pattern-replace',
+                'awpt/propose-pattern-insert',
+                'awpt/propose-block-batch-update',
+                'awpt/propose-content-update',
+                'awpt/propose-block-attrs-update',
+                'awpt/propose-block-insert',
+                'awpt/propose-block-remove',
+            ];
+        }
+
         if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
             return [
+                'awpt/propose-pattern-replace',
                 'awpt/propose-content-update',
                 'awpt/propose-block-attrs-update',
                 'awpt/propose-block-batch-update',
@@ -479,6 +587,7 @@ final class TurnProfile {
     public function diagnostics(): array {
         return [
             'tool_profile' => $this->tool_profile,
+            'work_mode' => $this->work_mode,
             'design_level' => $this->design_level,
             'content_turn' => $this->content_turn,
             'content_edit_turn' => $this->content_edit_turn,
@@ -494,6 +603,36 @@ final class TurnProfile {
      * @param array{
      *     content_turn: bool,
      *     content_edit_turn: bool,
+     *     redesign?: bool,
+     *     diagnosis: bool,
+     *     has_open_proposals: bool,
+     *     has_focus: bool,
+     *     design_level: string,
+     *     frontend: bool,
+     *     template_or_styles: bool,
+     *     settings_or_theme: bool,
+     *     site_data: bool
+     * } $signals
+     */
+    private static function resolve_work_mode(string $tool_profile, array $signals): string {
+        if (true === ($signals['redesign'] ?? false)) {
+            return self::MODE_REDESIGN;
+        }
+
+        return match ($tool_profile) {
+            self::TOOL_COMPOSE => self::MODE_CREATE,
+            self::TOOL_EDIT => self::MODE_EDIT,
+            self::TOOL_DIAGNOSE => self::MODE_DIAGNOSE,
+            self::TOOL_INVESTIGATE => self::MODE_INVESTIGATE,
+            default => self::MODE_CHAT,
+        };
+    }
+
+    /**
+     * @param array{
+     *     content_turn: bool,
+     *     content_edit_turn: bool,
+     *     redesign?: bool,
      *     diagnosis: bool,
      *     has_open_proposals: bool,
      *     has_focus: bool,
@@ -509,9 +648,8 @@ final class TurnProfile {
             return self::TOOL_DIAGNOSE;
         }
 
-        // A focused session has an explicit existing-page target. Prefer the
-        // surgical edit route for a requested modification, even if a
-        // preservation phrase accidentally resembles composition language.
+        // Focused redesign/edit targets an existing page. Prefer the edit tool
+        // surface (with redesign-specific allowlists) over new-post compose.
         if ($signals['has_focus'] && $signals['content_edit_turn'] && !self::explicit_new_page_request($message)) {
             return self::TOOL_EDIT;
         }
@@ -564,7 +702,11 @@ final class TurnProfile {
         );
     }
 
-    private static function looks_like_presentation_edit(string $message): bool {
+    /**
+     * Focused full-page structural improvement (theme-enhanced redesign).
+     * Distinct from surgical copy/attr edits.
+     */
+    private static function looks_like_redesign(string $message): bool {
         if ((bool) preg_match(
             '/\b(improve|polish|tidy|clean\s*up|cleanup)\b.*\b(this|the|that)?\s*(page|post|article)\b/i',
             $message,

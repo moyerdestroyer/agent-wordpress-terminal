@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PatternFallbackPolicy;
+use AWPT\Support\PatternFirstPolicy;
 
 function awpt_fallback_pattern_fixture(string $name, string $title): array {
     return [
@@ -23,25 +24,40 @@ function awpt_fallback_pattern_fixture(string $name, string $title): array {
     ];
 }
 
-function test_pattern_fallback_policy_requires_only_an_explanation_not_a_theme_pattern(): void {
+function test_pattern_fallback_policy_requires_structured_unfit_not_a_vague_reason(): void {
     awpt_test_reset_state();
     $GLOBALS['awpt_test_registered_patterns'] = [
         awpt_fallback_pattern_fixture('civicpress/header-hero', 'CivicPress Hero'),
     ];
     $policy = new PatternFallbackPolicy();
     $catalog = new PatternCatalog();
-    $missing_reason = $policy->validate($catalog, 'page', 'core', '');
 
-    Assert::true(is_wp_error($missing_reason), 'unexplained Core fallback should be recoverable');
+    // Pattern-first is soft: Core custom composition is allowed without unfit ceremony.
     Assert::same(
-        'awpt_pattern_fallback_reason_required',
-        $missing_reason instanceof WP_Error ? $missing_reason->get_error_code() : '',
-        'fallback error should be specific',
+        null,
+        $policy->validate($catalog, 'page', 'core', ''),
+        'unexplained Core fallback is allowed (pattern-first is advisory)',
     );
     Assert::same(
         null,
-        $policy->validate($catalog, 'page', 'core', 'The theme patterns do not support the required map.'),
-        'a concrete fallback reason should preserve agent choice',
+        $policy->validate(
+            $catalog,
+            'page',
+            'core',
+            'The theme patterns do not support the required map.',
+        ),
+        'a reason without pattern_unfit_code is allowed',
+    );
+    Assert::same(
+        null,
+        $policy->validate(
+            $catalog,
+            'page',
+            'core',
+            'civicpress/header-hero is a hero cover; this draft needs an interactive map block the theme patterns do not provide.',
+            PatternFirstPolicy::CODE_SCOPE_MISMATCH,
+        ),
+        'structured scope_mismatch should preserve agent choice',
     );
     Assert::same(
         null,
@@ -63,5 +79,5 @@ function test_pattern_fallback_policy_does_not_block_sites_without_native_patter
     );
 }
 
-test_pattern_fallback_policy_requires_only_an_explanation_not_a_theme_pattern();
+test_pattern_fallback_policy_requires_structured_unfit_not_a_vague_reason();
 test_pattern_fallback_policy_does_not_block_sites_without_native_patterns();

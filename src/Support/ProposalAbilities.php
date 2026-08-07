@@ -30,6 +30,7 @@ final class ProposalAbilities {
         'awpt/propose-block-insert',
         'awpt/propose-block-remove',
         'awpt/propose-pattern-insert',
+        'awpt/propose-pattern-replace',
         'awpt/propose-template-update',
         'awpt/propose-global-styles-update',
         'awpt/propose-global-styles-patch',

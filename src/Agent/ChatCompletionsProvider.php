@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\AiLogger;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -34,25 +36,40 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
      * @return array<string, mixed>|\WP_Error
      */
     public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error {
+        $started_at = microtime(true);
         $api_key = $this->get_api_key();
 
         if ($this->requires_api_key() && '' === $api_key) {
-            return new \WP_Error('awpt_provider_not_configured', $this->get_missing_key_message());
+            $error = new \WP_Error('awpt_provider_not_configured', $this->get_missing_key_message());
+            $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+            return $error;
         }
 
         $endpoint = $this->get_endpoint();
 
         if ('' === $endpoint) {
-            return new \WP_Error('awpt_provider_not_configured', $this->get_missing_endpoint_message());
+            $error = new \WP_Error('awpt_provider_not_configured', $this->get_missing_endpoint_message());
+            $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+            return $error;
         }
 
         $model = $this->get_model();
 
         if ('' === $model) {
-            return new \WP_Error('awpt_model_not_configured', __(
+            $error = new \WP_Error('awpt_model_not_configured', __(
                 'Fallback model is not configured. Add a model in AWPT AI connection settings.',
                 'agent-wordpress-terminal',
             ));
+            $this->log_complete($messages, $tools, $options, $error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                ],
+            ]);
+
+            return $error;
         }
 
         // DeepSeek and other text-only OpenRouter routes 404 when image_url parts
@@ -124,12 +141,22 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
         ]);
 
         if (is_wp_error($response)) {
+            $this->log_complete($messages, $tools, $options, $response, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'model' => $model,
+                    'timeout' => $timeout,
+                ],
+            ]);
+
             return $response;
         }
 
         $status = (int) wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        $used_image_fallback = false;
 
         if ($status < 200 || $status >= 300) {
             $error_text = strtolower(
@@ -165,35 +192,71 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                     $status = (int) wp_remote_retrieve_response_code($response);
                     $body = wp_remote_retrieve_body($response);
                     $data = json_decode($body, true);
+                    $messages = $text_only_messages;
+                    $used_image_fallback = true;
                 }
             }
         }
 
         if ($status < 200 || $status >= 300) {
-            return new \WP_Error(
+            $error = new \WP_Error(
                 'awpt_provider_request_failed',
                 $this->format_error_message($status, \AWPT\Support\ArrayKey::as_map($data), $body),
                 ['status' => $status],
             );
+            $this->log_complete($messages, $tools, $options, $error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'model' => $model,
+                    'http_status' => $status,
+                    'timeout' => $timeout,
+                    'image_fallback' => $used_image_fallback,
+                    'raw_body_preview' => is_string($body) ? mb_substr($body, 0, 4_000) : '',
+                ],
+            ]);
+
+            return $error;
         }
 
         if (!is_array($data)) {
-            return new \WP_Error('awpt_provider_invalid_response', __(
+            $error = new \WP_Error('awpt_provider_invalid_response', __(
                 'Provider returned an invalid JSON response.',
                 'agent-wordpress-terminal',
             ));
+            $this->log_complete($messages, $tools, $options, $error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'model' => $model,
+                    'http_status' => $status,
+                ],
+            ]);
+
+            return $error;
         }
 
         $message = $data['choices'][0]['message'] ?? null;
 
         if (!is_array($message)) {
-            return new \WP_Error('awpt_provider_invalid_response', __(
+            $error = new \WP_Error('awpt_provider_invalid_response', __(
                 'Provider response did not include an assistant message.',
                 'agent-wordpress-terminal',
             ));
+            $this->log_complete($messages, $tools, $options, $error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'model' => $model,
+                    'http_status' => $status,
+                    'raw_response' => $data,
+                ],
+            ]);
+
+            return $error;
         }
 
-        return [
+        $result = [
             'content' => $this->stringify_content($message['content'] ?? ''),
             'raw_tool_calls' => is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [],
             'message' => $message,
@@ -201,6 +264,43 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             'model' => (string) ($data['model'] ?? $model),
             'usage' => is_array($data['usage'] ?? null) ? $data['usage'] : [],
         ];
+        $this->log_complete($messages, $tools, $options, $result, [
+            'started_at' => $started_at,
+            'meta' => [
+                'endpoint' => $endpoint,
+                'model' => $model,
+                'http_status' => $status,
+                'timeout' => $timeout,
+                'image_fallback' => $used_image_fallback,
+            ],
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $messages
+     * @param array<int, array<string, mixed>> $tools
+     * @param array<string, mixed>             $options
+     * @param array<string, mixed>|\WP_Error   $result
+     * @param array{started_at?: float, meta?: array<string, mixed>} $context
+     */
+    private function log_complete(
+        array $messages,
+        array $tools,
+        array $options,
+        array|\WP_Error $result,
+        array $context = [],
+    ): void {
+        AiLogger::log_provider_complete([
+            'provider' => $this->get_name(),
+            'messages' => $messages,
+            'tools' => $tools,
+            'options' => $options,
+            'result' => $result,
+            'started_at' => is_float($context['started_at'] ?? null) ? $context['started_at'] : microtime(true),
+            'meta' => is_array($context['meta'] ?? null) ? $context['meta'] : [],
+        ]);
     }
 
     /**

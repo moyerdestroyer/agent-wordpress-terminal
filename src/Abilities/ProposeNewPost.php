@@ -13,7 +13,7 @@ namespace AWPT\Abilities;
 use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 use AWPT\Domain\PatternCompositionBuilder;
 use AWPT\Domain\PatternMaterializer;
 use AWPT\Domain\PatternStructureCompleter;
@@ -21,11 +21,10 @@ use AWPT\Domain\PatternTemplateExpander;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PatternCompositionPolicy;
-use AWPT\Support\PatternFallbackPolicy;
-use AWPT\Support\PostCompositionNormalizer;
 use AWPT\Support\PostCompositionValidator;
 use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentSanitizer;
+use AWPT\Support\PostContentStagingPipeline;
 use AWPT\Support\StagedPostPreview;
 use AWPT\Support\ThemePostTitleStrategy;
 
@@ -283,7 +282,14 @@ final class ProposeNewPost implements AbilityInterface {
                     'pattern_fallback_reason' => [
                         'type' => 'string',
                         'description' => __(
-                            'Required when active/parent-theme or reusable patterns exist but a Core, plugin, or custom composition is a better fit. State the concrete reason briefly.',
+                            'Optional short note when composing without a theme pattern. Pattern-first is preferred but not mandatory.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_unfit_code' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional telemetry when composing without a recommended theme pattern (no_recommendations, explicit_bespoke, preservation_conflict, media_unavailable, scope_mismatch). Not required to stage.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -554,6 +560,10 @@ final class ProposeNewPost implements AbilityInterface {
         $pattern_fallback_reason = '' !== $input_fallback_reason
             ? $input_fallback_reason
             : sanitize_textarea_field((string) ($existing_payload['pattern_fallback_reason'] ?? ''));
+        $input_unfit_code = sanitize_key((string) ($input['pattern_unfit_code'] ?? ''));
+        $pattern_unfit_code = '' !== $input_unfit_code
+            ? $input_unfit_code
+            : sanitize_key((string) ($existing_payload['pattern_unfit_code'] ?? ''));
         $existing_attachment_ids = is_array($existing_payload['required_attachment_ids'] ?? null)
             ? $existing_payload['required_attachment_ids']
             : [];
@@ -682,24 +692,10 @@ final class ProposeNewPost implements AbilityInterface {
         }
 
         $pattern_owner = '' !== $pattern_name ? (string) ($pattern_summary['owner'] ?? 'other') : 'custom';
-        $fallback_error = new PatternFallbackPolicy()->validate(
-            $this->patterns,
-            $post_type,
-            $pattern_owner,
-            $pattern_fallback_reason,
-        );
-
-        if (null !== $fallback_error) {
-            return $fallback_error;
-        }
-
-        $repairs_applied = [];
-        $normalization = new PostCompositionNormalizer()->normalize($post_content);
+        $pipeline = new PostContentStagingPipeline();
+        $normalization = $pipeline->normalize($post_content);
         $post_content = $normalization['content'];
-        $repairs_applied = array_map(
-            static fn(array $repair): string => (string) ($repair['kind'] ?? ''),
-            $normalization['repairs'],
-        );
+        $repairs_applied = $normalization['repairs'];
 
         $validator = new PostCompositionValidator();
         $syntax_error = $validator->validate_syntax($post_content);
@@ -776,7 +772,7 @@ final class ProposeNewPost implements AbilityInterface {
             return new \WP_Error($validation_error->get_error_code(), $validation_error->get_error_message(), $data);
         }
 
-        $domain_validation = new DomainValidationService();
+        $domain_validation = new CompositionGate();
 
         $materializer = new PatternMaterializer();
 
@@ -894,6 +890,9 @@ final class ProposeNewPost implements AbilityInterface {
 
         if ('' !== $pattern_fallback_reason) {
             $payload['pattern_fallback_reason'] = $pattern_fallback_reason;
+        }
+        if ('' !== $pattern_unfit_code) {
+            $payload['pattern_unfit_code'] = $pattern_unfit_code;
         }
 
         if ([] !== $required_attachment_ids) {

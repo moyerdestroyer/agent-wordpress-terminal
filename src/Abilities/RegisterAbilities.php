@@ -85,6 +85,7 @@ final class RegisterAbilities {
         new ListPatterns()->register();
         new RecommendPatterns()->register();
         new PreparePatternDraft()->register();
+        new PreparePatternChange()->register();
         new ReadPattern()->register();
         new ListDomainPacks()->register();
         new ReadDomainGuidance()->register();
@@ -100,6 +101,7 @@ final class RegisterAbilities {
         new ProposeBlockInsert()->register();
         new ProposeBlockRemove()->register();
         new ProposePatternInsert()->register();
+        new ProposePatternReplace()->register();
         new ProposeTemplateUpdate()->register();
         new ProposeGlobalStylesUpdate()->register();
         new ProposeGlobalStylesPatch()->register();

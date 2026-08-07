@@ -71,6 +71,17 @@ function test_post_content_media_integrity_blocks_ambiguous_local_upload_urls_wi
         $ambiguous instanceof WP_Error ? $ambiguous->get_error_code() : '',
         'same-site uploads without a verified attachment identity should block staging',
     );
+    $ambiguous_data = $ambiguous instanceof WP_Error ? $ambiguous->get_error_data() : [];
+    $ambiguous_data = is_array($ambiguous_data) ? $ambiguous_data : [];
+    Assert::true(
+        str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'media_unavailable'),
+        'recovery should mention media_unavailable as an exit',
+    );
+    Assert::true(
+        str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'omit')
+            || str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'optional'),
+        'recovery should allow omitting optional media',
+    );
 
     $external = new PostContentMediaIntegrity()->prepare(
         '<!-- wp:cover {"url":"https://images.example.org/hero.jpg"} -->'

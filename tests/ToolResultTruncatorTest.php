@@ -132,3 +132,75 @@ test_tool_result_truncator_removes_duplicate_pattern_tree_for_provider();
 test_tool_result_truncator_clips_theme_file_content();
 test_tool_result_truncator_removes_rendered_screenshot_bytes_but_keeps_geometry();
 test_tool_result_truncator_uses_compact_revision_context_instead_of_raw_proposal_markup();
+
+function test_tool_result_truncator_keeps_analyze_page_brief_under_budget(): void {
+    $blocks = [];
+
+    for ($i = 0; $i < 60; ++$i) {
+        $blocks[] = [
+            'path' => (string) $i,
+            'name' => 'core/group',
+            'attributes' => [],
+            'attributes_summary' => [],
+            'text_excerpt' => str_repeat('FAQ answer body ', 30),
+            'fingerprint' => hash('sha256', 'a' . $i),
+            'inner' => [],
+        ];
+    }
+
+    $provider = new ToolResultTruncator()->for_provider('awpt/analyze-page', [
+        'title' => 'SLIP',
+        'status' => 'publish',
+        'url' => 'http://example.test/slip/',
+        'headings' => ['One', 'Two', 'Three'],
+        'risk_level' => 'low',
+        'recommended_next_actions' => ['Review block structure'],
+        'plain_text' => str_repeat('plain ', 5_000),
+        'block_tree' => $blocks,
+    ]);
+
+    Assert::false((bool) ($provider['truncated'] ?? false), 'analyze-page should shrink before stubbing');
+    Assert::same(['One', 'Two', 'Three'], $provider['headings'] ?? null, 'headings must survive');
+    Assert::same('low', $provider['risk_level'] ?? null, 'risk must survive');
+    Assert::true(
+        mb_strlen((string) ($provider['plain_text'] ?? ''), 'UTF-8') <= 1_600,
+        'plain_text should be clipped',
+    );
+    Assert::false(
+        array_key_exists('block_tree', $provider),
+        'provider channel must drop analyze-page block_tree to keep explore lean',
+    );
+}
+
+function test_tool_result_truncator_keeps_compact_analyze_tree_for_storage(): void {
+    $blocks = [];
+
+    for ($i = 0; $i < 20; ++$i) {
+        $blocks[] = [
+            'path' => (string) $i,
+            'name' => 'core/group',
+            'attributes' => ['layout' => ['type' => 'constrained']],
+            'attributes_summary' => ['layout' => '[1 items]'],
+            'text_excerpt' => str_repeat('FAQ answer body ', 30),
+            'fingerprint' => hash('sha256', 'a' . $i),
+            'inner' => [],
+        ];
+    }
+
+    $storage = new ToolResultTruncator()->for_storage('awpt/analyze-page', [
+        'title' => 'SLIP',
+        'headings' => ['One'],
+        'plain_text' => str_repeat('plain ', 5_000),
+        'block_tree' => $blocks,
+    ]);
+
+    Assert::true(is_array($storage['block_tree'] ?? null), 'storage must retain a compact tree');
+    Assert::same(
+        64,
+        strlen((string) ($storage['block_tree'][0]['fingerprint'] ?? '')),
+        'storage tree fingerprints must survive compaction',
+    );
+}
+
+test_tool_result_truncator_keeps_analyze_page_brief_under_budget();
+test_tool_result_truncator_keeps_compact_analyze_tree_for_storage();

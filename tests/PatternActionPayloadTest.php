@@ -22,13 +22,19 @@ function test_pattern_action_payload_preserves_nested_composition(): void {
         'blocks' => [[
             'blockName' => 'core/group',
             'attrs' => ['layout' => ['type' => 'constrained']],
-            'innerHTML' => '',
+            'innerHTML' => '<div class="wp-block-group"></div>',
             'innerBlocks' => [[
                 'blockName' => 'core/paragraph',
                 'attrs' => [],
                 'innerHTML' => '<p>Pattern body</p>',
                 'innerBlocks' => [],
+                'innerContent' => ['<p>Pattern body</p>'],
             ]],
+            'innerContent' => [
+                '<div class="wp-block-group">',
+                null,
+                '</div>',
+            ],
         ]],
         'inserted_paths' => ['1', 'bad<script>'],
     ]);
@@ -49,9 +55,50 @@ function test_pattern_action_payload_preserves_nested_composition(): void {
         $payload['inserted_paths'] ?? null,
         'stored insertion paths should be valid dotted block paths',
     );
+    Assert::same(
+        ['<div class="wp-block-group">', null, '</div>'],
+        $payload['blocks'][0]['innerContent'] ?? null,
+        'container wrapper HTML in innerContent must survive sanitization for apply rebuild',
+    );
+}
+
+function test_pattern_replace_payload_preserves_wrappers_for_apply_rebuild(): void {
+    $payload = new ActionPayloadSanitizer()->sanitize([
+        'operation' => ActionOperations::PATTERN_REPLACE,
+        'post_id' => 55,
+        'pattern_name' => 'theme/staff',
+        'block_path' => '1',
+        'expected_fingerprint' => str_repeat('e', 64),
+        'blocks' => [[
+            'blockName' => 'core/group',
+            'attrs' => ['layout' => ['type' => 'constrained']],
+            'innerHTML' => '<div class="wp-block-group is-layout-constrained"></div>',
+            'innerBlocks' => [[
+                'blockName' => 'core/heading',
+                'attrs' => ['level' => 2],
+                'innerHTML' => '<h2>Staff</h2>',
+                'innerBlocks' => [],
+                'innerContent' => ['<h2>Staff</h2>'],
+            ]],
+            'innerContent' => [
+                '<div class="wp-block-group is-layout-constrained">',
+                null,
+                '</div>',
+            ],
+        ]],
+    ]);
+
+    Assert::same(ActionOperations::PATTERN_REPLACE, $payload['operation'] ?? null, 'replace op survives');
+    Assert::true(
+        is_array($payload['blocks'][0]['innerContent'] ?? null)
+        && in_array(null, $payload['blocks'][0]['innerContent'], true)
+        && str_contains((string) ($payload['blocks'][0]['innerContent'][0] ?? ''), 'wp-block-group'),
+        'replace payload must keep wrapper fragments so apply matches preview',
+    );
 }
 
 test_pattern_action_payload_preserves_nested_composition();
+test_pattern_replace_payload_preserves_wrappers_for_apply_rebuild();
 
 function test_action_payload_preserves_sanitized_markup_repair_report(): void {
     $payload = new ActionPayloadSanitizer()->sanitize([

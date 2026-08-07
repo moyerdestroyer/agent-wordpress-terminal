@@ -78,8 +78,8 @@ final class CompositionProposalGuard {
                 return $outline_error;
             }
         }
-        $validation = new DomainValidationService();
-        $result = $validation->evaluate(
+        $gate = new CompositionGate();
+        $result = $gate->evaluate(
             $content,
             [
                 'work_type' => sanitize_key($work_type),
@@ -89,10 +89,10 @@ final class CompositionProposalGuard {
             ],
             true,
         );
-        $baseline = array_values(array_filter($this->baseline_findings($validation, $payload, $work_type), 'is_array'));
+        $baseline = array_values(array_filter($this->baseline_findings($gate, $payload, $work_type), 'is_array'));
         /** @var list<array<string, mixed>> $baseline */
         $blocking_findings = self::new_findings($result['findings'], $baseline);
-        $error = $validation->blocking_error($blocking_findings);
+        $error = $gate->blocking_error($blocking_findings);
 
         if ($error instanceof \WP_Error) {
             $data = $error->get_error_data();
@@ -243,14 +243,14 @@ final class CompositionProposalGuard {
     }
 
     /** @param array<string, mixed> $payload @return list<array<string, mixed>> */
-    private function baseline_findings(DomainValidationService $validation, array $payload, string $work_type): array {
+    private function baseline_findings(CompositionGate $gate, array $payload, string $work_type): array {
         $original = (string) ($payload['original_post_content'] ?? '');
 
         if ('' === $original) {
             return [];
         }
 
-        $baseline = $validation->evaluate(
+        $baseline = $gate->evaluate(
             $original,
             [
                 'work_type' => sanitize_key($work_type),

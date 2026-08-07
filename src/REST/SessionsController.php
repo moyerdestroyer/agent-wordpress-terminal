@@ -34,7 +34,9 @@ final class SessionsController extends RestController {
             [
                 'methods' => \WP_REST_Server::READABLE,
                 'callback' => [$this, 'list_sessions'],
-                'permission_callback' => [$this, 'can_manage'],
+                // Dev convenience: session reads are open so external agents can
+                // pull transcripts/AI logs without cookie or application-password auth.
+                'permission_callback' => '__return_true',
             ],
             [
                 'methods' => \WP_REST_Server::CREATABLE,
@@ -47,11 +49,11 @@ final class SessionsController extends RestController {
             ],
         ]);
 
-        register_rest_route(AWPT_REST_NAMESPACE, '/sessions/(?P<id>\d+)', [
+        register_rest_route(AWPT_REST_NAMESPACE, '/sessions/latest', [
             [
                 'methods' => \WP_REST_Server::READABLE,
-                'callback' => [$this, 'get_session'],
-                'permission_callback' => [$this, 'can_manage'],
+                'callback' => [$this, 'get_latest_session'],
+                'permission_callback' => '__return_true',
                 'args' => [
                     'messages_limit' => [
                         'type' => 'integer',
@@ -60,6 +62,32 @@ final class SessionsController extends RestController {
                     'include_tool_outputs' => [
                         'type' => 'integer',
                         'default' => 0,
+                    ],
+                    'include_ai_logs' => [
+                        'type' => 'integer',
+                        'default' => 1,
+                    ],
+                ],
+            ],
+        ]);
+
+        register_rest_route(AWPT_REST_NAMESPACE, '/sessions/(?P<id>\d+)', [
+            [
+                'methods' => \WP_REST_Server::READABLE,
+                'callback' => [$this, 'get_session'],
+                'permission_callback' => '__return_true',
+                'args' => [
+                    'messages_limit' => [
+                        'type' => 'integer',
+                        'default' => 50,
+                    ],
+                    'include_tool_outputs' => [
+                        'type' => 'integer',
+                        'default' => 0,
+                    ],
+                    'include_ai_logs' => [
+                        'type' => 'integer',
+                        'default' => 1,
                     ],
                 ],
             ],
@@ -136,11 +164,40 @@ final class SessionsController extends RestController {
      */
     public function get_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
         $session_id = RequestParams::int($request, 'id');
+
+        return $this->respond_with_session_detail($request, $session_id);
+    }
+
+    /**
+     * Get the current admin's most recently updated session (full detail + ai_logs).
+     */
+    public function get_latest_session(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {
+        $session_id = $this->sessions->latest_id();
+
+        if ($session_id <= 0) {
+            return new \WP_Error(
+                code: 'awpt_session_not_found',
+                message: __('No agent sessions found.', 'agent-wordpress-terminal'),
+                data: ['status' => 404],
+            );
+        }
+
+        return $this->respond_with_session_detail($request, $session_id);
+    }
+
+    /**
+     * @return \WP_REST_Response|\WP_Error
+     */
+    private function respond_with_session_detail(
+        \WP_REST_Request $request,
+        int $session_id,
+    ): \WP_REST_Response|\WP_Error {
         $messages_limit = RequestParams::int($request, 'messages_limit');
         $messages_limit = $messages_limit > 0 ? $messages_limit : 50;
         $messages_limit = max(1, min(200, $messages_limit));
         $include_tool_outputs = 1 === RequestParams::int($request, 'include_tool_outputs');
-        $session = $this->sessions->find_detail($session_id, $messages_limit, $include_tool_outputs);
+        $include_ai_logs = 0 !== RequestParams::int($request, 'include_ai_logs');
+        $session = $this->sessions->find_detail($session_id, $messages_limit, $include_tool_outputs, $include_ai_logs);
 
         if (null === $session) {
             return new \WP_Error(

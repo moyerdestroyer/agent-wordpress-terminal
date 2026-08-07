@@ -120,6 +120,7 @@ final class ProposalRequestContext {
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
+                'awpt/propose-pattern-replace',
             ],
             true,
         );

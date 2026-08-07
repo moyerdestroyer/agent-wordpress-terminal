@@ -29,7 +29,10 @@ new integrations should use the local v2 schema at
   ],
   "patterns": {
     "namespace": "my-theme",
-    "catalog": "inc/blocks/awpt-patterns.json"
+    "catalog": "inc/blocks/awpt-patterns.json",
+    "aliases": {
+      "my-theme/page-header": "my-theme/header-page"
+    }
   },
   "rules": {
     "path": "inc/blocks/awpt-rules.json"
@@ -56,6 +59,17 @@ When WordPress exposes `wp_knowledge`, published Knowledge entries can extend or
 - `_awpt_override_mode` (`extend` or `replace`)
 
 AWPT also supports the proposal-era `wp_guideline` post type through feature detection. Without either post type, the theme files remain the source of truth.
+
+## Pattern namespaces and aliases
+
+`patterns.namespace` is the registered block-pattern prefix the pack owns (usually the theme
+stylesheet slug). AWPT uses it when expanding bare slugs the agent invents (`hero` →
+`my-theme/hero` candidates).
+
+Optional `patterns.aliases` maps thrash names the agent has used to the **exact** registered
+slug. Prefer shipping aliases in the pack so theme authors can fix resolution without an AWPT
+release. AWPT still applies a few **namespace-agnostic** heuristics (`page-header` ↔
+`header-page` inside any namespace); product-specific synonyms belong in the pack.
 
 ## Pattern catalog
 
@@ -126,6 +140,10 @@ Available registration functions are:
 - `awpt_register_pattern_recommender()`
 - `awpt_register_pattern_materializer()`
 - `awpt_register_proposal_operation()`
+
+Empty `recommenders`, `materializers`, and `proposal_operations` arrays are normal.
+Most themes only need declarative rules plus optional validators (as CivicPress does).
+Declare an extension id in the manifest only when you also register a matching PHP callback.
 
 Validators are read-only callbacks returning typed findings with `severity`,
 `code`, `message`, and optional `rule_id`, `block_path`, `source`,

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Refreshes the knowledge index after a completed Dufresne import.
+ * Refreshes the knowledge index after Dufresne import or rollback.
  *
  * @package AWPT
  */
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-/** Coordinates a single deferred rebuild once an import has settled. */
+/** Coordinates a single deferred rebuild once an import or rollback has settled. */
 final class DufresneKnowledgeRefresh {
     public const CRON_HOOK = 'awpt_rebuild_knowledge_after_dufresne_import';
 
@@ -22,6 +22,7 @@ final class DufresneKnowledgeRefresh {
 
     public static function register(): void {
         add_action('dufresne_wp_plugin_run_completed', [self::class, 'schedule'], 10, 2);
+        add_action('dufresne_wp_plugin_after_rollback', [self::class, 'on_rollback'], 10, 2);
         add_action(self::CRON_HOOK, [self::class, 'rebuild']);
     }
 
@@ -35,10 +36,16 @@ final class DufresneKnowledgeRefresh {
             return;
         }
 
-        // Multiple imports can finish close together. One deferred rebuild indexes their
-        // combined final state and avoids starting competing index runs.
-        wp_clear_scheduled_hook(self::CRON_HOOK);
-        wp_schedule_single_event(time() + self::DELAY_SECONDS, self::CRON_HOOK);
+        self::schedule_deferred_rebuild();
+    }
+
+    /**
+     * @param array{deleted_posts?: int, deleted_media?: int, deleted_terms?: int}|mixed $result
+     */
+    public static function on_rollback(int $run_id, mixed $result = []): void {
+        unset($run_id, $result);
+        KnowledgeIndexer::mark_stale();
+        self::schedule_deferred_rebuild();
     }
 
     /** @param array<string, mixed> $summary */
@@ -48,5 +55,12 @@ final class DufresneKnowledgeRefresh {
 
     public static function rebuild(): void {
         new KnowledgeIndexer()->rebuild();
+    }
+
+    private static function schedule_deferred_rebuild(): void {
+        // Multiple imports/rollbacks can finish close together. One deferred rebuild
+        // indexes their combined final state and avoids starting competing index runs.
+        wp_clear_scheduled_hook(self::CRON_HOOK);
+        wp_schedule_single_event(time() + self::DELAY_SECONDS, self::CRON_HOOK);
     }
 }

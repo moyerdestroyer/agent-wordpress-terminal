@@ -62,7 +62,10 @@ final class ProviderMessageBuilder {
                     $profile->needs_site_data_module() ? $this->site_data_module() : '',
                     $profile->needs_compose_module() ? $this->compose_module() : '',
                     $profile->needs_edit_module() ? $this->edit_module() : '',
-                    $profile->presentation_edit ? $this->presentation_edit_module() : '',
+                    $profile->is_improve_evaluate() ? $this->improve_evaluate_module() : '',
+                    !$profile->is_improve_evaluate() && ($profile->is_redesign() || $profile->presentation_edit)
+                        ? $this->redesign_module()
+                        : '',
                     $profile->needs_template_module() ? $this->template_styles_module() : '',
                     $profile->needs_settings_module() ? $this->settings_module() : '',
                     $profile->needs_frontend_module() ? $this->frontend_module() : '',
@@ -137,7 +140,7 @@ final class ProviderMessageBuilder {
             'When the user asks to revise a staged new post or page, read awpt/read-proposal and treat revision_context as authoritative. The action_id is an AWPT proposal ID, never a WordPress post ID: do not pass it to read-content, read-block-tree, get-block, or other post abilities. For ordinary revisions, call awpt/propose-patterned-post with that action_id and partial path-addressed pattern_text_updates or intentional media_placements; AWPT preserves every unmentioned block server-side. Use awpt/propose-new-post with complete post_content only when the user explicitly requests a bespoke or from-scratch redesign. Never claim a preview or draft was revised unless the staging tool succeeded in the same turn. Do not stop after reading the proposal.',
             'On revisions, keep the staged proposal mode and revise the existing action in place. Prefer compact path updates; unrestricted full Gutenberg composition remains available for explicit from-scratch redesigns.',
             'If pattern preparation returns custom_fallback, use awpt/propose-new-post with a complete Gutenberg document. This unrestricted path remains available for explicitly bespoke/from-scratch requests or sites without a suitable full-document pattern.',
-            'The active theme is the default design authority even when the user does not name it. Prefer active/parent-theme patterns, then site-owned reusable patterns. Core, plugin, or custom composition is allowed when it fits better; for a substantial new composition, pass pattern_fallback_reason explaining that choice. Do not ask the user to restate the active theme or request use of its design system.',
+            'The active theme is the default design authority even when the user does not name it. Prefer active/parent-theme patterns, then site-owned reusable patterns. Bespoke core composition is allowed when no pattern fits — pattern-first is preferred, not mandatory. Do not ask the user to restate the active theme or request use of its design system.',
             'Proposal calls are real staging attempts, never probes or placeholders. New posts are always drafts.',
             'You choose the composition strategy after discovery. Do not retry a failed proposal with unchanged arguments.',
             'After a failed proposal, use the returned issue and existing evidence for a corrected attempt. Do not repeat discovery unless the failure says evidence is missing.',
@@ -159,20 +162,26 @@ final class ProviderMessageBuilder {
         ]);
     }
 
-    private function presentation_edit_module(): string {
+    private function redesign_module(): string {
         return implode("\n", [
-            'This is a presentation-improvement request for the currently focused WordPress page.',
-            'Before staging anything, inspect the complete current page with awpt/analyze-page and inspect its rendered WordPress presentation with awpt/inspect-rendered-element using the focused post ID and a screenshot.',
-            'A generic request such as "Make this page more presentable" authorizes both presentation and page-level information-architecture work. After inspecting the page, choose the smallest coherent scope that materially improves it: surgical block changes, structural regrouping, or a substantial full-page layout adaptation. You may reorder or wrap blocks and add concise headings, labels, navigation, or framing that the chosen layout genuinely needs. Preserve the source\'s substantive meaning, links, numbers, media, and legal references, and never invent factual claims.',
-            'Use the structural and rendered evidence to identify the most consequential presentation problems. Decide the appropriate scope yourself; do not ask the admin to choose routine presentation details. A complicated or poorly structured page may warrant a large overhaul even when the user supplied only the generic request.',
-            'When the page content clearly matches a recognizable page archetype such as documentation, reference, policy, landing, news, or cards, call awpt/recommend-patterns and inspect the best compatible full-page pattern before choosing between targeted edits and a full layout adaptation. Pattern discovery informs the decision; it does not require forcing a pattern onto content that is better served by native block improvements.',
-            'Treat the rendered page as authoritative about visible title hierarchy. Do not assume the active template displays post_title. If the rendered page has no visible level-1 heading, include an appropriate page-local title or header in the proposal; if the template already renders one, do not duplicate it.',
-            'In conventional document flow, place the page H1 before its introductory prose. Put an eyebrow or kicker before the H1 only when a verified theme pattern explicitly uses that treatment; do not strand an ordinary explanatory paragraph above the page title.',
-            'For Gutenberg content, use verified block attribute changes and one atomic awpt/propose-block-batch-update when that is sufficient. When a complete active-theme page-layout pattern better fits the content, read that pattern and stage an adapted awpt/propose-content-update with pattern_name provenance. A focused page request may overhaul that page\'s block layout, but it does not authorize changing a site-wide FSE template.',
-            'The proposal title and description must describe only changes actually present in that proposal tool call. Never describe planned removals, insertions, grouping, pattern use, or layout work unless the payload performs those operations.',
-            'The active WordPress theme is the visual authority. Use verified theme patterns, guidance, and tokens when they materially improve the result; do not force a pattern when the existing content needs a simpler native-block treatment.',
-            'Preserve factual meaning, working links, media, and important content. Apply ordinary AWPT editorial judgment about hierarchy, framing, labels, and structure; never fabricate facts or remove substantive information merely to shorten the page.',
-            'Stage one coherent proposal that resolves the observed problems. The staged page will be rendered automatically after proposal validation. Review that evidence honestly and make at most one targeted revision if the result is visibly unsatisfactory.',
+            'This is a theme-enhanced redesign of the currently focused page (same machinery as creation, applied in place).',
+            'Read the focused page (awpt/read-content, awpt/read-block-tree, or awpt/analyze-page), then awpt/recommend-patterns (or prepare-pattern-change for a targeted section).',
+            'Prefer awpt/prepare-pattern-change → awpt/propose-pattern-replace for structural section swaps (use the returned preparation_id; do not invent IDs). Prefer awpt/propose-pattern-insert for additions.',
+            'When a theme pattern fits a full-document rewrite, read or prepare it first and pass pattern_name only with structure evidence. Surgical batch/attrs edits are fine for copy-only work.',
+            'Map existing copy into the new structure where it fits. Placeholders are fine for empty slots. Do not invent factual claims, deadlines, fees, or Media Library URLs/IDs.',
+            'Full-document freehand is allowed when no pattern fits or the user asks for a custom layout; use an honest pattern_unfit_code when relevant (not no_recommendations when recommendations exist).',
+            'Dense or large pages (about 40+ blocks or 12k+ characters of markup): prefer section replace/insert and awpt/propose-block-batch-update over a single full-document post_content rewrite.',
+            'Use design tokens and registered blocks only. Prefer one clear content H1 when the page is a standard interior document. Stage exactly one coherent proposal.',
+        ]);
+    }
+
+    private function improve_evaluate_module(): string {
+        return implode("\n", [
+            'This is an Improve evaluate-only turn: produce a short execution plan, not a staged change.',
+            'Prefer a short loop: awpt/read-block-tree (top_level_sections) and optionally awpt/analyze-page or awpt/recommend-patterns, then stop calling tools and write the plan.',
+            'Do not thrash list-patterns or read every pattern. Do not call propose-* abilities.',
+            'Name least-destructive operations per change (batch/attrs, prepare-replace, insert, or no change). Flag preserve_by_default sections.',
+            'Your final assistant message is a compact markdown plan (sections/paths + ops) for the next act turn — not a tool dump.',
         ]);
     }
 

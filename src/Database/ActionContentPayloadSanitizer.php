@@ -242,7 +242,9 @@ final class ActionContentPayloadSanitizer {
             'pattern_source',
             'pattern_owner',
             'pattern_fallback_reason',
+            'pattern_unfit_code',
             'required_pattern_prefix',
+            'preparation_id',
             'template_type',
             'template_area',
             'post_name',
@@ -407,6 +409,20 @@ final class ActionContentPayloadSanitizer {
             $clean['inserted_paths'] = $paths;
         }
 
+        if (array_key_exists('replaced_paths', $payload) && is_array($payload['replaced_paths'])) {
+            $paths = [];
+
+            foreach (\AWPT\Support\ArrayKey::list_of_strings($payload['replaced_paths']) as $path) {
+                $value = sanitize_text_field($path);
+
+                if (1 === preg_match('/^\d+(?:\.\d+)*$/', $value)) {
+                    $paths[] = $value;
+                }
+            }
+
+            $clean['replaced_paths'] = $paths;
+        }
+
         if (array_key_exists('batch_changes', $payload) && is_array($payload['batch_changes'])) {
             $clean['batch_changes'] = array_values(array_filter(array_map(function (mixed $change): ?array {
                 if (!is_array($change)) {
@@ -483,13 +499,62 @@ final class ActionContentPayloadSanitizer {
             $inner_blocks[] = $this->sanitize_block_definition($inner);
         }
 
+        // Preserve Gutenberg innerContent (wrapper HTML + null child slots). Replacing
+        // it with all-null placeholders drops container markup so apply-time rebuilds
+        // for pattern_insert/pattern_replace lose group/columns wrappers that preview
+        // still shows from post_content.
+        $inner_content = $this->sanitize_inner_content(
+            is_array($block['innerContent'] ?? null) ? $block['innerContent'] : null,
+            $inner_html,
+            count($inner_blocks),
+        );
+
         return [
             'blockName' => $name,
             'attrs' => $attrs,
             'innerHTML' => $inner_html,
             'innerBlocks' => $inner_blocks,
-            'innerContent' => [] === $inner_blocks ? [$inner_html] : array_fill(0, count($inner_blocks), null),
+            'innerContent' => $inner_content,
         ];
+    }
+
+    /**
+     * @param array<array-key, mixed>|null $inner_content
+     * @return list<null|string>
+     */
+    private function sanitize_inner_content(?array $inner_content, string $inner_html, int $inner_block_count): array {
+        if (null === $inner_content || [] === $inner_content) {
+            return 0 === $inner_block_count
+                ? [$inner_html]
+                : array_fill(0, $inner_block_count, null);
+        }
+
+        $clean = [];
+        $null_slots = 0;
+
+        foreach ($inner_content as $part) {
+            if (null === $part) {
+                $clean[] = null;
+                ++$null_slots;
+                continue;
+            }
+
+            if (is_string($part) || is_scalar($part)) {
+                $clean[] = wp_kses_post((string) $part);
+            }
+        }
+
+        // If the stored map under-counts children, pad nulls so serialize_block stays aligned.
+        while ($null_slots < $inner_block_count) {
+            $clean[] = null;
+            ++$null_slots;
+        }
+
+        if ([] === $clean) {
+            return 0 === $inner_block_count ? [$inner_html] : array_fill(0, $inner_block_count, null);
+        }
+
+        return $clean;
     }
 
     /**

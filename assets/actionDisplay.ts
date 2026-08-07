@@ -391,7 +391,8 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 	if (
 		payload.operation === 'block_insert' ||
 		payload.operation === 'block_remove' ||
-		payload.operation === 'pattern_insert'
+		payload.operation === 'pattern_insert' ||
+		payload.operation === 'pattern_replace'
 	) {
 		const snippet =
 			payload.operation === 'block_remove'
@@ -408,7 +409,9 @@ export function buildActionDiffModel(payload?: ActionPayload): ActionDiffModel {
 						? __('Block insert', 'agent-wordpress-terminal')
 						: payload.operation === 'block_remove'
 							? __('Block remove', 'agent-wordpress-terminal')
-							: __('Pattern insert', 'agent-wordpress-terminal'),
+							: payload.operation === 'pattern_replace'
+								? __('Pattern replace', 'agent-wordpress-terminal')
+								: __('Pattern insert', 'agent-wordpress-terminal'),
 				before,
 				after,
 				emptyBeforeLabel: __('(no previous content)', 'agent-wordpress-terminal'),

@@ -187,19 +187,40 @@ function test_presentation_preservation_blocks_loss_but_allows_structure_only_ch
         . '<a href="https://example.test/rule">Read the rule</a> and retain this substantive explanation.</p><!-- /wp:paragraph -->';
     $lossy = '<!-- wp:paragraph --><p>California filing guidance.</p><!-- /wp:paragraph -->';
     $validator = new ExistingContentPreservationValidator();
-    $error = $validator->validate('Make this page more presentable.', $before, $lossy);
 
-    Assert::instanceOf(WP_Error::class, $error, 'generic presentation work must not discard source facts');
-    Assert::same('awpt_presentation_content_loss', $error->get_error_code(), 'loss gets a dedicated error');
     Assert::same(
         null,
-        $validator->validate('Make this page more presentable.', $before, $before),
-        'structure-preserving content passes',
+        $validator->validate('Make this page more presentable.', $before, $lossy),
+        'default redesign allows lossy restructure without strict preservation',
+    );
+
+    $error = $validator->validate(
+        'Make this page more presentable. Preserve all existing content and links.',
+        $before,
+        $lossy,
+    );
+
+    Assert::instanceOf(WP_Error::class, $error, 'strict preservation language still blocks content loss');
+    Assert::same('awpt_presentation_content_loss', $error->get_error_code(), 'loss gets a dedicated error');
+    $recommendation = $error->get_error_data()['recommended_next_tools'][0] ?? [];
+    Assert::same(
+        'awpt/propose-block-batch-update',
+        $recommendation['tool'] ?? '',
+        'content-loss feedback should still suggest the batch path',
+    );
+    Assert::false(
+        array_key_exists('input', $recommendation) && 0 === (int) ($recommendation['input']['post_id'] ?? null),
+        'recommended_next_tools must not send a junk post_id of 0',
     );
     Assert::same(
         null,
-        $validator->validate('Shorten and summarize this page.', $before, $lossy),
-        'explicit reduction bypasses strict presentation preservation',
+        $validator->validate('Preserve all content while restyling.', $before, $before),
+        'structure-preserving content passes under strict mode',
+    );
+    Assert::same(
+        null,
+        $validator->validate('Shorten and summarize this page. Preserve all wording.', $before, $lossy),
+        'explicit reduction still bypasses strict presentation preservation',
     );
 }
 
@@ -210,9 +231,13 @@ function test_presentation_preservation_keeps_unique_short_imported_labels(): vo
         . '</p><!-- /wp:paragraph -->';
     $label = '<!-- wp:html --><div>Virtual or In-Person?</div><!-- /wp:html -->';
     $validator = new ExistingContentPreservationValidator();
-    $error = $validator->validate('Make this page more presentable.', $paragraph . $label, $paragraph);
+    $error = $validator->validate(
+        'Improve this page but preserve all content including every label.',
+        $paragraph . $label,
+        $paragraph,
+    );
 
-    Assert::instanceOf(WP_Error::class, $error, 'global token recall must not hide deletion of a unique short label');
+    Assert::instanceOf(WP_Error::class, $error, 'strict mode still catches deleted short labels');
     Assert::same(
         ['Virtual or In-Person?'],
         $error->get_error_data()['missing_short_fragments'] ?? [],
@@ -221,7 +246,7 @@ function test_presentation_preservation_keeps_unique_short_imported_labels(): vo
     Assert::same(
         null,
         $validator->validate(
-            'Make this page more presentable.',
+            'Improve this page but preserve all content.',
             $paragraph . '<!-- wp:paragraph --><p>A:</p><!-- /wp:paragraph -->',
             $paragraph,
         ),

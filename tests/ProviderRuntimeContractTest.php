@@ -165,24 +165,6 @@ function test_provider_runtime_reviews_only_genuinely_rendered_preview_evidence(
 
 test_provider_runtime_reviews_only_genuinely_rendered_preview_evidence();
 
-function test_provider_runtime_derives_missing_page_h1_from_rendered_evidence(): void {
-    $method = new ReflectionMethod(ProviderRuntime::class, 'presentation_requires_page_h1');
-    $runtime = new ProviderRuntime();
-
-    Assert::true($method->invoke($runtime, [[
-        'tool' => 'awpt/inspect-rendered-element',
-        'status' => 'success',
-        'output' => ['rendered' => false, 'main_h1_count' => 0],
-    ]]), 'static content-region evidence should ground the page-local H1 requirement');
-    Assert::false($method->invoke($runtime, [[
-        'tool' => 'awpt/inspect-rendered-element',
-        'status' => 'success',
-        'output' => ['rendered' => false, 'main_h1_count' => 1],
-    ]]), 'an already-visible page H1 must not create a duplicate-title requirement');
-}
-
-test_provider_runtime_derives_missing_page_h1_from_rendered_evidence();
-
 function test_provider_runtime_keeps_focused_edits_out_of_patterned_post_finalization(): void {
     $runtime = new ProviderRuntime();
     $method = new ReflectionMethod(ProviderRuntime::class, 'compose_abilities_for');
@@ -234,6 +216,94 @@ function test_provider_runtime_exposes_an_actionable_failed_turn_outcome(): void
 }
 
 test_provider_runtime_keeps_focused_edits_out_of_patterned_post_finalization();
+
+function test_provider_runtime_presentation_compose_prefers_pattern_tools_after_recommendations(): void {
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'compose_abilities_for');
+    $profile = AWPT\Agent\TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
+    $pack = [
+        'coverage' => ['page_analysis', 'rendered_inspection', 'pattern_consulted', 'pattern_recommendation', 'pattern_structure'],
+        'content_reads' => [[
+            'tool' => 'awpt/read-block-tree',
+            'output' => [
+                'blocks' => [['path' => '0', 'name' => 'core/heading', 'fingerprint' => str_repeat('a', 64)]],
+            ],
+        ]],
+    ];
+    $abilities = $method->invoke(
+        $runtime,
+        [],
+        $profile,
+        [
+            'awpt/propose-content-update',
+            'awpt/propose-block-batch-update',
+            'awpt/propose-pattern-insert',
+            'awpt/propose-block-attrs-update',
+        ],
+        $pack,
+        true,
+    );
+
+    // Pattern-first is advisory: redesign compose keeps the full proposal surface when fingerprints exist.
+    Assert::true(in_array('awpt/propose-pattern-insert', $abilities, true), 'pattern insert should stay available');
+    Assert::true(in_array('awpt/propose-content-update', $abilities, true), 'pattern-backed content update should stay available');
+    Assert::true(
+        in_array('awpt/propose-block-batch-update', $abilities, true),
+        'surgical batch tools remain available without unfit ceremony',
+    );
+    Assert::true(
+        in_array('awpt/propose-block-attrs-update', $abilities, true),
+        'attrs surgical tools remain available without unfit ceremony',
+    );
+}
+
+test_provider_runtime_presentation_compose_prefers_pattern_tools_after_recommendations();
+
+function test_provider_runtime_narrows_compose_tools_without_fingerprints(): void {
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'compose_abilities_for');
+    $profile = AWPT\Agent\TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
+    $empty_pack = [
+        'content_reads' => [],
+        'page_brief' => ['main_h1_count' => 0],
+    ];
+    $abilities = $method->invoke(
+        $runtime,
+        [],
+        $profile,
+        ['awpt/propose-content-update', 'awpt/propose-block-batch-update'],
+        $empty_pack,
+    );
+
+    Assert::same(
+        ['awpt/propose-content-update'],
+        $abilities,
+        'without fingerprints compose must not offer batch/attrs tools',
+    );
+
+    $fp = hash('sha256', 'ok');
+    $with_tree = [
+        'content_reads' => [[
+            'tool' => 'awpt/read-block-tree',
+            'output' => [
+                'blocks' => [['path' => '0', 'name' => 'core/paragraph', 'fingerprint' => $fp]],
+            ],
+        ]],
+    ];
+    $full = $method->invoke(
+        $runtime,
+        [],
+        $profile,
+        ['awpt/propose-content-update', 'awpt/propose-block-batch-update'],
+        $with_tree,
+    );
+    Assert::true(
+        in_array('awpt/propose-block-batch-update', $full, true),
+        'fingerprint-bearing packs keep surgical compose tools',
+    );
+}
+
+test_provider_runtime_narrows_compose_tools_without_fingerprints();
 
 function test_provider_runtime_drops_same_turn_actions_superseded_by_a_revision(): void {
     $method = new ReflectionMethod(ProviderRuntime::class, 'merge_actions');
@@ -437,6 +507,175 @@ function test_provider_runtime_continues_after_proposal_recovery_stalls_in_prose
 }
 
 test_provider_runtime_continues_after_proposal_recovery_stalls_in_prose();
+
+/**
+ * After content-loss recovery enters compose, a stalled/502 follow-up must keep
+ * compose proposal tools offered — not demote to explore.
+ */
+final class AwptComposeRecoveryStallProvider implements ProviderInterface {
+    public int $completions = 0;
+
+    /** @var list<list<string>> */
+    public array $offered_by_completion = [];
+
+    public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
+        unset($options);
+        ++$this->completions;
+        $names = array_values(array_filter(array_map(
+            static fn(array $tool): string => (string) ($tool['function']['name'] ?? ''),
+            $tools,
+        )));
+        $this->offered_by_completion[] = $names;
+
+        if (1 === $this->completions) {
+            // Simulate provider 502 / stall after validation failure — no tools.
+            return [
+                'content' => 'I will refine the proposal next.',
+                'raw_tool_calls' => [],
+                'message' => ['role' => 'assistant', 'content' => 'I will refine the proposal next.'],
+                'model' => 'fake',
+                'usage' => [],
+            ];
+        }
+
+        Assert::true(
+            in_array('awpt__propose_block_batch_update', $names, true)
+            || in_array('wpab__awpt__propose-block-batch-update', $names, true)
+            || in_array('awpt/propose-block-batch-update', $names, true)
+            || [] !== array_filter($names, static fn(string $n): bool => str_contains($n, 'propose_block_batch') || str_contains($n, 'propose-block-batch')),
+            'stall nudge after compose recovery must keep proposal tools offered; got: ' . implode(',', $names),
+        );
+
+        $calls = [[
+            'id' => 'compose-stall-corrected',
+            'function' => [
+                'name' => 'awpt__propose_block_batch_update',
+                'arguments' => '{"post_id":550,"title":"Corrected batch","changes":[]}',
+            ],
+        ]];
+
+        return [
+            'content' => '',
+            'raw_tool_calls' => $calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+            'model' => 'fake',
+            'usage' => [],
+        ];
+    }
+
+    public function get_name(): string {
+        return 'Compose recovery stall test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
+}
+
+function test_provider_runtime_keeps_compose_tools_after_recovery_stall(): void {
+    awpt_test_reset_state();
+    $post = new WP_Post();
+    $post->ID = 550;
+    $post->post_title = 'SLIP';
+    $post->post_content = '<!-- wp:paragraph --><p>Body</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][550] = $post;
+    add_filter('awpt_mcp_tools', static fn(): array => [
+        [
+            'name' => 'awpt/propose-content-update',
+            'description' => 'Stage complete content.',
+            'readonly' => false,
+            'destructive' => false,
+            'requires_approval' => true,
+        ],
+        [
+            'name' => 'awpt/propose-block-batch-update',
+            'description' => 'Stage targeted block changes.',
+            'readonly' => false,
+            'destructive' => false,
+            'requires_approval' => true,
+        ],
+        [
+            'name' => 'awpt/analyze-page',
+            'description' => 'Explore evidence.',
+            'readonly' => true,
+            'destructive' => false,
+            'requires_approval' => false,
+        ],
+    ]);
+    $proposal_attempts = 0;
+    add_filter(
+        'awpt_mcp_execute_tool',
+        static function (mixed $result, string $tool_name) use (&$proposal_attempts): array|WP_Error {
+            unset($result);
+
+            if ('awpt/propose-content-update' === $tool_name) {
+                ++$proposal_attempts;
+
+                return new WP_Error('awpt_presentation_content_loss', 'Preserve the source page.', [
+                    'token_recall' => 0.786,
+                    'missing_excerpt' => 'Legislative Chair',
+                ]);
+            }
+
+            if ('awpt/propose-block-batch-update' === $tool_name) {
+                ++$proposal_attempts;
+
+                return [
+                    'id' => 97,
+                    'title' => 'Corrected batch',
+                    'status' => 'proposed',
+                    'payload' => ['operation' => 'block_batch_update', 'post_id' => 550],
+                ];
+            }
+
+            return ['ok' => true];
+        },
+        10,
+        2,
+    );
+
+    $initial_calls = [[
+        'id' => 'compose-stall-initial',
+        'function' => [
+            'name' => 'awpt__propose_content_update',
+            'arguments' => '{"post_id":550,"title":"Presentation rewrite"}',
+        ],
+    ]];
+    $provider = new AwptComposeRecoveryStallProvider();
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => 'Make this page more presentable.']],
+        [
+            'content' => '',
+            'raw_tool_calls' => $initial_calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $initial_calls],
+            'model' => 'fake',
+            'usage' => [],
+        ],
+        [
+            'tool_registry' => new ToolRegistry(),
+            'is_content_edit_turn' => true,
+            'uses_explore_compose' => true,
+            'presentation_edit' => true,
+            'turn_profile' => TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]),
+            'compose_abilities' => ['awpt/propose-content-update', 'awpt/propose-block-batch-update'],
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 240,
+        ],
+    );
+
+    Assert::same(2, $provider->completions, 'stall prose then corrected proposal');
+    Assert::same(1, count($result['actions']), 'corrected batch proposal should stage after stall nudge');
+    $stall_tools = $provider->offered_by_completion[1] ?? [];
+    $has_propose = [] !== array_filter(
+        $stall_tools,
+        static fn(string $n): bool => str_contains($n, 'propose'),
+    );
+    Assert::true($has_propose, 'second completion after stall must offer propose tools, got: ' . implode(',', $stall_tools));
+}
+
+test_provider_runtime_keeps_compose_tools_after_recovery_stall();
 
 final class AwptFailedFollowUpProvider implements ProviderInterface {
     public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
@@ -1103,6 +1342,11 @@ final class AwptPresentationLossRecoveryProvider implements ProviderInterface {
 
 function test_provider_runtime_allows_corrected_full_page_retry_after_content_loss(): void {
     awpt_test_reset_state();
+    $post = new WP_Post();
+    $post->ID = 580;
+    $post->post_title = 'Docs';
+    $post->post_content = '<!-- wp:paragraph --><p>Statute 1774</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][580] = $post;
     add_filter('awpt_mcp_tools', static fn(): array => [
         [
             'name' => 'awpt/propose-content-update',
@@ -1179,36 +1423,6 @@ function test_provider_runtime_allows_corrected_full_page_retry_after_content_lo
 }
 
 test_provider_runtime_allows_corrected_full_page_retry_after_content_loss();
-
-function test_provider_runtime_switches_to_atomic_batch_after_repeated_content_loss(): void {
-    $method = new ReflectionMethod(ProviderRuntime::class, 'presentation_content_loss_recovery');
-    $runtime = new ProviderRuntime();
-    $first = (string) $method->invoke($runtime, 1);
-    $second = (string) $method->invoke($runtime, 2);
-
-    Assert::true(
-        str_contains($first, 'may retry a full-document layout adaptation'),
-        'one rejected overhaul should retain the normal corrected full-page path',
-    );
-    Assert::true(
-        str_contains($second, 'Use awpt/propose-block-batch-update now'),
-        'repeated copy loss should move to the atomic batch',
-    );
-    Assert::true(
-        str_contains($second, 'update_attrs changes against verified existing blocks only'),
-        'terminal content-loss recovery should prohibit another prose mutation',
-    );
-    Assert::true(
-        str_contains($second, 'Do not use replace_text, remove, or insert'),
-        'terminal content-loss recovery should be explicitly structure-only',
-    );
-    Assert::false(
-        str_contains($second, 'may retry a full-document layout adaptation'),
-        'the bounded recovery should stop repeating a demonstrably lossy strategy',
-    );
-}
-
-test_provider_runtime_switches_to_atomic_batch_after_repeated_content_loss();
 
 function test_provider_runtime_allows_one_terminal_content_loss_recovery(): void {
     $method = new ReflectionMethod(ProviderRuntime::class, 'should_allow_terminal_content_loss_recovery');

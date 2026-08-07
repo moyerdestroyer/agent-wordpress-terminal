@@ -21,6 +21,9 @@ if (!defined('ABSPATH')) {
  * Reads and writes awpt_sessions and related session detail.
  */
 final class SessionRepository {
+    /** Soft cap on sessions retained per admin (oldest by updated_at are pruned). */
+    public const MAX_PER_USER = 8;
+
     private SessionHydrator $hydrator;
 
     public function __construct(?SessionHydrator $hydrator = null) {
@@ -31,26 +34,77 @@ final class SessionRepository {
      * @return list<array<string, mixed>>
      */
     public function list_summaries(): array {
-        $wpdb = WpDb::get();
+        $user_id = $this->current_user_id();
 
+        if ($user_id > 0) {
+            $this->prune_excess();
+        }
+
+        $wpdb = WpDb::get();
         $table = $wpdb->prefix . 'awpt_sessions';
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT id, user_id, title, model, provider, focus_post_id, created_at, updated_at FROM {$table} WHERE user_id = %d ORDER BY updated_at DESC LIMIT 50",
-                $this->current_user_id(),
-            ),
-            output: \ARRAY_A,
-        );
+
+        if ($user_id > 0) {
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, user_id, title, model, provider, focus_post_id, created_at, updated_at
+                    FROM {$table}
+                    WHERE user_id = %d
+                    ORDER BY updated_at DESC
+                    LIMIT %d",
+                    $user_id,
+                    self::MAX_PER_USER,
+                ),
+                output: \ARRAY_A,
+            );
+        } else {
+            // Unauthenticated session GET (dev agents): no user filter.
+            $rows = $wpdb->get_results(
+                $wpdb->prepare("SELECT id, user_id, title, model, provider, focus_post_id, created_at, updated_at
+                    FROM {$table}
+                    ORDER BY updated_at DESC
+                    LIMIT %d", self::MAX_PER_USER),
+                output: \ARRAY_A,
+            );
+        }
 
         return $this->with_focus_summaries(is_array($rows) ? $rows : []);
     }
 
     /**
+     * Most recently updated session id for the viewer, or 0 when none exist.
+     *
+     * Authenticated admins are scoped to their own sessions; unauthenticated
+     * readers (dev agents) see the global latest session.
+     */
+    public function latest_id(): int {
+        $wpdb = WpDb::get();
+        $table = $wpdb->prefix . 'awpt_sessions';
+        $user_id = $this->current_user_id();
+
+        if ($user_id > 0) {
+            $id = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$table} WHERE user_id = %d ORDER BY updated_at DESC, id DESC LIMIT 1",
+                $user_id,
+            ));
+        } else {
+            $id = $wpdb->get_var("SELECT id FROM {$table} ORDER BY updated_at DESC, id DESC LIMIT 1");
+        }
+
+        return max(0, (int) $id);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
-    public function find_detail(int $session_id, int $messages_limit = 50, bool $include_tool_outputs = false): ?array {
+    public function find_detail(
+        int $session_id,
+        int $messages_limit = 50,
+        bool $include_tool_outputs = false,
+        bool $include_ai_logs = true,
+    ): ?array {
         $messages_limit = max(1, min(200, $messages_limit));
         $wpdb = WpDb::get();
+        $user_id = $this->current_user_id();
 
         $sessions = $wpdb->prefix . 'awpt_sessions';
         $messages = $wpdb->prefix . 'awpt_messages';
@@ -58,11 +112,9 @@ final class SessionRepository {
         $actions = $wpdb->prefix . 'awpt_actions';
 
         $session = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM {$sessions} WHERE id = %d AND user_id = %d",
-                $session_id,
-                $this->current_user_id(),
-            ),
+            $user_id > 0
+                ? $wpdb->prepare("SELECT * FROM {$sessions} WHERE id = %d AND user_id = %d", $session_id, $user_id)
+                : $wpdb->prepare("SELECT * FROM {$sessions} WHERE id = %d", $session_id),
             output: \ARRAY_A,
         );
 
@@ -102,6 +154,15 @@ final class SessionRepository {
         $session['last_turn_outcome'] = Json::decode_array((string) ($session['last_outcome_json'] ?? ''));
         unset($session['last_outcome_json']);
 
+        if ($include_ai_logs) {
+            $ai_logs = new AiLogRepository()->list_for_session($session_id, min(100, $messages_limit * 4));
+            $session['ai_logs'] = $ai_logs;
+            $session['ai_logs_truncated'] = count($ai_logs) >= min(100, $messages_limit * 4);
+        } else {
+            $session['ai_logs'] = [];
+            $session['ai_logs_truncated'] = false;
+        }
+
         return $this->with_focus_summary($session);
     }
 
@@ -130,8 +191,17 @@ final class SessionRepository {
             return [];
         }
 
+        $created_id = (int) $wpdb->insert_id;
+        $this->prune_excess();
+
+        $summary = $this->get_summary($created_id);
+
+        if ([] !== $summary) {
+            return $summary;
+        }
+
         return [
-            'id' => (int) $wpdb->insert_id,
+            'id' => $created_id,
             'user_id' => $this->current_user_id(),
             'title' => $title,
             'focus_post_id' => $focus_post_id > 0 ? $focus_post_id : null,
@@ -287,6 +357,26 @@ final class SessionRepository {
 
     private function current_user_id(): int {
         return get_current_user_id();
+    }
+
+    /**
+     * Drop oldest sessions beyond {@see MAX_PER_USER} for the current admin.
+     */
+    private function prune_excess(): void {
+        $wpdb = WpDb::get();
+        $table = $wpdb->prefix . 'awpt_sessions';
+        $ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT id FROM {$table} WHERE user_id = %d ORDER BY updated_at DESC, id DESC",
+            $this->current_user_id(),
+        ));
+
+        if (!is_array($ids) || count($ids) <= self::MAX_PER_USER) {
+            return;
+        }
+
+        foreach (array_slice($ids, self::MAX_PER_USER) as $overflow_id) {
+            $this->delete((int) $overflow_id);
+        }
     }
 
     /**

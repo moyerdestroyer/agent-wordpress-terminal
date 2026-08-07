@@ -26,6 +26,7 @@ final class ActionOperations {
     public const BLOCK_INSERT = 'block_insert';
     public const BLOCK_REMOVE = 'block_remove';
     public const PATTERN_INSERT = 'pattern_insert';
+    public const PATTERN_REPLACE = 'pattern_replace';
     public const NEW_POST = 'new_post';
     public const TEMPLATE_UPDATE = 'template_update';
     public const GLOBAL_STYLES_UPDATE = 'global_styles_update';
@@ -46,6 +47,7 @@ final class ActionOperations {
         self::BLOCK_INSERT,
         self::BLOCK_REMOVE,
         self::PATTERN_INSERT,
+        self::PATTERN_REPLACE,
         self::NEW_POST,
         self::TEMPLATE_UPDATE,
         self::GLOBAL_STYLES_UPDATE,
@@ -69,6 +71,7 @@ final class ActionOperations {
         self::BLOCK_INSERT,
         self::BLOCK_REMOVE,
         self::PATTERN_INSERT,
+        self::PATTERN_REPLACE,
         self::NEW_POST,
     ];
 
@@ -92,6 +95,7 @@ final class ActionOperations {
                 self::BLOCK_INSERT,
                 self::BLOCK_REMOVE,
                 self::PATTERN_INSERT,
+                self::PATTERN_REPLACE,
             ],
             true,
         );

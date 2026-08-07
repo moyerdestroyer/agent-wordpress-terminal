@@ -491,6 +491,7 @@ export interface ChatProgress {
 		content_turn?: boolean;
 		content_edit_turn?: boolean;
 		presentation_edit?: boolean;
+		work_mode?: string;
 		auto_retrieve_knowledge?: boolean;
 		history_limit?: number;
 		tool_allowlist_count?: number;

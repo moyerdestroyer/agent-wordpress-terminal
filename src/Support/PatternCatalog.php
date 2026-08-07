@@ -82,6 +82,8 @@ final class PatternCatalog {
     }
 
     /**
+     * Exact registered/reusable lookup only (no alias expansion).
+     *
      * @return array<string, mixed>|null
      */
     public function find(string $name): ?array {
@@ -108,6 +110,24 @@ final class PatternCatalog {
         }
 
         return null;
+    }
+
+    /**
+     * Resolve a name with thrash aliases (page-header → header-page, etc.).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function find_resolved(string $name): ?array {
+        $resolved = new PatternNameResolver($this)->resolve($name);
+
+        return null === $resolved ? null : $resolved['pattern'];
+    }
+
+    /**
+     * @return array{pattern: array<string, mixed>, resolved_name: string, resolved_from: string|null}|null
+     */
+    public function resolve_name(string $name): ?array {
+        return new PatternNameResolver($this)->resolve($name);
     }
 
     /**

@@ -116,13 +116,23 @@ final class DomainValidationService {
             return null;
         }
 
+        $first_code = sanitize_key((string) ($errors[0]['code'] ?? 'domain_rule'));
+        $first_message = trim((string) ($errors[0]['message'] ?? ''));
+
         return new \WP_Error(
             'awpt_domain_validation_failed',
-            __('The active composition rules rejected this proposal.', 'agent-wordpress-terminal'),
+            '' !== $first_message
+                ? $first_message
+                : __('The active composition rules rejected this proposal.', 'agent-wordpress-terminal'),
             [
                 'status' => 409,
                 'validation_findings' => $findings,
-                'recovery' => __('Resolve every error and stage the proposal again.', 'agent-wordpress-terminal'),
+                'blocking_findings' => $errors,
+                'primary_code' => $first_code,
+                'recovery' => __(
+                    'Resolve every blocking error (blocking_findings) and stage the proposal again. Warnings and inherited import findings do not need to be cleared for presentation improves.',
+                    'agent-wordpress-terminal',
+                ),
                 'ruleset_hash' => $this->ruleset_hash(),
                 'agent_feedback' => AgentFeedback::validation($findings),
             ],

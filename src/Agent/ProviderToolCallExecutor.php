@@ -12,8 +12,10 @@ namespace AWPT\Agent;
 
 use AWPT\Database\ActionRepository;
 use AWPT\MCP\Adapter;
+use AWPT\Support\AiLogger;
 use AWPT\Support\ArrayKey;
 use AWPT\Support\ProposalAbilities;
+use AWPT\Support\TurnToolEvidence;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -320,8 +322,18 @@ final class ProviderToolCallExecutor {
         $function_name = (string) ($function['name'] ?? '');
         $tool_name = $tool_registry->tool_name_for_function($function_name);
         $input = $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}'));
+        $tool_started_at = microtime(true);
 
         if (ProposalAbilities::requires_session_id($tool_name ?? '')) {
+            $input['session_id'] = $session_id;
+        }
+
+        // Pattern prep abilities are readonly but mint session-bound receipts.
+        if (in_array(
+            $tool_name,
+            ['awpt/prepare-pattern-change', 'awpt/prepare-pattern-draft'],
+            true,
+        )) {
             $input['session_id'] = $session_id;
         }
 
@@ -350,6 +362,7 @@ final class ProviderToolCallExecutor {
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
+                'awpt/propose-pattern-replace',
                 'awpt/propose-patterned-post',
             ],
             true,
@@ -436,6 +449,23 @@ final class ProviderToolCallExecutor {
             $tool_call['provider_call_id'] = $provider_call_id;
         }
 
+        AiLogger::log_tool_execute([
+            'session_id' => $session_id,
+            'turn_id' => sanitize_key((string) ($turn_context['turn_id'] ?? '')),
+            'tool_name' => $tool,
+            'input' => is_array($execution_input) ? $execution_input : ['value' => $execution_input],
+            'status' => $status,
+            'output' => $storage_output,
+            'started_at' => $tool_started_at,
+            'meta' => [
+                'provider_call_id' => $provider_call_id,
+                'function_name' => $function_name,
+            ],
+        ]);
+
+        // Available to mid-turn gates before AgentRuntime persists tool_calls.
+        TurnToolEvidence::record($session_id, $tool_call);
+
         return [
             'tool_call' => $tool_call,
             'message' => [
@@ -499,9 +529,21 @@ final class ProviderToolCallExecutor {
                 'error_code' => $result->get_error_code(),
                 'attribution' => $attribution,
             ];
-            $error_data = ArrayKey::as_map_or_null($result->get_error_data());
+            $error_data = ArrayKey::as_map_or_null($result->get_error_data()) ?? [];
 
-            if (null !== $error_data) {
+            if (ProposalAbilities::is_proposal($tool_name)) {
+                $constraints = ProposalFailureNormalizer::normalize(
+                    (string) $result->get_error_code(),
+                    $error_data,
+                    (string) $result->get_error_message(),
+                );
+
+                if ([] !== $constraints) {
+                    $error_data['constraints'] = $constraints;
+                }
+            }
+
+            if ([] !== $error_data) {
                 $failed['error_data'] = $error_data;
             }
 

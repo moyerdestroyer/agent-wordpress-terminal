@@ -8,6 +8,7 @@ use AWPT\Agent\AgentFeedback;
 use AWPT\Domain\DomainPackRegistry;
 use AWPT\Domain\PatternSemanticReranker;
 use AWPT\Support\ArrayKey;
+use AWPT\Support\PageSectionModel;
 use AWPT\Support\PatternCatalog;
 
 if (!defined('ABSPATH')) {
@@ -30,7 +31,7 @@ final class RecommendPatterns implements AbilityInterface {
             'name' => 'awpt/recommend-patterns',
             'label' => __('Recommend Patterns', 'agent-wordpress-terminal'),
             'description' => __(
-                'Ranks active-theme patterns for a concrete page intent and explains the matching domain guidance.',
+                'Ranks active-theme patterns for a concrete page intent and explains the matching domain guidance. Optional target_role / post_id+target_path boost section-scoped matches.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -43,6 +44,38 @@ final class RecommendPatterns implements AbilityInterface {
                         'type' => 'boolean',
                         'description' => __(
                             'Use optional configured embeddings to rerank local candidates.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'target_role' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional page-section role (header, hero, faq, cta, …) to boost matching patterns.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'section_role' => [
+                        'type' => 'string',
+                        'description' => __('Alias of target_role.', 'agent-wordpress-terminal'),
+                    ],
+                    'post_id' => [
+                        'type' => 'integer',
+                        'description' => __(
+                            'Optional post to load section outline from when target_path is set.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'target_path' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional block path used with post_id to resolve target_role.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'prefer_section_scope' => [
+                        'type' => 'boolean',
+                        'description' => __(
+                            'When true, boost section-scoped patterns and soft-demote full page layouts.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -65,6 +98,34 @@ final class RecommendPatterns implements AbilityInterface {
         $post_type = sanitize_key((string) ($input['post_type'] ?? 'page'));
         $max = max(1, min(24, (int) ($input['max'] ?? 8)));
         $terms = $this->terms($intent);
+        $target_role = sanitize_key((string) ($input['target_role'] ?? $input['section_role'] ?? ''));
+        $post_id = max(0, (int) ($input['post_id'] ?? 0));
+        $target_path = sanitize_text_field((string) ($input['target_path'] ?? ''));
+        $resolved_from_post = false;
+
+        if ('' === $target_role && $post_id > 0 && '' !== $target_path) {
+            $post = get_post($post_id);
+
+            if ($post instanceof \WP_Post) {
+                $section = PageSectionModel::find_by_path(
+                    PageSectionModel::from_content((string) $post->post_content, [
+                        'title' => (string) ($post->post_title ?? ''),
+                        'post_type' => (string) ($post->post_type ?? ''),
+                    ]),
+                    $target_path,
+                );
+
+                if (is_array($section)) {
+                    $target_role = sanitize_key((string) ($section['role'] ?? ''));
+                    $resolved_from_post = '' !== $target_role;
+                }
+            }
+        }
+
+        $prefer_section_scope = array_key_exists('prefer_section_scope', $input)
+            ? (bool) $input['prefer_section_scope']
+            : ('' !== $target_role);
+
         $ranked = [];
 
         foreach ($this->patterns->list('', 200, $post_type) as $pattern) {
@@ -105,15 +166,37 @@ final class RecommendPatterns implements AbilityInterface {
             $score += 'active_theme' === (string) ($pattern['owner'] ?? '') ? 40 : 0;
             $score += [] !== $domain ? 30 : 0;
 
+            $affinity = $this->section_role_affinity(
+                $target_role,
+                $prefer_section_scope,
+                (string) ($domain['role'] ?? ''),
+                (string) ($pattern['composition_scope'] ?? ''),
+                (string) ($pattern['name'] ?? ''),
+                (string) ($pattern['title'] ?? ''),
+            );
+            $score += $affinity['score'];
+
+            $rationale_parts = [];
+
+            if ([] !== $matched) {
+                $rationale_parts[] = sprintf(
+                    __('Matches intent terms: %s.', 'agent-wordpress-terminal'),
+                    implode(', ', array_unique($matched)),
+                );
+            }
+
+            if ('' !== $affinity['rationale']) {
+                $rationale_parts[] = $affinity['rationale'];
+            }
+
+            if ([] === $rationale_parts) {
+                $rationale_parts[] = __('Compatible active-theme pattern.', 'agent-wordpress-terminal');
+            }
+
             $ranked[] = [
                 'score' => $score,
                 'pattern' => $pattern,
-                'rationale' => [] !== $matched
-                    ? sprintf(
-                        __('Matches intent terms: %s.', 'agent-wordpress-terminal'),
-                        implode(', ', array_unique($matched)),
-                    )
-                    : __('Compatible active-theme pattern.', 'agent-wordpress-terminal'),
+                'rationale' => implode(' ', $rationale_parts),
             ];
         }
 
@@ -153,6 +236,9 @@ final class RecommendPatterns implements AbilityInterface {
         return [
             'intent' => $intent,
             'post_type' => $post_type,
+            'target_role' => '' !== $target_role ? $target_role : null,
+            'prefer_section_scope' => $prefer_section_scope,
+            'target_role_resolved_from_post' => $resolved_from_post,
             'recommendations' => $recommendations,
             'ranking_mode' => $reranked['mode'],
             'policy' => 'Recommendations are read-only candidates. Read a selected pattern before using it.',
@@ -178,6 +264,92 @@ final class RecommendPatterns implements AbilityInterface {
                 ],
             ),
         ];
+    }
+
+    /**
+     * Soft boost / demote based on page-section role vs pattern domain role / scope.
+     *
+     * @return array{score: int, rationale: string}
+     */
+    private function section_role_affinity(
+        string $section_role,
+        bool $prefer_section_scope,
+        string $pattern_role,
+        string $composition_scope,
+        string $pattern_name,
+        string $pattern_title,
+    ): array {
+        $score = 0;
+        $notes = [];
+        $blob = mb_strtolower(
+            trim($pattern_role . ' ' . $composition_scope . ' ' . $pattern_name . ' ' . $pattern_title),
+            'UTF-8',
+        );
+        $pattern_role_l = mb_strtolower($pattern_role, 'UTF-8');
+        $scope_l = mb_strtolower($composition_scope, 'UTF-8');
+
+        if ('' !== $section_role) {
+            $aliases = $this->section_role_aliases($section_role);
+            $matched_alias = '';
+
+            foreach ($aliases as $alias) {
+                if (
+                    $pattern_role_l === $alias
+                    || $scope_l === $alias
+                    || str_contains($blob, $alias)
+                ) {
+                    $matched_alias = $alias;
+                    break;
+                }
+            }
+
+            if ('' !== $matched_alias) {
+                $score += 28;
+                $notes[] = sprintf(
+                    /* translators: 1: section role, 2: matched alias */
+                    __('Boosted for section role %1$s (matched %2$s).', 'agent-wordpress-terminal'),
+                    $section_role,
+                    $matched_alias,
+                );
+            }
+        }
+
+        if ($prefer_section_scope) {
+            if (in_array($scope_l, ['section', 'hero', 'cta', 'media'], true)) {
+                $score += 15;
+                $notes[] = __('Prefers section-scoped composition.', 'agent-wordpress-terminal');
+            }
+
+            if (
+                in_array($scope_l, ['layout', 'page'], true)
+                || in_array($pattern_role_l, ['page-layout', 'page'], true)
+            ) {
+                $score -= 22;
+                $notes[] = __('Soft-demoted full-page layout for section change.', 'agent-wordpress-terminal');
+            }
+        }
+
+        return [
+            'score' => $score,
+            'rationale' => implode(' ', array_unique($notes)),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function section_role_aliases(string $section_role): array {
+        return match ($section_role) {
+            PageSectionModel::ROLE_HEADER => ['header', 'page-introduction', 'title', 'masthead', 'hero'],
+            PageSectionModel::ROLE_HERO => ['hero', 'cover', 'banner', 'page-introduction', 'header'],
+            PageSectionModel::ROLE_BODY => ['body', 'content', 'section', 'about', 'text'],
+            PageSectionModel::ROLE_STEPS => ['steps', 'process', 'how-to', 'howto', 'timeline'],
+            PageSectionModel::ROLE_FAQ => ['faq', 'accordion', 'questions', 'details'],
+            PageSectionModel::ROLE_CTA => ['cta', 'call-to-action', 'contact', 'buttons'],
+            PageSectionModel::ROLE_QUERY => ['query', 'news', 'listing', 'posts', 'loop', 'archive'],
+            PageSectionModel::ROLE_MEDIA => ['media', 'gallery', 'image', 'photo', 'video'],
+            default => [$section_role],
+        };
     }
 
     /**

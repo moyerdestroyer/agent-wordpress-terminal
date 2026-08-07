@@ -1,7 +1,11 @@
 <?php
 
 /**
- * Presentation-edit content preservation.
+ * Optional strict content-preservation for redesigns.
+ *
+ * Off by default: theme-enhanced redesign may restructure and compress copy.
+ * Enable only when the admin explicitly requests full preservation or a
+ * filter/request flag opts in.
  *
  * @package AWPT
  */
@@ -10,14 +14,14 @@ declare(strict_types=1);
 
 namespace AWPT\Domain;
 
-use AWPT\Agent\TurnProfile;
 use AWPT\Database\MessageRepository;
+use AWPT\Database\SessionRepository;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
-/** Blocks lossy rewrites when the admin requested presentation rather than editorial deletion. */
+/** Blocks lossy rewrites only when strict content preservation is requested. */
 final class ExistingContentPreservationValidator {
     public function validate_for_session(int $session_id, string $before, string $after): ?\WP_Error {
         if ($session_id <= 0 || '' === trim($before)) {
@@ -29,15 +33,16 @@ final class ExistingContentPreservationValidator {
     }
 
     public function validate(string $message, string $before, string $after, int $session_id = 0): ?\WP_Error {
-        $profile = TurnProfile::from_message($message, [], ['has_focus' => true]);
+        if (!$this->strict_preservation_enabled($message, $session_id)) {
+            return null;
+        }
 
-        if (!$profile->presentation_edit || $this->explicit_content_reduction($message)) {
+        if ($this->explicit_content_reduction($message)) {
             return null;
         }
 
         /**
-         * Filter the universal preservation policy for presentation edits.
-         * Dufresne and theme integrations should normally retain these defaults.
+         * Filter the strict preservation policy (only consulted when strict mode is on).
          *
          * @param array<string, mixed> $policy
          * @param int                  $session_id
@@ -86,7 +91,7 @@ final class ExistingContentPreservationValidator {
         return new \WP_Error(
             'awpt_presentation_content_loss',
             __(
-                'The presentation proposal removes or rewrites substantive existing content. Preserve the page copy, links, numbers, and legal references, or use verified block-level presentation changes.',
+                'Strict content preservation was requested, but the proposal removes or rewrites substantive existing content. Preserve the page copy, links, numbers, and legal references, or drop the strict-preservation requirement.',
                 'agent-wordpress-terminal',
             ),
             [
@@ -99,12 +104,56 @@ final class ExistingContentPreservationValidator {
                 'missing_numeric_tokens' => array_slice($missing_numbers, 0, 30),
                 'missing_short_fragments' => array_slice($missing_short_fragments, 0, 20),
                 'missing_excerpt' => $this->missing_excerpt($before_text, $after_tokens),
-                'recommended_next_tools' => [[
+                'recommended_next_tools' => [array_filter([
                     'tool' => 'awpt/propose-block-batch-update',
-                    'input' => ['post_id' => 0],
-                ]],
+                    'reason' => __(
+                        'Use verified block paths for conservation-oriented changes when strict preservation is required.',
+                        'agent-wordpress-terminal',
+                    ),
+                    'input' => $this->recommendation_post_input($session_id),
+                ])],
             ],
         );
+    }
+
+    /**
+     * Strict mode is opt-in: explicit admin language, payload flag via filter, or filter force-on.
+     */
+    private function strict_preservation_enabled(string $message, int $session_id): bool {
+        /**
+         * Force strict content preservation for a session (default false).
+         *
+         * @param bool   $enabled
+         * @param int    $session_id
+         * @param string $message
+         */
+        $forced = (bool) apply_filters('awpt_strict_content_preservation', false, $session_id, $message);
+        if ($forced) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/\b('
+            . 'preserve\s+all|keep\s+all|do\s+not\s+(?:remove|drop|delete|omit)|'
+            . 'without\s+(?:removing|dropping|deleting|losing)|'
+            . 'strict\s+(?:content\s+)?preservation|must\s+not\s+lose'
+            . ')\b/i',
+            $message,
+        );
+    }
+
+    /**
+     * @return array{post_id: int}|null
+     */
+    private function recommendation_post_input(int $session_id): ?array {
+        if ($session_id <= 0) {
+            return null;
+        }
+
+        $summary = new SessionRepository()->get_summary($session_id);
+        $post_id = absint($summary['focus_post_id'] ?? 0);
+
+        return $post_id > 0 ? ['post_id' => $post_id] : null;
     }
 
     private function explicit_content_reduction(string $message): bool {

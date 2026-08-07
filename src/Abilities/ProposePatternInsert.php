@@ -7,13 +7,15 @@ namespace AWPT\Abilities;
 use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 use AWPT\Domain\ExistingContentPreservationValidator;
 use AWPT\Domain\PatternMaterializer;
+use AWPT\Domain\PatternStructureEvidence;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\PatternCatalog;
 use AWPT\Support\PostContentMediaIntegrity;
+use AWPT\Support\PostContentStagingPipeline;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -91,16 +93,27 @@ final class ProposePatternInsert implements AbilityInterface {
             ]);
         }
 
-        $pattern = $this->patterns->find((string) ($input['pattern_name'] ?? ''));
+        $resolved = $this->patterns->resolve_name((string) ($input['pattern_name'] ?? ''));
 
-        if (null === $pattern) {
+        if (null === $resolved) {
             return new \WP_Error('awpt_pattern_not_found', __('Pattern not found.', 'agent-wordpress-terminal'), [
                 'status' => 404,
+                'requested_name' => (string) ($input['pattern_name'] ?? ''),
+                'suggested_patterns' => $this->patterns->suggestions((string) ($input['pattern_name'] ?? ''), 8),
             ]);
         }
 
+        $pattern = $resolved['pattern'];
         $pattern_content = (string) ($pattern['content'] ?? '');
-        $pattern_name = (string) ($pattern['name'] ?? '');
+        $pattern_name = $resolved['resolved_name'];
+
+        // Insert still needs structure evidence so agents cannot skip read-pattern.
+        // Catalog content is used for materialization only after a successful read/prep.
+        $read_error = new PatternStructureEvidence()->require_read_for_pattern_name($session_id, $pattern_name);
+        if ($read_error instanceof \WP_Error) {
+            return $read_error;
+        }
+
         $materializer = new PatternMaterializer();
         $materialized_content = $materializer->materialize($pattern_name, $pattern_content);
         $blocks = array_values(array_filter(parse_blocks($materialized_content), BlockTree::has_block_name(...)));
@@ -113,7 +126,14 @@ final class ProposePatternInsert implements AbilityInterface {
         }
 
         $summary = $this->patterns->summary($pattern, $post->post_type);
-        $validation = new DomainValidationService();
+        // Normalize before domain validation so repairable tagName/wrapper drift
+        // does not reject an otherwise valid pattern insert.
+        $pipeline = new PostContentStagingPipeline();
+        $normalized = $pipeline->normalize($update['content']);
+        $update['content'] = $normalized['content'];
+        $repairs_applied = $normalized['repairs'];
+
+        $validation = new CompositionGate();
         $validation_result = $validation->evaluate(
             $update['content'],
             [
@@ -127,15 +147,35 @@ final class ProposePatternInsert implements AbilityInterface {
         );
         $update['content'] = $validation_result['content'];
         $findings = $validation_result['findings'];
-        $validation_error = $validation->blocking_error($findings);
+        $baseline_result = $validation->evaluate(
+            $post->post_content,
+            [
+                'operation' => ActionOperations::PATTERN_INSERT,
+                'work_type' => 'edit',
+                'post_type' => $post->post_type,
+                'pattern_name' => $pattern_name,
+                'phase' => 'baseline',
+            ],
+            true,
+        );
+        $blocking_findings = \AWPT\Domain\CompositionProposalGuard::new_findings(
+            $findings,
+            $baseline_result['findings'],
+        );
+        $validation_error = $validation->blocking_error($blocking_findings);
 
         if (null !== $validation_error) {
             $validation_error->add_data([
                 'status' => 409,
                 'validation_findings' => $findings,
+                'blocking_findings' => $blocking_findings,
                 'ruleset_hash' => $validation_result['ruleset_hash'],
                 'safe_fixes' => $validation_result['fixes'],
                 'agent_feedback' => $validation_result['agent_feedback'],
+                'recovery' => __(
+                    'Fix only blocking_findings (newly introduced issues). Inherited import findings are grandfathered for this edit.',
+                    'agent-wordpress-terminal',
+                ),
             ]);
             return $validation_error;
         }
@@ -147,6 +187,7 @@ final class ProposePatternInsert implements AbilityInterface {
         }
 
         $update['content'] = $media_integrity['content'];
+        $repairs_applied = [...$repairs_applied, ...$media_integrity['repairs']];
 
         $payload = [
             'operation' => ActionOperations::PATTERN_INSERT,
@@ -170,6 +211,10 @@ final class ProposePatternInsert implements AbilityInterface {
             'ruleset_hash' => $validation_result['ruleset_hash'],
             'agent_feedback' => AgentFeedback::validation($findings, $validation_result['fixes'], true),
         ];
+
+        if ([] !== $repairs_applied) {
+            $payload['repairs_applied'] = $repairs_applied;
+        }
 
         if ([] !== $findings) {
             $payload['validation_findings'] = $findings;

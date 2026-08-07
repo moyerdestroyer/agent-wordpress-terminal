@@ -13,19 +13,19 @@ namespace AWPT\Abilities;
 use AWPT\Agent\AbilityReplacementRegistry;
 use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
-use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionProposalGuard;
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 use AWPT\Domain\ExistingContentPreservationValidator;
 use AWPT\Domain\PatternMaterializer;
+use AWPT\Domain\PatternStructureEvidence;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\NewPostStagingDraft;
 use AWPT\Support\PatternCatalog;
-use AWPT\Support\PatternFallbackPolicy;
 use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentSanitizer;
-use AWPT\Support\SiteDesignContext;
+use AWPT\Support\PostContentStagingPipeline;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -120,18 +120,11 @@ final class ProposeContentUpdate implements AbilityInterface {
                     'pattern_name' => [
                         'type' => 'string',
                         'description' => __(
-                            'Optional registered or reusable pattern used as provenance for a substantial layout rewrite. Read it before adapting.',
+                            'Optional registered or reusable pattern used as provenance for a substantial layout rewrite. Requires a successful awpt/read-pattern (or prepare-pattern-draft) for this name in the session.',
                             'agent-wordpress-terminal',
                         ),
                     ],
-                    'pattern_fallback_reason' => [
-                        'type' => 'string',
-                        'description' => __(
-                            'For a substantial layout rewrite, explain why Core or custom composition is preferable when theme-native patterns are available.',
-                            'agent-wordpress-terminal',
-                        ),
-                    ],
-                    'pattern_read_verified' => ['type' => 'boolean'],
+                    ...PatternUnfitInput::schema_properties(),
                 ],
                 // session_id is injected by the runtime. title/description are filled when omitted.
                 // post_id remains required for schema honesty, but the runtime also tries focus /
@@ -238,72 +231,54 @@ final class ProposeContentUpdate implements AbilityInterface {
             $payload['post_content'] = PostContentSanitizer::for_staged_update((string) $input['post_content']);
         }
 
-        $design_level = new SiteDesignContext()->request_level(new MessageRepository()->latest_user_message(
-            $session_id,
-        ));
-        $substantial_design_update =
-            array_key_exists('post_content', $input)
-            && in_array($design_level, [SiteDesignContext::LEVEL_COMPOSITION, SiteDesignContext::LEVEL_SECTION], true);
         $pattern_name = sanitize_text_field((string) ($input['pattern_name'] ?? ''));
-        $fallback_reason = sanitize_textarea_field((string) ($input['pattern_fallback_reason'] ?? ''));
-        $pattern_owner = 'custom';
+        $pattern = [];
+        $structure = new PatternStructureEvidence();
+
+        $unfit_error = $structure->validate_unfit_code(
+            $session_id,
+            sanitize_key((string) ($input['pattern_unfit_code'] ?? '')),
+        );
+        if ($unfit_error instanceof \WP_Error) {
+            return $unfit_error;
+        }
 
         if ('' !== $pattern_name) {
             $patterns = new PatternCatalog();
-            $pattern = $patterns->find($pattern_name);
+            $resolved = $patterns->resolve_name($pattern_name);
 
-            if (null === $pattern) {
+            if (null === $resolved) {
                 return new \WP_Error(
                     'awpt_pattern_not_found',
                     __('The requested pattern is not available.', 'agent-wordpress-terminal'),
-                    ['status' => 404],
-                );
-            }
-
-            if (
-                array_key_exists('pattern_read_verified', $input)
-                && !filter_var($input['pattern_read_verified'], FILTER_VALIDATE_BOOLEAN)
-            ) {
-                return new \WP_Error(
-                    'awpt_pattern_not_read',
-                    __(
-                        'Read the selected pattern before using it as the basis for a layout rewrite.',
-                        'agent-wordpress-terminal',
-                    ),
                     [
-                        'status' => 400,
-                        'recommended_next_tools' => [
-                            ['tool' => 'awpt/read-pattern', 'input' => ['name' => $pattern_name]],
-                        ],
+                        'status' => 404,
+                        'requested_name' => $pattern_name,
+                        'suggested_patterns' => $patterns->suggestions($pattern_name, 8),
                     ],
                 );
             }
 
+            $pattern = $resolved['pattern'];
+            $pattern_name = $resolved['resolved_name'];
+
+            // Full-document rewrite claiming a pattern requires server-side structure evidence.
+            if (array_key_exists('post_content', $input)) {
+                $read_error = $structure->require_read_for_pattern_name($session_id, $pattern_name);
+                if ($read_error instanceof \WP_Error) {
+                    return $read_error;
+                }
+            }
+
             $summary = $patterns->summary($pattern, $post->post_type);
-            $pattern_owner = (string) ($summary['owner'] ?? 'other');
             $payload['pattern_name'] = $pattern_name;
             $payload['pattern_mode'] = 'adapted';
             $payload['pattern_title'] = (string) ($summary['title'] ?? '');
             $payload['pattern_source'] = (string) ($summary['source'] ?? '');
-            $payload['pattern_owner'] = $pattern_owner;
+            $payload['pattern_owner'] = (string) ($summary['owner'] ?? 'other');
         }
 
-        if ($substantial_design_update) {
-            $fallback_error = new PatternFallbackPolicy()->validate(
-                new PatternCatalog(),
-                $post->post_type,
-                $pattern_owner,
-                $fallback_reason,
-            );
-
-            if (null !== $fallback_error) {
-                return $fallback_error;
-            }
-        }
-
-        if ('' !== $fallback_reason) {
-            $payload['pattern_fallback_reason'] = $fallback_reason;
-        }
+        $payload = PatternUnfitInput::persist_on_payload($payload, $input);
 
         if (array_key_exists('post_content', $payload)) {
             if ('' !== $pattern_name) {
@@ -319,7 +294,14 @@ final class ProposeContentUpdate implements AbilityInterface {
                 );
             }
 
-            $domain_validation = new DomainValidationService();
+            // Normalize wrappers/classes before domain validation so repairable
+            // tagName drift does not burn a propose attempt.
+            $pipeline = new PostContentStagingPipeline();
+            $normalized = $pipeline->normalize((string) $payload['post_content']);
+            $payload['post_content'] = $normalized['content'];
+            $repairs_applied = $normalized['repairs'];
+
+            $domain_validation = new CompositionGate();
             $domain_result = $domain_validation->evaluate(
                 (string) $payload['post_content'],
                 [
@@ -344,18 +326,37 @@ final class ProposeContentUpdate implements AbilityInterface {
                 ],
                 true,
             );
-            $domain_error = $domain_validation->blocking_error(CompositionProposalGuard::new_findings(
+            $blocking_findings = CompositionProposalGuard::new_findings(
                 $domain_findings,
                 $baseline_result['findings'],
+            );
+            $inherited_findings = array_values(array_filter(
+                $domain_findings,
+                static function (array $finding) use ($blocking_findings): bool {
+                    foreach ($blocking_findings as $blocking) {
+                        if ($finding === $blocking) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                },
             ));
+            $domain_error = $domain_validation->blocking_error($blocking_findings);
 
             if (null !== $domain_error) {
                 $domain_error->add_data([
                     'status' => 409,
                     'validation_findings' => $domain_findings,
+                    'blocking_findings' => $blocking_findings,
+                    'inherited_findings' => $inherited_findings,
                     'ruleset_hash' => $domain_result['ruleset_hash'],
                     'safe_fixes' => $domain_result['fixes'],
                     'agent_feedback' => $domain_result['agent_feedback'],
+                    'recovery' => __(
+                        'Fix only blocking_findings (newly introduced issues). Inherited import findings are grandfathered for this edit.',
+                        'agent-wordpress-terminal',
+                    ),
                 ]);
                 return $domain_error;
             }
@@ -378,9 +379,10 @@ final class ProposeContentUpdate implements AbilityInterface {
             }
 
             $payload['post_content'] = $media_integrity['content'];
+            $repairs_applied = [...$repairs_applied, ...$media_integrity['repairs']];
 
-            if ([] !== $media_integrity['repairs']) {
-                $payload['repairs_applied'] = $media_integrity['repairs'];
+            if ([] !== $repairs_applied) {
+                $payload['repairs_applied'] = $repairs_applied;
             }
         }
 

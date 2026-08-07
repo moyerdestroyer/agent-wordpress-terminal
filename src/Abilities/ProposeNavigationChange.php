@@ -7,7 +7,7 @@ namespace AWPT\Abilities;
 use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
-use AWPT\Domain\DomainValidationService;
+use AWPT\Domain\CompositionGate;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\PostContentSanitizer;
 
@@ -76,7 +76,7 @@ final class ProposeNavigationChange implements AbilityInterface {
                 ));
             }
 
-            $validation = new DomainValidationService();
+            $validation = new CompositionGate();
             $validated = $validation->evaluate(
                 $content,
                 [

@@ -118,7 +118,10 @@ final class DiagnosisRuntime {
         ];
 
         $tool_registry = new ToolRegistry();
-        $result = $provider->complete($messages, $tool_registry->get_chat_completion_tools());
+        $result = $provider->complete($messages, $tool_registry->get_chat_completion_tools(), [
+            'session_id' => $session_id,
+            'log_phase' => 'diagnosis',
+        ]);
 
         if (is_wp_error($result)) {
             return $result;

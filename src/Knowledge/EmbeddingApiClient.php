@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Knowledge;
 
+use AWPT\Support\AiLogger;
 use AWPT\Support\ConnectorInspector;
 
 if (!defined('ABSPATH')) {
@@ -91,10 +92,23 @@ final class EmbeddingApiClient {
         $count = count($texts);
         $api_key = $this->resolve_api_key();
         $endpoint = $this->endpoint();
+        $started_at = microtime(true);
+        $provider = $this->provider_label();
 
         if ('' === $api_key || '' === $endpoint || $count <= 0) {
             if ($count > 0) {
                 $this->record_error(__('No embeddings API key is configured.', 'agent-wordpress-terminal'));
+                AiLogger::log_embedding([
+                    'provider' => $provider,
+                    'model' => $model,
+                    'texts' => $texts,
+                    'outcome' => 'error',
+                    'error_code' => 'awpt_embeddings_not_configured',
+                    'started_at' => $started_at,
+                    'meta' => [
+                        'endpoint' => $endpoint,
+                    ],
+                ]);
             }
 
             return $this->null_vectors($count);
@@ -109,6 +123,17 @@ final class EmbeddingApiClient {
 
         if (!is_string($body) || '' === $body) {
             $this->record_error(__('The embeddings request could not be encoded.', 'agent-wordpress-terminal'));
+            AiLogger::log_embedding([
+                'provider' => $provider,
+                'model' => $model,
+                'texts' => $texts,
+                'outcome' => 'error',
+                'error_code' => 'awpt_embeddings_encode_failed',
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                ],
+            ]);
 
             return $this->null_vectors($count);
         }
@@ -130,6 +155,18 @@ final class EmbeddingApiClient {
                 __('Embeddings request failed: %s', 'agent-wordpress-terminal'),
                 $response->get_error_message(),
             ));
+            AiLogger::log_embedding([
+                'provider' => $provider,
+                'model' => $model,
+                'texts' => $texts,
+                'outcome' => 'error',
+                'error_code' => (string) $response->get_error_code(),
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'error_message' => $response->get_error_message(),
+                ],
+            ]);
 
             return $this->null_vectors($count);
         }
@@ -150,14 +187,51 @@ final class EmbeddingApiClient {
                 $status,
                 $detail,
             ));
+            AiLogger::log_embedding([
+                'provider' => $provider,
+                'model' => $model,
+                'texts' => $texts,
+                'outcome' => 'error',
+                'error_code' => 'awpt_embeddings_http_' . $status,
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'http_status' => $status,
+                    'error_message' => $detail,
+                ],
+            ]);
 
             return $this->null_vectors($count);
         }
 
         /** @var array<array-key, mixed> $data */
         $data = $decoded['data'];
+        $vectors = $this->parse_data($data, $count);
+        $dims = 0;
 
-        return $this->parse_data($data, $count);
+        foreach ($vectors as $vector) {
+            if (is_array($vector)) {
+                $dims = count($vector);
+                break;
+            }
+        }
+
+        AiLogger::log_embedding([
+            'provider' => $provider,
+            'model' => $model,
+            'texts' => $texts,
+            'outcome' => 'success',
+            'error_code' => '',
+            'started_at' => $started_at,
+            'meta' => [
+                'endpoint' => $endpoint,
+                'http_status' => $status,
+                'vector_count' => count(array_filter($vectors, static fn(?array $vector): bool => null !== $vector)),
+                'vector_dims' => $dims,
+            ],
+        ]);
+
+        return $vectors;
     }
 
     /**

@@ -115,52 +115,53 @@ function test_presentation_edit_prompt_requires_structural_and_visual_judgment()
     $system = (string) ($messages[0]['content'] ?? '');
 
     Assert::true(
-        str_contains($system, 'inspect the complete current page with awpt/analyze-page'),
-        'presentation edits should require complete structural inspection',
+        str_contains($system, 'theme-enhanced redesign'),
+        'redesign prompts should describe theme-enhanced redesign',
     );
     Assert::true(
-        str_contains($system, 'awpt/inspect-rendered-element'),
-        'presentation edits should require rendered inspection',
+        str_contains($system, 'awpt/prepare-pattern-change')
+        || str_contains($system, 'awpt/recommend-patterns'),
+        'redesign should prefer pattern change prep or recommendation',
     );
     Assert::true(
-        str_contains($system, 'Decide the appropriate scope yourself'),
-        'AWPT should own routine transformation scope in every surface',
+        str_contains($system, 'Placeholders are fine'),
+        'redesign may use placeholders for empty slots',
     );
     Assert::true(
-        str_contains($system, 'substantial full-page layout adaptation'),
-        'generic presentation work should permit a large page overhaul when inspection warrants one',
+        str_contains($system, 'awpt/prepare-pattern-change')
+        || str_contains($system, 'awpt/propose-pattern-replace')
+        || str_contains($system, 'awpt/recommend-patterns')
+        || str_contains($system, 'awpt/read-pattern'),
+        'redesign should mention pattern prepare/replace or recommendation paths',
     );
     Assert::true(
-        str_contains($system, 'Do not assume the active template displays post_title'),
-        'rendered evidence should determine whether an existing page needs a page-local H1',
+        str_contains($system, 'Do not invent factual claims'),
+        'redesign still forbids inventing facts',
     );
     Assert::true(
-        str_contains($system, 'place the page H1 before its introductory prose'),
-        'ordinary document improvements should not strand explanatory copy above the page title',
-    );
-    Assert::true(
-        str_contains($system, 'awpt/propose-content-update with pattern_name provenance'),
-        'generic presentation work should expose the normal active-theme pattern adaptation path',
-    );
-    Assert::true(
-        str_contains($system, 'call awpt/recommend-patterns'),
-        'recognizable page archetypes should trigger pattern discovery before the scope decision',
+        str_contains($system, 'pattern_unfit_code') || str_contains($system, 'no_recommendations'),
+        'redesign prompt should describe honest unfit codes',
     );
     Assert::false(
-        str_contains($system, 'Do not reorder blocks'),
-        'generic presentation work should not be artificially limited to cosmetic attribute changes',
-    );
-    Assert::false(
-        str_contains($system, 'A full-document update is a last resort'),
-        'full-page adaptation should be selected on merit rather than discouraged categorically',
+        str_contains($system, 'every working href'),
+        'default redesign must not require full-content preservation checklists',
     );
     Assert::true(
-        str_contains($system, 'must describe only changes actually present'),
-        'proposal copy must not promise structural work absent from its operation payload',
+        str_contains($system, 'awpt/propose-content-update')
+            || str_contains($system, 'propose-pattern-insert'),
+        'redesign should expose pattern-backed update paths',
+    );
+    Assert::true(
+        str_contains($system, 'Media Library'),
+        'redesign module should forbid inventing local media URLs',
+    );
+    Assert::true(
+        str_contains($system, 'Stage exactly one coherent proposal'),
+        'redesign guidance must forbid multi-propose batches',
     );
     Assert::false(
         str_contains($system, 'review queue'),
-        'presentation guidance should not mention or depend on the hosting surface',
+        'redesign guidance should not mention or depend on the hosting surface',
     );
 }
 

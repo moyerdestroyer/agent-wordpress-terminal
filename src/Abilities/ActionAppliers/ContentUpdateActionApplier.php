@@ -116,6 +116,7 @@ final class ContentUpdateActionApplier {
                 ActionOperations::BLOCK_INSERT,
                 ActionOperations::BLOCK_REMOVE,
                 ActionOperations::PATTERN_INSERT,
+                ActionOperations::PATTERN_REPLACE,
             ],
             true,
         )) {

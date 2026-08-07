@@ -54,9 +54,9 @@ final class ReadPattern implements AbilityInterface {
     public function execute(array $input): array|\WP_Error {
         $name = sanitize_text_field((string) ($input['name'] ?? ''));
         $catalog = new PatternCatalog();
-        $pattern = $catalog->find($name);
+        $resolved = $catalog->resolve_name($name);
 
-        if (null === $pattern) {
+        if (null === $resolved) {
             $suggestions = $catalog->suggestions($name, 8);
 
             return new \WP_Error(
@@ -83,8 +83,10 @@ final class ReadPattern implements AbilityInterface {
             );
         }
 
+        $pattern = $resolved['pattern'];
+        $canonical = $resolved['resolved_name'];
         $source_content = (string) ($pattern['content'] ?? '');
-        $expanded = new PatternTemplateExpander($catalog)->expand($name);
+        $expanded = new PatternTemplateExpander($catalog)->expand($canonical);
         $content = is_wp_error($expanded) ? $source_content : $expanded;
         $tree = BlockTree::from_content($content);
         $summary = $catalog->summary($pattern);
@@ -94,6 +96,7 @@ final class ReadPattern implements AbilityInterface {
             'content' => $content,
             'source_content' => $source_content,
             'content_mode' => is_wp_error($expanded) ? 'source' : 'expanded_editable',
+            'resolved_from' => $resolved['resolved_from'],
             'blocks' => $tree->normalized(),
             'design_dependencies' => $catalog->design_dependencies($content),
             'adaptation_contract' => [
