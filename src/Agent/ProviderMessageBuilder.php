@@ -63,7 +63,10 @@ final class ProviderMessageBuilder {
                     $profile->needs_compose_module() ? $this->compose_module() : '',
                     $profile->needs_edit_module() ? $this->edit_module() : '',
                     $profile->is_improve_evaluate() ? $this->improve_evaluate_module() : '',
-                    !$profile->is_improve_evaluate() && ($profile->is_redesign() || $profile->presentation_edit)
+                    $profile->is_improve_act() ? $this->improve_act_module() : '',
+                    !$profile->is_improve_evaluate()
+                    && !$profile->is_improve_act()
+                    && ($profile->is_redesign() || $profile->presentation_edit)
                         ? $this->redesign_module()
                         : '',
                     $profile->needs_template_module() ? $this->template_styles_module() : '',
@@ -166,9 +169,9 @@ final class ProviderMessageBuilder {
         return implode("\n", [
             'This is a theme-enhanced redesign of the currently focused page (same machinery as creation, applied in place).',
             'Read the focused page (awpt/read-content, awpt/read-block-tree, or awpt/analyze-page), then awpt/recommend-patterns (or prepare-pattern-change for a targeted section).',
-            'Prefer awpt/prepare-pattern-change → awpt/propose-pattern-replace for structural section swaps (use the returned preparation_id; do not invent IDs). Prefer awpt/propose-pattern-insert for additions.',
+            'For structural replacements or additions, prefer awpt/prepare-pattern-change → the matching propose-pattern-replace/insert call. After preparation succeeds, copy its exact preparation_id into the proposal and omit pattern_name/block_path/position; those are already receipt-bound. Never discard a successful preparation to switch to the legacy name-based insert path.',
             'When a theme pattern fits a full-document rewrite, read or prepare it first and pass pattern_name only with structure evidence. Surgical batch/attrs edits are fine for copy-only work.',
-            'Map existing copy into the new structure where it fits. Placeholders are fine for empty slots. Do not invent factual claims, deadlines, fees, or Media Library URLs/IDs.',
+            'Map existing copy into the new structure and replace required authoring placeholders before staging. Do not invent factual claims, deadlines, fees, or Media Library URLs/IDs.',
             'Full-document freehand is allowed when no pattern fits or the user asks for a custom layout; use an honest pattern_unfit_code when relevant (not no_recommendations when recommendations exist).',
             'Dense or large pages (about 40+ blocks or 12k+ characters of markup): prefer section replace/insert and awpt/propose-block-batch-update over a single full-document post_content rewrite.',
             'Use design tokens and registered blocks only. Prefer one clear content H1 when the page is a standard interior document. Stage exactly one coherent proposal.',
@@ -179,9 +182,23 @@ final class ProviderMessageBuilder {
         return implode("\n", [
             'This is an Improve evaluate-only turn: produce a short execution plan, not a staged change.',
             'Prefer a short loop: awpt/read-block-tree (top_level_sections) and optionally awpt/analyze-page or awpt/recommend-patterns, then stop calling tools and write the plan.',
+            'If a tool result is truncated, plan from top_level_sections / excerpts you already have — do not re-call the same read thrice.',
             'Do not thrash list-patterns or read every pattern. Do not call propose-* abilities.',
             'Name least-destructive operations per change (batch/attrs, prepare-replace, insert, or no change). Flag preserve_by_default sections.',
+            'For a prepared replace/insert plan, name prepare-pattern-change with intent, mode, target path, and position. Do not guess a pattern slug: preparation selects it server-side. Only name a pattern when copying the exact name field from successful pattern evidence.',
+            'Do not plan placeholder URLs or unresolved authoring placeholders; preserve a verified URL or omit that optional slot.',
             'Your final assistant message is a compact markdown plan (sections/paths + ops) for the next act turn — not a tool dump.',
+        ]);
+    }
+
+    private function improve_act_module(): string {
+        return implode("\n", [
+            'This is an Improve act turn: the operator approved the plan in the user message. Treat it as authoritative.',
+            'Do not reopen open-ended diagnosis or call find-abilities / list-blocks thrash / theme-file research.',
+            'At most one targeted re-read (read-block-tree or get-block) for fingerprints if needed, then stage.',
+            'Prefer awpt/propose-block-batch-update and prepare-pattern-change → propose-pattern-replace/insert as the plan names. If preparation succeeds, the next pattern proposal must use its exact preparation_id and compact returned slots, not a guessed pattern_name.',
+            'Advance the first incomplete phase(s) in one coherent proposal; do not freehand-rewrite the whole page unless the plan says no pattern fits.',
+            'Do not invent preparation_id values.',
         ]);
     }
 

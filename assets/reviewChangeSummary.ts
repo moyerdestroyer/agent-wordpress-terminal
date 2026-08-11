@@ -29,7 +29,7 @@ function summarizeBatchChanges(changes: NonNullable<ActionPayload['batch_changes
 		const kind = change.kind || 'update_attrs';
 		kindCounts.set(kind, (kindCounts.get(kind) ?? 0) + 1);
 
-		if (kind !== 'update_attrs') {
+		if (kind !== 'update_attrs' && kind !== 'update_block') {
 			continue;
 		}
 

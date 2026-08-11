@@ -92,6 +92,7 @@ export async function getSession(
 	updated_at: string;
 	last_turn_id?: string;
 	last_turn_outcome?: import('./types').TurnOutcome;
+	improve_workflow?: import('./types').ImproveWorkflow;
 	messages: Array<{ id: number; role: string; content: string; created_at: string }>;
 	tool_calls: ToolCall[];
 	actions: ProposedAction[];
@@ -127,11 +128,12 @@ export async function sendMessage(
 	message: string,
 	attachments: ComposerAttachment[] = [],
 	turnId = '',
+	workflow?: import('./types').ImproveWorkflowRequest,
 ): Promise<ChatResponse> {
 	return apiFetch<ChatResponse>({
 		path: path(`/sessions/${sessionId}/chat`),
 		method: 'POST',
-		data: { message, attachments, turn_id: turnId },
+		data: { message, attachments, turn_id: turnId, workflow },
 	});
 }
 

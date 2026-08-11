@@ -61,7 +61,7 @@ final class BlockTreeView {
      * every path + fingerprint needed for batch updates.
      *
      * @param array<int, array<string, mixed>> $blocks
-     * @return array{blocks: list<array<string, mixed>>, count: int, truncated_excerpts?: bool}
+     * @return array{blocks: list<array<string, mixed>>, count: int, truncated_excerpts?: bool, flat_index?: bool}
      */
     public function compact_for_evidence(array $blocks, int $max_encoded_bytes = 12_000): array {
         $max_encoded_bytes = max(2_000, $max_encoded_bytes);
@@ -105,10 +105,6 @@ final class BlockTreeView {
         $out = [];
 
         foreach ($blocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
             $node = [
                 'path' => (string) ($block['path'] ?? ''),
                 'name' => (string) ($block['name'] ?? ''),
@@ -135,7 +131,7 @@ final class BlockTreeView {
                 $node['text_excerpt'] = mb_substr($excerpt, 0, $excerpt_limit, 'UTF-8');
             }
 
-            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+            $inner = ArrayKey::list_of_maps($block['inner'] ?? null);
 
             if ([] !== $inner) {
                 $node['inner'] = $this->compact_nodes($inner, $excerpt_limit, $prefer_summary_attrs);
@@ -154,12 +150,8 @@ final class BlockTreeView {
         $count = 0;
 
         foreach ($blocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
             ++$count;
-            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+            $inner = ArrayKey::list_of_maps($block['inner'] ?? null);
             $count += $this->count_normalized($inner);
         }
 
@@ -183,7 +175,7 @@ final class BlockTreeView {
      */
     private function collect_flat_normalized(array $blocks, int $max, array &$items, bool $minimal = false): void {
         foreach ($blocks as $block) {
-            if (count($items) >= $max || !is_array($block)) {
+            if (count($items) >= $max) {
                 return;
             }
 
@@ -208,7 +200,7 @@ final class BlockTreeView {
             }
 
             $items[] = $entry;
-            $inner = is_array($block['inner'] ?? null) ? $block['inner'] : [];
+            $inner = ArrayKey::list_of_maps($block['inner'] ?? null);
             $this->collect_flat_normalized($inner, $max, $items, $minimal);
         }
     }

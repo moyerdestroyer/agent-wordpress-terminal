@@ -23,7 +23,7 @@ final class Installer {
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '11';
+    private const SCHEMA_VERSION = '12';
 
     /**
      * Plugin activation hook.
@@ -106,6 +106,7 @@ final class Installer {
 			focus_post_id bigint(20) unsigned NULL,
 			last_turn_id varchar(64) NULL,
 			last_outcome_json longtext NULL,
+			improve_workflow_json longtext NULL,
 			created_at datetime NOT NULL,
 			updated_at datetime NOT NULL,
 			PRIMARY KEY  (id),

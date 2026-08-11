@@ -29,7 +29,7 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             'name' => 'awpt/propose-block-batch-update',
             'label' => __('Propose Block Batch Update', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages one atomic existing-page update containing multiple verified attribute, rich-text, removal, or insertion changes. Use paths and fingerprints from the compose evidence pack content_reads block tree (from awpt/read-block-tree or server-side synthesis) when two or more blocks need coordinated edits. Insertions must use a verified anchor path and before/after position.',
+                'Stages one atomic existing-page update containing multiple verified attribute, rich-text, combined block, removal, or insertion changes. Each path accepts one non-insertion mutation; use update_block with both attrs and content when the same block needs attribute and rich-text changes. Use paths and fingerprints from the compose evidence pack content_reads block tree (from awpt/read-block-tree or server-side synthesis). Insertions must use a verified anchor path and before/after position.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -47,7 +47,11 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                             'properties' => [
                                 'kind' => [
                                     'type' => 'string',
-                                    'enum' => ['update_attrs', 'replace_text', 'remove', 'insert'],
+                                    'enum' => ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'],
+                                    'description' => __(
+                                        'Use update_block—not separate update_attrs and replace_text entries—when one path needs both attrs and content changed.',
+                                        'agent-wordpress-terminal',
+                                    ),
                                 ],
                                 'block_path' => ['type' => 'string'],
                                 'expected_fingerprint' => [
@@ -60,8 +64,15 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
-                                'attrs' => ['type' => 'object', 'additionalProperties' => true],
-                                'content' => ['type' => 'string'],
+                                'attrs' => [
+                                    'type' => 'object',
+                                    'additionalProperties' => true,
+                                    'description' => __('Required for update_attrs and update_block.', 'agent-wordpress-terminal'),
+                                ],
+                                'content' => [
+                                    'type' => 'string',
+                                    'description' => __('Required for replace_text and update_block.', 'agent-wordpress-terminal'),
+                                ],
                                 'position' => ['type' => 'string', 'enum' => ['before', 'after']],
                                 'block_name' => [
                                     'type' => 'string',

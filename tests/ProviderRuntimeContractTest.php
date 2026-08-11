@@ -361,9 +361,10 @@ function test_provider_runtime_exposes_provider_finalization_failures_to_review_
         $result['failure_tool_call']['output']['error_code'] ?? '',
         'review clients should receive the concrete provider error code',
     );
-    Assert::true(
-        ToolRegistry::is_proposal_ability((string) ($result['failure_tool_call']['tool'] ?? '')),
-        'the failure must be attached to a proposal ability so turn_outcome classifies it as failed',
+    Assert::same(
+        'awpt/provider-finalization',
+        (string) ($result['failure_tool_call']['tool'] ?? ''),
+        'transport timeouts must not be mislabeled as propose-content-update',
     );
 }
 
@@ -1554,3 +1555,156 @@ function test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone(): v
 }
 
 test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone();
+
+/**
+ * Evaluate-only turns that thrash read tools until hop budget must still end with a plan.
+ */
+final class AwptEvaluateThrashProvider implements ProviderInterface {
+    public int $completions = 0;
+
+    /** @var list<int> */
+    public array $toolCounts = [];
+
+    public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
+        unset($messages, $options);
+        ++$this->completions;
+        $this->toolCounts[] = count($tools);
+
+        // Forced finalization passes tools=[] / tool_choice none.
+        if ([] === $tools) {
+            return [
+                'content' => "## Plan\n\n- Keep header path 0\n- Fix FAQ headings with batch/attrs on paths 0.0–8.0\n- No prepare-pattern-change needed\n",
+                'raw_tool_calls' => [],
+                'message' => [
+                    'role' => 'assistant',
+                    'content' => "## Plan\n\n- Keep header path 0\n- Fix FAQ headings with batch/attrs on paths 0.0–8.0\n- No prepare-pattern-change needed\n",
+                ],
+                'model' => 'fake-eval',
+                'usage' => [],
+                'finish_reason' => 'stop',
+            ];
+        }
+
+        // Harness maps OpenAI-style names via ToolNameMapper (no WP AI Client).
+        $calls = [[
+            'id' => 'eval-call-' . $this->completions,
+            'function' => [
+                'name' => 'awpt__read_block_tree',
+                'arguments' => '{"id":847}',
+            ],
+        ]];
+
+        return [
+            'content' => 'Let me get the full block tree since it was truncated:',
+            'raw_tool_calls' => $calls,
+            'message' => [
+                'role' => 'assistant',
+                'content' => 'Let me get the full block tree since it was truncated:',
+                'tool_calls' => $calls,
+            ],
+            'model' => 'fake-eval',
+            'usage' => [],
+            'finish_reason' => 'tool_calls',
+        ];
+    }
+
+    public function get_name(): string {
+        return 'Evaluate thrash test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
+}
+
+function test_provider_runtime_forces_plan_after_evaluate_tool_thrash(): void {
+    awpt_test_reset_state();
+
+    $registry = new ToolRegistry();
+    add_filter('awpt_mcp_tools', static fn(): array => [[
+        'name' => 'awpt/read-block-tree',
+        'description' => 'Read block tree.',
+        'readonly' => true,
+        'destructive' => false,
+        'annotations' => ['readonly' => true, 'destructive' => false],
+    ]]);
+    add_filter(
+        'awpt_mcp_execute_tool',
+        static function ($result, $name) {
+            unset($result);
+
+            if ('awpt/read-block-tree' === $name) {
+                return [
+                    'id' => 847,
+                    'count' => 44,
+                    'top_level_sections' => [
+                        ['path' => '0', 'role' => 'faq', 'heading' => 'What is surplus line?'],
+                    ],
+                    'truncated' => true,
+                ];
+            }
+
+            return ['ok' => true];
+        },
+        10,
+        2,
+    );
+
+    $provider = new AwptEvaluateThrashProvider();
+    $eval_message = AWPT\Support\ImprovePagePrompt::evaluate_text();
+    $profile = TurnProfile::from_message($eval_message, [], ['has_focus' => true]);
+    Assert::true($profile->is_improve_evaluate(), 'fixture is evaluate profile');
+
+    $initial_calls = [[
+        'id' => 'eval-call-0',
+        'function' => [
+            'name' => 'awpt__read_block_tree',
+            'arguments' => '{"id":847}',
+        ],
+    ]];
+    $initial = [
+        'content' => 'Let me get the full block tree since it was truncated:',
+        'raw_tool_calls' => $initial_calls,
+        'message' => [
+            'role' => 'assistant',
+            'content' => 'Let me get the full block tree since it was truncated:',
+            'tool_calls' => $initial_calls,
+        ],
+        'model' => 'fake-eval',
+        'usage' => [],
+        'finish_reason' => 'tool_calls',
+    ];
+
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => $eval_message]],
+        $initial,
+        [
+            'tool_registry' => $registry,
+            'turn_profile' => $profile,
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 150,
+            'turn_id' => 'eval-test-1',
+        ],
+    );
+
+    Assert::true(
+        str_contains($result['content'], '## Plan') || str_contains($result['content'], 'batch/attrs'),
+        'forced finalization must yield a plan, not thrash prose: ' . $result['content'],
+    );
+    Assert::false(
+        str_starts_with(trim($result['content']), 'Let me get the full block tree'),
+        'must not leave intermediate thrash as the final answer',
+    );
+    Assert::true(
+        in_array(0, $provider->toolCounts, true),
+        'must issue at least one tools-off finalization complete',
+    );
+    Assert::true(
+        count($result['tool_calls']) >= 1,
+        'read evidence from thrash hops should be retained',
+    );
+}
+
+test_provider_runtime_forces_plan_after_evaluate_tool_thrash();

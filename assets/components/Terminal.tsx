@@ -18,11 +18,15 @@ import {
 	updateSession,
 	uploadAttachment,
 } from '../api';
+import { improvePageActPrompt, improvePageEvaluatePrompt } from '../improvePagePrompt';
+import { runImproveWorkflow } from '../improveWorkflow';
 import type { PreviewCapture } from '../lib/previewCapture';
 import { mergeProposalActions, proposalActionsFromToolCalls } from '../proposalActions';
 import type {
 	ChatProgress,
 	ChatResponse,
+	ImproveWorkflow,
+	ImproveWorkflowRequest,
 	Message,
 	PreviewDetails,
 	ProposedAction,
@@ -35,6 +39,34 @@ import { KnowledgePanel } from './KnowledgePanel';
 import { PreviewPane } from './PreviewPane';
 import { ToolsSidebar } from './ToolsSidebar';
 import { Transcript } from './Transcript';
+
+function newTurnId(): string {
+	return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+		? crypto.randomUUID()
+		: `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Parse terminal slash aliases that expand to Improve evaluate / one-shot improve. */
+function parseImproveSlash(input: string): { command: 'plan' | 'improve'; notes: string } | null {
+	const trimmed = input.trim();
+	const match = trimmed.match(/^\/(plan|evaluate|improve)(?:\s+([\s\S]*))?$/i);
+	if (!match) {
+		return null;
+	}
+	const command = match[1].toLowerCase();
+	const notes = (match[2] ?? '').trim();
+	if (command === 'plan' || command === 'evaluate') {
+		return { command: 'plan', notes };
+	}
+	return { command: 'improve', notes };
+}
+
+function withOperatorNotes(base: string, notes: string): string {
+	if (notes === '') {
+		return base;
+	}
+	return `${base}\n\nAdditional operator notes: ${notes}`;
+}
 
 function titleCase(value: string): string {
 	return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -372,6 +404,8 @@ export function Terminal(): JSX.Element {
 	const [editingSessionTitle, setEditingSessionTitle] = useState('');
 	const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<number | null>(null);
 	const [providerBilling, setProviderBilling] = useState<ProviderBilling | null>(null);
+	/** Durable evaluate workflow waiting for an explicit Execute (act) turn. */
+	const [pendingPlan, setPendingPlan] = useState<ImproveWorkflow | null>(null);
 	const previewDrawerRef = useRef<HTMLElement | null>(null);
 	const previewReturnFocusRef = useRef<HTMLElement | null>(null);
 	const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
@@ -582,6 +616,9 @@ export function Terminal(): JSX.Element {
 		setPreview(null);
 		setPreviewAction(null);
 		setIsPreviewOpen(false);
+		setPendingPlan(
+			session.improve_workflow?.state === 'plan_ready' ? session.improve_workflow : null,
+		);
 		setCommandHistory(
 			session.messages
 				.filter((message) => message.role === 'user' && message.content.trim() !== '')
@@ -591,181 +628,216 @@ export function Terminal(): JSX.Element {
 		setHistoryDraft('');
 	};
 
-	const handleSend = async (): Promise<void> => {
-		if (
-			!activeSessionId ||
-			(!input.trim() && attachments.length === 0) ||
-			isSending ||
-			isUploading
-		) {
-			return;
+	const applyChatResponse = async (
+		sessionId: number,
+		response: ChatResponse,
+		turnAt: string,
+	): Promise<{ toolCount: number; skipTurnSummary: boolean }> => {
+		if (response.command === 'clear') {
+			setMessages([]);
+			setToolCalls([]);
+			setActions([]);
+			setPreview(null);
+			setPreviewAction(null);
+			setIsPreviewOpen(false);
+			setPendingPlan(null);
+			return { toolCount: 0, skipTurnSummary: true };
 		}
 
-		const submittedAttachments = attachments;
+		setMessages((current) => [
+			...current,
+			{ role: 'assistant', content: response.content, created_at: turnAt },
+		]);
+
+		const turnToolCalls = (response.tool_calls ?? []).map((call) => ({
+			...call,
+			created_at: turnAt,
+		}));
+
+		if (turnToolCalls.length > 0) {
+			setToolCalls((current) => [...current, ...turnToolCalls]);
+		}
+
+		const responseActions = (response.actions ?? []).map((action) => ({
+			id: action.id,
+			session_id: action.session_id,
+			title: action.title,
+			description: action.description,
+			payload: action.payload,
+			status: action.status as ProposedAction['status'],
+			created_at: action.created_at,
+			updated_at: action.updated_at,
+			revision_kind: action.revision_kind,
+			revised_action_id: action.revised_action_id,
+			removed_action_ids: action.removed_action_ids,
+		}));
+		const incomingActions = mergeProposalActions(
+			proposalActionsFromToolCalls(turnToolCalls),
+			responseActions,
+		);
+		const removedActionIds = new Set(response.removed_action_ids ?? []);
+
+		if (incomingActions.length > 0 || removedActionIds.size > 0) {
+			setActions((current) =>
+				mergeProposalActions(
+					current.filter((action) => !action.id || !removedActionIds.has(action.id)),
+					incomingActions,
+				),
+			);
+		}
+
+		const revisedAction = incomingActions.find(
+			(action) => action.id === response.revised_action_id,
+		);
+
+		if (response.revision_kind === 'revised' && revisedAction?.id && isPreviewOpen) {
+			setPreviewAction(revisedAction);
+
+			try {
+				const refreshed = await fetchActionPreview(revisedAction.id);
+				setPreview(cacheBustPreview(refreshed, revisedAction.updated_at ?? String(Date.now())));
+			} catch {
+				setPreview(null);
+			}
+		} else if (previewAction?.id && removedActionIds.has(previewAction.id)) {
+			setPreview(null);
+			setPreviewAction(null);
+			setIsPreviewOpen(false);
+		}
+
+		if (response.preview?.preview_url) {
+			setPreview(response.preview);
+			setPreviewAction(null);
+			setIsPreviewOpen(true);
+		}
+
+		if (
+			response.provider ||
+			response.model ||
+			response.focus_post_id ||
+			response.focus ||
+			response.session_title
+		) {
+			setSessions((current) =>
+				current.map((session) =>
+					session.id === sessionId
+						? {
+								...session,
+								title: response.session_title ?? session.title,
+								provider: response.provider ?? session.provider,
+								model: response.model ?? session.model,
+								focus_post_id: response.focus_post_id ?? session.focus_post_id,
+								focus: response.focus ?? session.focus,
+							}
+						: session,
+				),
+			);
+		}
+
+		return { toolCount: turnToolCalls.length, skipTurnSummary: false };
+	};
+
+	type SendOptions = {
+		/** Message sent to the API. */
+		wireMessage: string;
+		/** Optional shorter line shown in the transcript. Defaults to wireMessage. */
+		displayMessage?: string;
+		attachments?: typeof attachments;
+		progressLabel?: string;
+		progressDetail?: string;
+		clearComposer?: boolean;
+		workflow?: ImproveWorkflowRequest;
+	};
+
+	const runChatTurn = async (options: SendOptions): Promise<ChatResponse | null> => {
+		if (!activeSessionId || isSending || isUploading) {
+			return null;
+		}
+
+		const wireMessage = options.wireMessage.trim();
+		const submittedAttachments = options.attachments ?? [];
+		if (wireMessage === '' && submittedAttachments.length === 0) {
+			return null;
+		}
+
 		const attachmentContext = submittedAttachments
 			.map(
 				(item) =>
 					`Attached ${item.kind === 'document' ? 'document' : 'image'}: ${item.url} (Media Library attachment #${item.id}, ${item.mime_type ?? 'unknown MIME'})`,
 			)
 			.join('\n');
-		const inputMessage = input.trim();
-		const message = [inputMessage, attachmentContext].filter(Boolean).join('\n\n');
-		setInput('');
-		setAttachments([]);
+		const displayBase = (options.displayMessage ?? wireMessage).trim();
+		const displayMessage = [displayBase, attachmentContext].filter(Boolean).join('\n\n');
+
+		if (options.clearComposer !== false) {
+			setInput('');
+			setAttachments([]);
+		}
+
 		setIsSending(true);
 		setTurnSummary(null);
 		turnStartedAtRef.current = Date.now();
 		setChatProgress({
 			state: 'pending',
 			phase: 'starting',
-			label: __('Starting request', 'agent-wordpress-terminal'),
-			detail: '',
+			label: options.progressLabel || __('Starting request', 'agent-wordpress-terminal'),
+			detail: options.progressDetail || '',
 			completed: 0,
 			total: 0,
 			sequence: 0,
 			updated_at: '',
 		});
 		setCommandHistory((current) =>
-			current[current.length - 1] === message ? current : [...current, message],
+			current[current.length - 1] === displayMessage ? current : [...current, displayMessage],
 		);
 		setHistoryIndex(null);
 		setHistoryDraft('');
 
 		const turnAt = new Date().toISOString();
-		const turnId =
-			typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-				? crypto.randomUUID()
-				: `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-		setMessages((current) => [...current, { role: 'user', content: message, created_at: turnAt }]);
-		let progressRequestPending = false;
-		const pollProgress = async (): Promise<void> => {
-			if (progressRequestPending) return;
-			progressRequestPending = true;
-
-			try {
-				const next = await getChatProgress(activeSessionId, turnId);
-				setChatProgress((current) =>
-					!current || next.sequence >= current.sequence ? next : current,
-				);
-			} catch {
-				// Progress is supplementary; the chat request remains authoritative.
-			} finally {
-				progressRequestPending = false;
-			}
-		};
-		void pollProgress();
-		const progressTimer = window.setInterval(() => void pollProgress(), 700);
+		const turnId = newTurnId();
 		let completedToolCount = 0;
 		let skipTurnSummary = false;
+		let progressTimer: number | undefined;
+		let progressRequestPending = false;
+		let activeTurnId = turnId;
+
+		const startPolling = (id: string) => {
+			if (progressTimer) {
+				window.clearInterval(progressTimer);
+			}
+			activeTurnId = id;
+			const pollProgress = async (): Promise<void> => {
+				if (progressRequestPending) return;
+				progressRequestPending = true;
+				try {
+					const next = await getChatProgress(activeSessionId, activeTurnId);
+					setChatProgress((current) =>
+						!current || next.sequence >= current.sequence ? next : current,
+					);
+				} catch {
+					// Progress is supplementary.
+				} finally {
+					progressRequestPending = false;
+				}
+			};
+			void pollProgress();
+			progressTimer = window.setInterval(() => void pollProgress(), 700);
+		};
+
+		setMessages((current) => [
+			...current,
+			{ role: 'user', content: displayMessage, created_at: turnAt },
+		]);
+		startPolling(turnId);
 
 		try {
 			const response: ChatResponse = await withTimeout(
-				sendMessage(activeSessionId, inputMessage, submittedAttachments, turnId),
+				sendMessage(activeSessionId, wireMessage, submittedAttachments, turnId, options.workflow),
 				CHAT_REQUEST_TIMEOUT_MS,
 			);
-
-			if (response.command === 'clear') {
-				setMessages([]);
-				setToolCalls([]);
-				setActions([]);
-				setPreview(null);
-				setPreviewAction(null);
-				setIsPreviewOpen(false);
-				skipTurnSummary = true;
-				return;
-			}
-
-			setMessages((current) => [
-				...current,
-				{ role: 'assistant', content: response.content, created_at: turnAt },
-			]);
-
-			const turnToolCalls = (response.tool_calls ?? []).map((call) => ({
-				...call,
-				created_at: turnAt,
-			}));
-			completedToolCount = turnToolCalls.length;
-
-			if (turnToolCalls.length > 0) {
-				setToolCalls((current) => [...current, ...turnToolCalls]);
-			}
-
-			const responseActions = (response.actions ?? []).map((action) => ({
-				id: action.id,
-				session_id: action.session_id,
-				title: action.title,
-				description: action.description,
-				payload: action.payload,
-				status: action.status as ProposedAction['status'],
-				created_at: action.created_at,
-				updated_at: action.updated_at,
-				revision_kind: action.revision_kind,
-				revised_action_id: action.revised_action_id,
-				removed_action_ids: action.removed_action_ids,
-			}));
-			const incomingActions = mergeProposalActions(
-				proposalActionsFromToolCalls(turnToolCalls),
-				responseActions,
-			);
-			const removedActionIds = new Set(response.removed_action_ids ?? []);
-
-			if (incomingActions.length > 0 || removedActionIds.size > 0) {
-				setActions((current) =>
-					mergeProposalActions(
-						current.filter((action) => !action.id || !removedActionIds.has(action.id)),
-						incomingActions,
-					),
-				);
-			}
-
-			const revisedAction = incomingActions.find(
-				(action) => action.id === response.revised_action_id,
-			);
-
-			if (response.revision_kind === 'revised' && revisedAction?.id && isPreviewOpen) {
-				setPreviewAction(revisedAction);
-
-				try {
-					const refreshed = await fetchActionPreview(revisedAction.id);
-					setPreview(cacheBustPreview(refreshed, revisedAction.updated_at ?? String(Date.now())));
-				} catch {
-					setPreview(null);
-				}
-			} else if (previewAction?.id && removedActionIds.has(previewAction.id)) {
-				setPreview(null);
-				setPreviewAction(null);
-				setIsPreviewOpen(false);
-			}
-
-			if (response.preview?.preview_url) {
-				setPreview(response.preview);
-				setPreviewAction(null);
-				setIsPreviewOpen(true);
-			}
-
-			if (
-				response.provider ||
-				response.model ||
-				response.focus_post_id ||
-				response.focus ||
-				response.session_title
-			) {
-				setSessions((current) =>
-					current.map((session) =>
-						session.id === activeSessionId
-							? {
-									...session,
-									title: response.session_title ?? session.title,
-									provider: response.provider ?? session.provider,
-									model: response.model ?? session.model,
-									focus_post_id: response.focus_post_id ?? session.focus_post_id,
-									focus: response.focus ?? session.focus,
-								}
-							: session,
-					),
-				);
-			}
+			const applied = await applyChatResponse(activeSessionId, response, turnAt);
+			completedToolCount += applied.toolCount;
+			skipTurnSummary = applied.skipTurnSummary;
 
 			if (isOpenRouter && connection?.ready) {
 				try {
@@ -774,6 +846,8 @@ export function Terminal(): JSX.Element {
 					// Keep the previous meter if refresh fails.
 				}
 			}
+
+			return response;
 		} catch (error: unknown) {
 			let messageText = __('The agent request failed. Try again.', 'agent-wordpress-terminal');
 
@@ -795,8 +869,11 @@ export function Terminal(): JSX.Element {
 			}
 
 			setMessages((current) => [...current, { role: 'assistant', content: messageText }]);
+			return null;
 		} finally {
-			window.clearInterval(progressTimer);
+			if (progressTimer) {
+				window.clearInterval(progressTimer);
+			}
 			const started = turnStartedAtRef.current;
 			const durationMs = started !== null ? Math.max(0, Date.now() - started) : 0;
 			turnStartedAtRef.current = null;
@@ -811,6 +888,151 @@ export function Terminal(): JSX.Element {
 			setChatProgress(null);
 			setIsSending(false);
 		}
+	};
+
+	const handleSend = async (): Promise<void> => {
+		if (
+			!activeSessionId ||
+			(!input.trim() && attachments.length === 0) ||
+			isSending ||
+			isUploading
+		) {
+			return;
+		}
+
+		const inputMessage = input.trim();
+		const slash = parseImproveSlash(inputMessage);
+
+		if (slash?.command === 'plan') {
+			const planResponse = await runChatTurn({
+				wireMessage: withOperatorNotes(improvePageEvaluatePrompt(), slash.notes),
+				displayMessage:
+					slash.notes !== ''
+						? sprintf(
+								/* translators: %s: optional plan notes */
+								__('Plan focused page — %s', 'agent-wordpress-terminal'),
+								slash.notes,
+							)
+						: __('Plan focused page (evaluate only, no staging)', 'agent-wordpress-terminal'),
+				attachments,
+				progressLabel: __('Evaluating the page', 'agent-wordpress-terminal'),
+				progressDetail: __(
+					'Reading structure and drafting a short plan (no changes yet).',
+					'agent-wordpress-terminal',
+				),
+				workflow: { type: 'improve', phase: 'evaluate' },
+			});
+			capturePendingPlan(planResponse);
+			return;
+		}
+
+		if (slash?.command === 'improve') {
+			await handleImprove(slash.notes);
+			return;
+		}
+
+		await runChatTurn({
+			wireMessage: inputMessage,
+			attachments,
+		});
+	};
+
+	const capturePendingPlan = (response: ChatResponse | null): void => {
+		const workflow = response?.improve_workflow;
+		if (workflow?.state === 'plan_ready' && workflow.plan.trim() !== '') {
+			setPendingPlan(workflow);
+			return;
+		}
+		setPendingPlan(null);
+	};
+
+	const handlePlan = async (): Promise<void> => {
+		if (!activeSessionId || isSending || isUploading) {
+			return;
+		}
+		if (!activeSession?.focus_post_id) {
+			setInput('/plan ');
+			return;
+		}
+		const response = await runChatTurn({
+			wireMessage: improvePageEvaluatePrompt(),
+			displayMessage: __(
+				'Plan focused page (evaluate only, no staging)',
+				'agent-wordpress-terminal',
+			),
+			progressLabel: __('Evaluating the page', 'agent-wordpress-terminal'),
+			progressDetail: __(
+				'Reading structure and drafting a short plan (no changes yet).',
+				'agent-wordpress-terminal',
+			),
+			workflow: { type: 'improve', phase: 'evaluate' },
+		});
+		capturePendingPlan(response);
+	};
+
+	/** Act step only: stage changes from a known plan (does not re-evaluate). */
+	const handleExecutePlan = async (workflow?: ImproveWorkflow): Promise<ChatResponse | null> => {
+		if (!activeSessionId || isSending || isUploading) {
+			return null;
+		}
+
+		const activeWorkflow = workflow ?? pendingPlan;
+		if (activeWorkflow?.state !== 'plan_ready') {
+			return null;
+		}
+
+		setPendingPlan(null);
+		return runChatTurn({
+			wireMessage: improvePageActPrompt(),
+			displayMessage: __('Execute plan (stage changes for review)', 'agent-wordpress-terminal'),
+			attachments: [],
+			progressLabel: __('Staging the plan', 'agent-wordpress-terminal'),
+			progressDetail: __(
+				'Staging pattern-native or surgical improvements. Use Apply on the proposal card to write the page.',
+				'agent-wordpress-terminal',
+			),
+			clearComposer: false,
+			workflow: { id: activeWorkflow.id, type: 'improve', phase: 'act' },
+		});
+	};
+
+	const handleImprove = async (notes = ''): Promise<void> => {
+		if (!activeSessionId || isSending || isUploading) {
+			return;
+		}
+		if (!activeSession?.focus_post_id && notes === '' && input.trim() === '') {
+			setInput('/improve ');
+			return;
+		}
+
+		const evaluateWire = withOperatorNotes(improvePageEvaluatePrompt(), notes);
+		const displayPlan =
+			notes !== ''
+				? sprintf(
+						/* translators: %s: optional improve notes */
+						__('Improve focused page (plan first) — %s', 'agent-wordpress-terminal'),
+						notes,
+					)
+				: __('Improve focused page (evaluate → act)', 'agent-wordpress-terminal');
+
+		await runImproveWorkflow({
+			evaluate: () =>
+				runChatTurn({
+					wireMessage: evaluateWire,
+					displayMessage: displayPlan,
+					attachments: notes === '' ? attachments : [],
+					progressLabel: __('Evaluating the page', 'agent-wordpress-terminal'),
+					progressDetail: __(
+						'Reading structure and drafting a short plan (no changes yet).',
+						'agent-wordpress-terminal',
+					),
+					workflow: { type: 'improve', phase: 'evaluate' },
+				}),
+			act: async (workflow) => {
+				setPendingPlan(workflow);
+				return handleExecutePlan(workflow);
+			},
+		});
 	};
 
 	const handleAttachment = async (file: File): Promise<void> => {
@@ -1222,6 +1444,41 @@ export function Terminal(): JSX.Element {
 						>
 							{__('Preview', 'agent-wordpress-terminal')}
 						</Button>
+						<Button
+							variant="secondary"
+							onClick={() => void handlePlan()}
+							disabled={isSending || isUploading}
+							title={__(
+								'Evaluate the focused page and write a plan only (no propose tools). Same as /plan.',
+								'agent-wordpress-terminal',
+							)}
+						>
+							{__('Plan', 'agent-wordpress-terminal')}
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={() => void handleImprove()}
+							disabled={isSending || isUploading}
+							title={__(
+								'Improve the focused page: evaluate plan, then stage changes. Same as review-queue Improve.',
+								'agent-wordpress-terminal',
+							)}
+						>
+							{__('Improve', 'agent-wordpress-terminal')}
+						</Button>
+						{pendingPlan ? (
+							<Button
+								variant="primary"
+								onClick={() => void handleExecutePlan()}
+								disabled={isSending || isUploading}
+								title={__(
+									'Run the latest plan: stage a proposal (not written to the live page until you Apply).',
+									'agent-wordpress-terminal',
+								)}
+							>
+								{__('Execute plan', 'agent-wordpress-terminal')}
+							</Button>
+						) : null}
 						<input
 							type="text"
 							value={input}
@@ -1246,7 +1503,7 @@ export function Terminal(): JSX.Element {
 							}}
 							onDragOver={(event) => event.preventDefault()}
 							placeholder={__(
-								'Ask about a page, post, or site task...',
+								'Ask about a page… or /plan /improve /focus',
 								'agent-wordpress-terminal',
 							)}
 							onKeyDown={(event) => {

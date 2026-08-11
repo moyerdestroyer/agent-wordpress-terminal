@@ -74,6 +74,56 @@ function test_block_batch_rejects_one_stale_target_without_partial_output(): voi
     );
 }
 
+function test_block_batch_updates_attrs_and_text_on_one_path_atomically(): void {
+    $content = '<!-- wp:heading {"level":4} --><h4>Coverage' . "\x07" . ' Questions</h4><!-- /wp:heading -->';
+    $heading = BlockTree::from_content($content)->get_block('0');
+    $result = new BlockBatchUpdater()->apply($content, [[
+        'kind' => 'update_block',
+        'block_path' => '0',
+        'expected_fingerprint' => BlockTree::fingerprint($heading ?? []),
+        'attrs' => ['level' => 2],
+        'content' => 'Coverage Questions',
+    ]]);
+
+    Assert::false(is_wp_error($result), 'one verified mutation may combine block attrs and rich text');
+    Assert::true(
+        str_contains((string) ($result['content'] ?? ''), '<h2>Coverage Questions</h2>'),
+        'the heading tag and text should change together',
+    );
+    Assert::same(
+        'Staged 1 verified block change: 1 combined block update.',
+        new BlockBatchUpdater()->describe($result['changes'] ?? []),
+        'the action description should identify a combined update',
+    );
+}
+
+function test_block_batch_rejects_split_attr_and_text_mutations_on_one_path(): void {
+    $content = '<!-- wp:heading {"level":4} --><h4>Coverage Questions</h4><!-- /wp:heading -->';
+    $heading = BlockTree::from_content($content)->get_block('0');
+    $fingerprint = BlockTree::fingerprint($heading ?? []);
+    $result = new BlockBatchUpdater()->apply($content, [
+        [
+            'kind' => 'update_attrs',
+            'block_path' => '0',
+            'expected_fingerprint' => $fingerprint,
+            'attrs' => ['level' => 2],
+        ],
+        [
+            'kind' => 'replace_text',
+            'block_path' => '0',
+            'expected_fingerprint' => $fingerprint,
+            'content' => 'Updated coverage questions',
+        ],
+    ]);
+
+    Assert::instanceOf(WP_Error::class, $result, 'split non-insertion mutations remain invalid');
+    Assert::same('awpt_invalid_block_batch_target', $result->get_error_code(), 'the conflict is explicit');
+    Assert::true(
+        str_contains($result->get_error_message(), 'update_block'),
+        'the validation error tells the agent how to recover',
+    );
+}
+
 function test_block_batch_can_insert_ordered_structure_with_other_verified_changes(): void {
     $content =
         '<!-- wp:group --><div class="wp-block-group">'
@@ -314,6 +364,8 @@ function test_presentation_h1_requirement_fails_closed_when_rendered_title_is_mi
 
 test_block_batch_updates_multiple_paths_atomically();
 test_block_batch_rejects_one_stale_target_without_partial_output();
+test_block_batch_updates_attrs_and_text_on_one_path_atomically();
+test_block_batch_rejects_split_attr_and_text_mutations_on_one_path();
 test_block_batch_can_insert_ordered_structure_with_other_verified_changes();
 test_block_batch_can_insert_then_update_the_same_verified_anchor();
 test_presentation_preservation_blocks_loss_but_allows_structure_only_changes();

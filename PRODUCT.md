@@ -10,7 +10,7 @@ WordPress administrators, developers, and technical site maintainers working ins
 
 ## Product Purpose
 
-AWPT is a WordPress-native terminal for agent-assisted site work. It gives humans a focused cockpit for chat, Core Knowledge-ready retrieval, WordPress Abilities, MCP tool visibility, previews, and explicit approvals. Success means admins can understand what knowledge and tool evidence the agent used, what tools are available, what the agent did, and which proposed actions remain staged instead of hidden or automatic.
+AWPT is a WordPress-native terminal for agent-assisted site work. It gives humans a focused cockpit for chat, Core Knowledge-ready retrieval, WordPress Abilities, MCP tool visibility, previews, and clear action boundaries. Success means admins can understand what knowledge and tool evidence the agent used, what tools are available, what the agent did, and whether a change is staged or was applied by an explicitly initiated review workflow.
 
 ## Brand Personality
 
@@ -23,7 +23,7 @@ Avoid bulky chatbot layouts, marketing-style AI assistant chrome, decorative das
 ## Design Principles
 
 - Make knowledge explicit: Core Knowledge, indexed site content, provider state, and tool scope should be visible rather than implied.
-- Keep the human in the loop: destructive or write actions must be staged, reviewed, and approved before execution.
+- Keep the human in the loop: Terminal writes remain staged for approval. Review-queue Improve may auto-apply one reversible, page-scoped safe content action after an explicit click, with visible context and Undo; destructive or broader writes still require approval.
 - Prefer operational density: admins should be able to scan sessions, tools, logs, previews, and actions without navigating away.
 - Respect WordPress boundaries: capability checks, nonces, REST permissions, and secure secret handling are part of the product experience.
 - Show evidence: agent responses should be connected to tool calls, results, previews, and action records.

@@ -59,7 +59,9 @@ final class QueueImprovePathClassifier {
                 continue;
             }
 
-            $payload = is_array($action['payload'] ?? null) ? $action['payload'] : $action;
+            $payload = is_array($action['payload'] ?? null)
+                ? ArrayKey::as_map($action['payload'])
+                : ArrayKey::string_map($action);
             $op = sanitize_key((string) ($payload['operation'] ?? $action['operation'] ?? ''));
 
             if ('' !== $op) {

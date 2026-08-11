@@ -8,10 +8,12 @@ Do not score a fast direct write as safer than an approval-gated proposal. Measu
 
 ### Improve evaluate → act (production-shaped)
 
-Review-queue **Improve** is two internal agent turns (still **one button**; Dufresne unchanged):
+Review-queue **Improve** is two internal agent turns from one button (Dufresne unchanged):
 
 1. **Evaluate** — read-only tools; markdown plan only (`ImprovePagePrompt::evaluate_text()`).
 2. **Act** — execute the plan (`ImprovePagePrompt::act_message($plan)`).
+
+The act turn only stages. After it returns, the review bridge automatically applies exactly one page-scoped, reversible, review-safe content action from that turn; ambiguous or unsupported action sets fail closed. Terminal and CLI retain their own explicit/apply-flag boundaries. Recovered review proposals are never auto-applied merely because the page was reopened.
 
 CLI (matches bridge):
 
@@ -47,11 +49,11 @@ wp eval-file wp-content/plugins/agent-wordpress-terminal/bin/run-scenario.php S5
 # Short ids work: S1, S2, S4, S5, S9
 ```
 
-Each run:
+Each task-shaped run now uses evaluate → act: the scenario prompt is appended as an evaluation constraint, and the server-stored plan is then executed. Each run:
 
 - Creates a **fresh focused session** and sends the scenario prompt as a chat message (same path as the agent terminal)
 - Optionally auto-applies review-safe staged actions (omit with `--no-apply` to inspect proposals only)
-- Writes `tmp-queue-runs/awpt-scenario-{id}-post-{post_id}.json` (+ `.raw.json`)
+- Writes uniquely named `tmp-queue-runs/awpt-scenario-{id}-post-{post_id}-{run_id}.json` (+ `.raw.json`)
 - Records soft expected path/tools hits (observation only — **not** hard locks)
 
 Suggested first pack: **S1** (middle swap), **S2** (FAQ), **S4** (insert CTA), **S5** (copy-only control), **S9** (Improve baseline thermometer).
@@ -60,12 +62,13 @@ Do **not** treat freehand on S9 as an M3 capability failure. Score S1–S4 on pr
 
 ### Improve / queue audit (M0 + M5 scorecard)
 
-`bin/queue-improve-one.php <post_id>` defaults to a **fresh session** (pass `--reuse-session` for production-like focus reuse). Still useful as an open-ended Improve thermometer. Summaries under `tmp-queue-runs/` include:
+`bin/queue-improve-one.php <post_id>` defaults to a **fresh session** (pass `reuse-session` for production-like focus reuse). Declare the task class with `class=structural_replace`, `class=additive_insert`, `class=surgical_copy`, or `class=no_change`. Summaries under `tmp-queue-runs/` include:
 
 - `meta.classifier_version` and `server_materialized` derived from operation + composition manifest (not `pattern_name` alone)
 - `path_used` labels such as `pattern_replace`, `pattern_insert`, `pattern_provenance_freehand`
 - `raw_trace_path` pointing at the full tool/action dump for classifier replay
-- `top_level_section_count` and a per-run `scorecard` object (prepare/replace/freehand flags, eligibility)
+- unique `meta.run_id`; plugin Git state; theme, domain-pack, catalog, prompt, and provider identity
+- `top_level_section_count` and a scorecard-v2 object with declared eligibility, separate insert/replace results, correction count, and funnel stage
 
 Task `replace-section` in the parity corpus maps to the `prepare-pattern-change` → `propose-pattern-replace` path.
 
@@ -77,8 +80,8 @@ Aggregate existing run summaries (no invented targets — rates always include d
 # Offline aggregate of tmp-queue-runs/awpt-queue-*.json
 php bin/cohort-scorecard.php --label=post-m3 tmp-queue-runs/
 
-# Live Improve for listed posts, then scorecard
-bin/queue-improve-cohort.sh --label=post-m3 848 853 858 841 850
+# Live same-class Improve for listed posts, then scorecard
+bin/queue-improve-cohort.sh --class=structural_replace --label=post-change-replace 848 853 858
 
 # Scorecard only
 bin/queue-improve-cohort.sh --scorecard-only --label=existing tmp-queue-runs/
@@ -88,11 +91,13 @@ Output: `tmp-queue-runs/cohort-<label>-summary.json` with:
 
 - `n` / `n_structural_eligible`
 - `path_counts`
-- `structural.rates.*` — `server_materialized`, `prepare_change_success`, `propose_replace_success`, `freehand_provenance` as `{count, denominator, rate}`
+- `scenario_counts` and explicit structural denominators
+- `structural.rates.*` — server materialization, preparation, replace, insert, and freehand as `{count, denominator, rate}`
+- per-run `funnel_stage` and `correction_count`
 - per-run rows for audit tables
 
 **Interpret carefully:** freehand share among structural-eligible Improve tasks is the adoption signal; do **not** set a fixed “70% materialize” target without a clean post-M3 cohort and denominators.
 
-**Living status:** see `ollie_gaps.md` (M1–M3 capabilities shipped; M2b rolled back; M5 scorecard available; M4 gated). Historical: `cohort-m1-audit*`, `cohort-m2-audit*`, `cohort-smoke-rollback*`.
+**Living status:** see `ollie_gaps.md`. Historical cohorts remain useful baselines, but they predate durable Improve state and prepared insert.
 
 The CivicPress repository also ships a deterministic catalog smoke test (`npm run awpt:evaluate`). It catches metadata and ranking regressions without an AI provider; it is a prerequisite for, not a replacement for, the cross-system exercise.

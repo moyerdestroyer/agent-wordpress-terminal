@@ -62,8 +62,22 @@ final class ProviderRuntime {
      */
     private const IMPROVE_EVALUATE_WALL_SECONDS = 150;
 
+    /**
+     * Execute-plan may legitimately spend several minutes composing a large,
+     * verified proposal and still need a correction. This is an overall circuit
+     * breaker, not a per-phase allocation; completion and proposal-failure caps
+     * remain the primary protection against self-calling loops.
+     */
+    private const IMPROVE_ACT_WALL_SECONDS = 480;
+
     /** Few provider hops: read structure → optional recommend → write plan. */
     private const IMPROVE_EVALUATE_MAX_COMPLETIONS = 4;
+
+    /** Act: one light re-read + prepare + stage — do not burn the wall rediscovering. */
+    private const IMPROVE_ACT_MAX_COMPLETIONS = 6;
+
+    /** Explore hops before forced compose on Execute-plan turns. */
+    private const IMPROVE_ACT_MAX_EXPLORE_HOPS = 1;
 
     /** Raw from-scratch Gutenberg documents need more transport time than compact pattern edits. */
     private const RAW_COMPOSITION_TURN_WALL_SECONDS = 480;
@@ -89,10 +103,11 @@ final class ProviderRuntime {
     private const RAW_COMPOSITION_MAX_COMPLETION_TOKENS = 20_000;
 
     /**
-     * Existing-page redesign compose can need multi-minute generation (large
-     * batch ops or full rewrites). 210s was too tight for ~10k-token batches.
+     * Let one productive existing-page composition use nearly all of the outer
+     * safety ceiling. The runtime does not reserve rigid slices for later phases;
+     * a correction simply receives whatever wall time remains.
      */
-    private const EXISTING_COMPOSE_REQUEST_SECONDS = 300;
+    private const EXISTING_COMPOSE_REQUEST_SECONDS = 450;
 
     /** Retry after a compose transport failure needs more than a token of wall. */
     private const EXISTING_COMPOSE_RETRY_SECONDS = 180;
@@ -157,9 +172,11 @@ final class ProviderRuntime {
         $is_content_turn = $profile->content_turn;
         $is_content_edit_turn = $profile->content_edit_turn;
         $is_improve_evaluate = $profile->is_improve_evaluate();
+        $is_improve_act = $profile->is_improve_act();
         $is_extended_turn = $is_content_turn || $is_content_edit_turn || [] !== $profile->compose_allowlist();
         $turn_wall_seconds = match (true) {
             $is_improve_evaluate => self::IMPROVE_EVALUATE_WALL_SECONDS,
+            $is_improve_act => self::IMPROVE_ACT_WALL_SECONDS,
             $is_extended_turn => self::CONTENT_TURN_WALL_SECONDS,
             default => self::TURN_WALL_SECONDS,
         };
@@ -411,11 +428,14 @@ final class ProviderRuntime {
             || ($turn_profile?->uses_explore_compose_phases() ?? false);
         $loop_profile = $options['turn_profile'] ?? null;
         $loop_profile = $loop_profile instanceof TurnProfile ? $loop_profile : null;
+        $is_improve_act = $loop_profile?->is_improve_act() ?? false;
         $max_provider_completions = match (true) {
             $loop_profile?->is_improve_evaluate() ?? false => self::IMPROVE_EVALUATE_MAX_COMPLETIONS,
+            $is_improve_act => self::IMPROVE_ACT_MAX_COMPLETIONS,
             $is_content_turn || $is_content_edit_turn => self::CONTENT_MAX_PROVIDER_COMPLETIONS,
             default => self::MAX_PROVIDER_COMPLETIONS,
         };
+        $max_explore_hops = $is_improve_act ? self::IMPROVE_ACT_MAX_EXPLORE_HOPS : self::MAX_EXPLORE_HOPS;
         $formatted_after_success = false;
         $turn_phase = $uses_explore_compose ? 'explore' : 'direct';
         $visual_verification_rounds = 0;
@@ -621,7 +641,7 @@ final class ProviderRuntime {
             }
 
             $latest_failure_code = $this->latest_proposal_failure_code($execution['tool_calls']);
-            $proposal_constraints->ingest($execution['tool_calls']);
+            $proposal_constraints->ingest(array_values($execution['tool_calls']));
             $allow_terminal_content_loss_recovery = $this->should_allow_terminal_content_loss_recovery(
                 $proposal_failures,
                 $latest_failure_code,
@@ -731,6 +751,7 @@ final class ProviderRuntime {
                 [
                     'content_turn' => $is_content_turn || $is_content_edit_turn,
                     'presentation_edit' => true === ($options['presentation_edit'] ?? false),
+                    'improve_act' => $is_improve_act,
                 ],
             );
             $last_discovery = $discovery_decision;
@@ -743,7 +764,7 @@ final class ProviderRuntime {
                     $is_content_turn || $is_content_edit_turn
                         ? $discovery_decision['compose']
                         || true !== ($options['presentation_edit'] ?? false)
-                        && $explore_hops >= self::MAX_EXPLORE_HOPS
+                        && $explore_hops >= $max_explore_hops
                         : [] !== ($turn_profile?->compose_allowlist() ?? [])
                 );
 
@@ -960,6 +981,31 @@ final class ProviderRuntime {
             }
 
             break;
+        }
+
+        // Improve evaluate: if the model burned hops re-reading truncated trees and
+        // never emitted a plan, force one tools-off finalization from existing evidence.
+        if (
+            ($loop_profile?->is_improve_evaluate() ?? false)
+            && $this->has_successful_evaluate_evidence($tool_calls)
+            && !$this->looks_like_execution_plan($content)
+        ) {
+            $finalized = $this->force_improve_evaluate_plan(
+                $provider,
+                $session_id,
+                [
+                    'messages' => $messages,
+                    'tool_calls' => $tool_calls,
+                    'result' => $result,
+                    'content' => $content,
+                    'turn_started_at' => $turn_started_at,
+                    'turn_wall_seconds' => (int) ($options['turn_wall_seconds'] ?? self::IMPROVE_EVALUATE_WALL_SECONDS),
+                    'turn_id' => (string) ($turn_context['turn_id'] ?? ''),
+                ],
+            );
+            $content = $finalized['content'];
+            $result = $finalized['result'];
+            $messages = $finalized['messages'];
         }
 
         if ([] === $actions && $compose_only && $this->completion_was_truncated($result)) {
@@ -1314,15 +1360,8 @@ final class ProviderRuntime {
             $failure_code = is_wp_error($follow_up)
                 ? sanitize_key((string) $follow_up->get_error_code())
                 : 'awpt_provider_finalization_failed';
-            $proposal_tool = 'awpt/propose-content-update';
 
-            foreach ($offered_tool_names as $offered_tool_name) {
-                if (ToolRegistry::is_proposal_ability($offered_tool_name)) {
-                    $proposal_tool = $offered_tool_name;
-                    break;
-                }
-            }
-
+            // Do not pretend a transport timeout was a propose-content-update ability failure.
             return [
                 // Finalization formats the tool results once. Returning an
                 // already-formatted transcript here duplicated every read.
@@ -1331,7 +1370,7 @@ final class ProviderRuntime {
                 'continue' => false,
                 'offered_tool_names' => $offered_tool_names,
                 'failure_tool_call' => [
-                    'tool' => $proposal_tool,
+                    'tool' => 'awpt/provider-finalization',
                     'input' => [],
                     'output' => [
                         'error' => '' !== trim($failure_message)
@@ -1519,6 +1558,260 @@ final class ProviderRuntime {
         return in_array($reason, ['length', 'max_tokens', 'max_completion_tokens'], true);
     }
 
+    /**
+     * Whether evaluate discovery already produced enough read evidence to draft a plan.
+     *
+     * @param array<int, array<string, mixed>> $tool_calls
+     */
+    private function has_successful_evaluate_evidence(array $tool_calls): bool {
+        foreach ($tool_calls as $call) {
+            if ('success' !== (string) ($call['status'] ?? '')) {
+                continue;
+            }
+
+            $tool = (string) ($call['tool'] ?? '');
+
+            if (in_array(
+                $tool,
+                [
+                    'awpt/read-block-tree',
+                    'awpt/read-content',
+                    'core/read-content',
+                    'awpt/analyze-page',
+                    'awpt/recommend-patterns',
+                ],
+                true,
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Heuristic: a real evaluate deliverable is a multi-line plan, not mid-loop thrash.
+     */
+    private function looks_like_execution_plan(string $content): bool {
+        $content = trim($content);
+
+        if (mb_strlen($content) < 120) {
+            return false;
+        }
+
+        // Intermediate "let me re-read..." style messages after truncation thrash.
+        if (
+            (bool) preg_match(
+                '/^(let me|i(?:\'|’)ll|i will|getting|fetching|reading|one more|trying again)\b/iu',
+                $content,
+            )
+            && mb_strlen($content) < 400
+        ) {
+            return false;
+        }
+
+        if ((bool) preg_match('/^#{1,3}\s+\S/m', $content)) {
+            return true;
+        }
+
+        if ((bool) preg_match(
+            '/\b(prepare-pattern-change|propose-block-batch|mode=replace|mode=insert|batch\/attrs|no change|path\s+\d|keep\b|preserve_by_default)\b/i',
+            $content,
+        )) {
+            return true;
+        }
+
+        return substr_count($content, "\n") >= 4 && mb_strlen($content) >= 200;
+    }
+
+    /**
+     * One tools-off hop so evaluate turns end with a plan when hop budget was spent on reads.
+     *
+     * @param array{
+     *   messages: array<int, array<string, mixed>>,
+     *   tool_calls: array<int, array<string, mixed>>,
+     *   result: array<string, mixed>,
+     *   content: string,
+     *   turn_started_at?: float,
+     *   turn_wall_seconds?: int,
+     *   turn_id?: string
+     * } $context
+     * @return array{
+     *   content: string,
+     *   result: array<string, mixed>,
+     *   messages: array<int, array<string, mixed>>
+     * }
+     */
+    private function force_improve_evaluate_plan(
+        ProviderInterface $provider,
+        int $session_id,
+        array $context,
+    ): array {
+        $messages = $context['messages'];
+        $tool_calls = $context['tool_calls'];
+        $result = $context['result'];
+        $content = $context['content'];
+        $turn_started_at = $this->float_value($context['turn_started_at'] ?? null, microtime(true));
+        $turn_wall_seconds = (int) ($context['turn_wall_seconds'] ?? self::IMPROVE_EVALUATE_WALL_SECONDS);
+        $turn_id = (string) ($context['turn_id'] ?? '');
+        $remaining = $turn_wall_seconds - (int) ceil(microtime(true) - $turn_started_at);
+
+        if ($remaining < self::MIN_USEFUL_REQUEST_SECONDS) {
+            return [
+                'content' => $this->fallback_evaluate_plan_from_evidence($tool_calls, $content),
+                'result' => $result,
+                'messages' => $messages,
+            ];
+        }
+
+        $messages[] = [
+            'role' => 'system',
+            'content' => implode(' ', [
+                'Discovery is complete for this evaluate-only turn.',
+                'Do not call any more tools — truncated re-reads will not help.',
+                'Write the final compact markdown execution plan now from the verified tool results already in this conversation:',
+                'what to keep, what to change, least-destructive op per change (batch/attrs, prepare-pattern-change mode=replace, insert, or no change),',
+                'preserve_by_default / carry-forward notes, and concrete paths when known.',
+                'No propose-* calls. No staging. The next turn will execute this plan.',
+            ]),
+        ];
+
+        new ChatProgress()->update($session_id, $turn_id, [
+            'phase' => 'finalizing',
+            'label' => __('Writing the plan', 'agent-wordpress-terminal'),
+            'detail' => __(
+                'Evidence is ready; drafting the execution plan without more tool calls.',
+                'agent-wordpress-terminal',
+            ),
+            'diagnostics' => [
+                'mode' => 'improve_evaluate_finalize',
+                'tool_count' => count($tool_calls),
+                'request_timeout_seconds' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining)),
+            ],
+        ]);
+
+        $started_at = microtime(true);
+        $follow_up = $provider->complete($messages, [], [
+            'session_id' => $session_id,
+            'turn_id' => $turn_id,
+            'tool_round' => count($tool_calls),
+            'log_phase' => 'improve_evaluate_finalize',
+            'max_completion_tokens' => 2_400,
+            'tool_choice' => 'none',
+            'timeout' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining)),
+        ]);
+        $this->record_provider_call($session_id, [
+            'provider' => $provider->get_name(),
+            'tool_round' => count($tool_calls),
+            'budget' => 2_400,
+            'started_at' => $started_at,
+            'result' => $follow_up,
+            'turn_id' => $turn_id,
+        ]);
+
+        if (!is_array($follow_up)) {
+            return [
+                'content' => $this->fallback_evaluate_plan_from_evidence($tool_calls, $content),
+                'result' => $result,
+                'messages' => $messages,
+            ];
+        }
+
+        // Ignore any tool calls on this forced hop — evaluate finalization is text-only.
+        $plan = trim((string) ($follow_up['content'] ?? ''));
+
+        if (!$this->looks_like_execution_plan($plan)) {
+            $plan = $this->fallback_evaluate_plan_from_evidence($tool_calls, $plan !== '' ? $plan : $content);
+        }
+
+        $messages[] = [
+            'role' => 'assistant',
+            'content' => $plan,
+        ];
+
+        return [
+            'content' => $plan,
+            'result' => $follow_up,
+            'messages' => $messages,
+        ];
+    }
+
+    /**
+     * Deterministic last-resort plan when the provider still will not write one.
+     *
+     * @param array<int, array<string, mixed>> $tool_calls
+     */
+    private function fallback_evaluate_plan_from_evidence(array $tool_calls, string $prior = ''): string {
+        $identity = '';
+        $sections = 0;
+        $tools_used = [];
+
+        foreach ($tool_calls as $call) {
+            if ('success' !== (string) ($call['status'] ?? '')) {
+                continue;
+            }
+
+            $tool = (string) ($call['tool'] ?? '');
+            $tools_used[$tool] = true;
+            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+
+            if (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
+                $id = (int) ($output['id'] ?? 0);
+                $title = trim((string) ($output['title'] ?? ''));
+
+                if ($id > 0) {
+                    $identity = sprintf('#%d%s', $id, '' !== $title ? ' ' . $title : '');
+                }
+            }
+
+            if ('awpt/read-block-tree' === $tool) {
+                $top = is_array($output['top_level_sections'] ?? null) ? $output['top_level_sections'] : [];
+                $sections = max($sections, count($top));
+
+                if (0 === $sections) {
+                    $sections = max($sections, (int) ($output['count'] ?? 0));
+                }
+            }
+        }
+
+        $lines = [
+            '## Execution plan',
+            '',
+            '' !== $identity
+                ? sprintf('Focused page: %s.', $identity)
+                : 'Focused page: use the session focus / last successful read.',
+        ];
+
+        if ($sections > 0) {
+            $lines[] = sprintf('Structure observed: about %d top-level section(s) / blocks in evidence.', $sections);
+        }
+
+        $lines[] = '';
+        $lines[] = '### Recommended next ops';
+        $lines[] = '- Prefer `awpt/read-block-tree` top_level_sections paths already gathered; do not re-discover from scratch.';
+        $lines[] = '- Surgical fixes: `awpt/propose-block-batch-update` (one non-insertion mutation per path; use `update_block` for combined attrs + text).';
+        $lines[] = '- Section swaps: `prepare-pattern-change` mode=replace → `propose-pattern-replace`.';
+        $lines[] = '- Additions: `prepare-pattern-change` mode=insert → prepared insert when available.';
+        $lines[] = '- Preserve dynamic / preserve_by_default sections and carry-forward links/numbers.';
+        $lines[] = '- No change if evidence shows the page is already fine.';
+        $lines[] = '';
+        $lines[] = '### Evidence used';
+        $lines[] = '- Tools: ' . implode(', ', array_keys($tools_used));
+
+        $prior = trim($prior);
+
+        if ('' !== $prior && mb_strlen($prior) < 500) {
+            $lines[] = '';
+            $lines[] = '### Model note before finalization';
+            $lines[] = $prior;
+        }
+
+        $lines[] = '';
+        $lines[] = '_Plan finalized from verified evidence after evaluate tool budget was exhausted._';
+
+        return implode("\n", $lines);
+    }
+
     private function should_allow_terminal_content_loss_recovery(
         int $proposal_failures,
         string $latest_failure_code,
@@ -1571,7 +1864,7 @@ final class ProviderRuntime {
 
     /**
      * @param array<int, array<string, mixed>> $tool_calls
-     * @param array<string, mixed>             $turn_context
+     * @param array<array-key, mixed>          $turn_context
      */
     private function focus_post_id_for_pack(int $session_id, array $tool_calls, array $turn_context): int {
         $from_context = (int) ($turn_context['focus_post_id'] ?? 0);
@@ -1968,7 +2261,16 @@ final class ProviderRuntime {
 
         $failures = array_values(array_filter(
             $this->unresolved_tool_failures($tool_calls),
-            static fn(array $call): bool => ToolRegistry::is_proposal_ability((string) ($call['tool'] ?? '')),
+            static function (array $call): bool {
+                $tool = (string) ($call['tool'] ?? '');
+                if (ToolRegistry::is_proposal_ability($tool)) {
+                    return true;
+                }
+
+                // Provider transport timeouts during compose are not proposal abilities
+                // but must still classify the turn as failed (honest labeling).
+                return 'awpt/provider-finalization' === $tool;
+            },
         ));
 
         if ([] !== $failures) {

@@ -136,6 +136,11 @@ final class TurnProfile {
         return ImprovePagePrompt::is_evaluate_message($this->message);
     }
 
+    /** Improve act turn (execute an approved plan; soft trust, limited rediscovery). */
+    public function is_improve_act(): bool {
+        return ImprovePagePrompt::is_act_message($this->message);
+    }
+
     /**
      * @param array{
      *     prior_user_messages?: list<string>,
@@ -171,6 +176,32 @@ final class TurnProfile {
                     'settings_or_theme' => false,
                     'template_or_styles' => true,
                     'has_open_proposals' => $has_open_proposals,
+                    'has_open_incidents' => $has_open_incidents,
+                    'has_focus' => $has_focus,
+                ],
+            ]);
+        }
+
+        // Improve act: execute an approved plan — edit tools, minimal rediscovery.
+        if (ImprovePagePrompt::is_act_message($message)) {
+            return new self([
+                'message' => $message,
+                'content_turn' => false,
+                'content_edit_turn' => true,
+                'presentation_edit' => false,
+                'work_mode' => self::MODE_EDIT,
+                'design_level' => SiteDesignContext::LEVEL_SECTION,
+                'tool_profile' => self::TOOL_EDIT,
+                'auto_retrieve_knowledge' => false,
+                'history_limit' => 20,
+                'flags' => [
+                    'site_data' => false,
+                    'frontend' => false,
+                    'diagnosis' => $has_open_incidents,
+                    'settings_or_theme' => false,
+                    'template_or_styles' => true,
+                    'has_open_proposals' => $has_open_proposals,
+                    'has_open_incidents' => $has_open_incidents,
                     'has_focus' => $has_focus,
                 ],
             ]);
@@ -447,6 +478,18 @@ final class TurnProfile {
             ));
         }
 
+        // Act: trust the plan — only tools needed for fingerprints / prepare / one pattern load.
+        if ($this->is_improve_act()) {
+            return [
+                'awpt/read-content',
+                'awpt/read-block-tree',
+                'awpt/get-block',
+                'awpt/prepare-pattern-change',
+                'awpt/recommend-patterns',
+                'awpt/read-pattern',
+            ];
+        }
+
         if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
             return $this->explore_allowlist_for_edit();
         }
@@ -546,14 +589,15 @@ final class TurnProfile {
         }
 
         if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
+            // Batch and prepared section ops first; freehand last (act isolation relies on this order).
             return [
-                'awpt/propose-pattern-replace',
-                'awpt/propose-content-update',
-                'awpt/propose-block-attrs-update',
                 'awpt/propose-block-batch-update',
+                'awpt/propose-pattern-replace',
+                'awpt/propose-pattern-insert',
+                'awpt/propose-block-attrs-update',
                 'awpt/propose-block-insert',
                 'awpt/propose-block-remove',
-                'awpt/propose-pattern-insert',
+                'awpt/propose-content-update',
             ];
         }
 
@@ -742,7 +786,8 @@ final class TurnProfile {
      *     frontend: bool,
      *     diagnosis: bool,
      *     settings_or_theme: bool,
-     *     template_or_styles: bool
+     *     template_or_styles: bool,
+     *     redesign: bool,
      * } $signals
      */
     private static function should_auto_retrieve_knowledge(array $signals): bool {

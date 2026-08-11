@@ -169,10 +169,12 @@ final class RecommendPatterns implements AbilityInterface {
             $affinity = $this->section_role_affinity(
                 $target_role,
                 $prefer_section_scope,
-                (string) ($domain['role'] ?? ''),
-                (string) ($pattern['composition_scope'] ?? ''),
-                (string) ($pattern['name'] ?? ''),
-                (string) ($pattern['title'] ?? ''),
+                [
+                    'role' => (string) ($domain['role'] ?? ''),
+                    'composition_scope' => (string) ($pattern['composition_scope'] ?? ''),
+                    'name' => (string) ($pattern['name'] ?? ''),
+                    'title' => (string) ($pattern['title'] ?? ''),
+                ],
             );
             $score += $affinity['score'];
 
@@ -269,24 +271,22 @@ final class RecommendPatterns implements AbilityInterface {
     /**
      * Soft boost / demote based on page-section role vs pattern domain role / scope.
      *
+     * @param array{role: string, composition_scope: string, name: string, title: string} $pattern
      * @return array{score: int, rationale: string}
      */
     private function section_role_affinity(
         string $section_role,
         bool $prefer_section_scope,
-        string $pattern_role,
-        string $composition_scope,
-        string $pattern_name,
-        string $pattern_title,
+        array $pattern,
     ): array {
         $score = 0;
         $notes = [];
         $blob = mb_strtolower(
-            trim($pattern_role . ' ' . $composition_scope . ' ' . $pattern_name . ' ' . $pattern_title),
+            trim(implode(' ', $pattern)),
             'UTF-8',
         );
-        $pattern_role_l = mb_strtolower($pattern_role, 'UTF-8');
-        $scope_l = mb_strtolower($composition_scope, 'UTF-8');
+        $pattern_role_l = mb_strtolower($pattern['role'], 'UTF-8');
+        $scope_l = mb_strtolower($pattern['composition_scope'], 'UTF-8');
 
         if ('' !== $section_role) {
             $aliases = $this->section_role_aliases($section_role);

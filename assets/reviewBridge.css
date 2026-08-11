@@ -2,27 +2,67 @@
 	color: #1d2327;
 }
 
-/* Single-row toolbar: title + primary action */
-.awpt-review-bridge__primary {
-	display: flex;
+/* The idle assistant is one command row so the page preview keeps the viewport. */
+.awpt-review-bridge__command {
+	display: grid;
+	grid-template-columns: max-content max-content minmax(10rem, 1fr) max-content;
 	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 0.45rem 0.65rem;
+	gap: 0.45rem;
+	padding: 0.35rem 0.45rem;
 	border: 1px solid #c3c4c7;
 	border-radius: 8px;
 	background: #f6f7f7;
 }
 
-.awpt-review-bridge__primary h2 {
+.awpt-review-bridge__identity {
+	display: flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	white-space: nowrap;
+}
+
+.awpt-review-bridge__identity h2 {
 	margin: 0;
-	font-size: 0.95rem;
+	font-size: 0.85rem;
 	font-weight: 600;
 	line-height: 1.3;
 }
 
-.awpt-review-bridge__primary .components-button {
-	flex: 0 0 auto;
+.awpt-review-bridge__identity span {
+	color: #646970;
+	font-size: 0.72rem;
+	line-height: 1.3;
+}
+
+.awpt-review-bridge__reset.components-button {
+	height: 30px;
+	min-height: 30px;
+	padding-inline: 0.35rem;
+	font-size: 0.72rem;
+}
+
+.awpt-review-bridge__request {
+	min-width: 0;
+}
+
+.awpt-review-bridge__request.components-base-control {
+	margin: 0;
+}
+
+.awpt-review-bridge__request .components-base-control__field {
+	margin: 0;
+}
+
+.awpt-review-bridge__request input.components-text-control__input {
+	width: 100%;
+	min-width: 0;
+	height: 32px;
+	min-height: 32px;
+	padding-inline: 0.55rem;
+	font-size: 0.8rem;
+}
+
+.awpt-review-bridge__submit.components-button {
 	height: 32px;
 	min-height: 32px;
 }
@@ -33,28 +73,48 @@
 	--awpt-accent: #2271b1;
 	--awpt-progress-timing: #646970;
 	--awpt-progress-track: #dcdcde;
-	margin-top: 0.5rem;
-	padding: 0.5rem 0.65rem;
+	margin-top: 0.35rem;
+	padding: 0.4rem 0.55rem;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
 	background: #fff;
 }
 
+.awpt-review-bridge__progress .awpt-turn-status {
+	grid-template-columns: minmax(0, 1fr) max-content;
+	align-items: center;
+	gap: 0.25rem 0.6rem;
+}
+
+.awpt-review-bridge__progress .awpt-turn-status__primary {
+	flex-wrap: nowrap;
+}
+
+.awpt-review-bridge__progress .awpt-turn-status__detail {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.awpt-review-bridge__progress .awpt-turn-status__track {
+	grid-column: 1 / -1;
+	width: 100%;
+}
+
 .awpt-review-bridge__action {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: space-between;
 	gap: 0.65rem;
-	margin-top: 0.5rem;
-	padding: 0.5rem 0.65rem;
+	margin-top: 0.35rem;
+	padding: 0.4rem 0.55rem;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
 	background: #fff;
 }
 
 .awpt-review-bridge__action.is-applied {
-	border-color: #c3c4c7;
-	border-left: 3px solid #dba617;
+	border-color: #dba617;
 	background: #fcf9e8;
 }
 
@@ -66,7 +126,7 @@
 .awpt-review-bridge__action-head {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: baseline;
+	align-items: center;
 	gap: 0.35rem 0.5rem;
 }
 
@@ -74,13 +134,24 @@
 	display: inline-block;
 	padding: 0.05rem 0.4rem;
 	border-radius: 999px;
-	background: #f0b849;
-	color: #1d2327;
+	background: #dcebf7;
+	color: #135e96;
 	font-size: 0.7rem;
 	font-weight: 600;
 	line-height: 1.4;
 	letter-spacing: 0.01em;
 	text-transform: uppercase;
+}
+
+.awpt-review-bridge__status-pill[data-state="verified"] {
+	background: #dff3e4;
+	color: #1e6b34;
+}
+
+.awpt-review-bridge__status-pill[data-state="applied"],
+.awpt-review-bridge__status-pill[data-state="unverified"] {
+	background: #f0b849;
+	color: #1d2327;
 }
 
 .awpt-review-bridge__action-title {
@@ -103,10 +174,9 @@
 
 .awpt-review-bridge > .components-notice,
 .awpt-review-bridge__notice {
-	margin: 0.5rem 0 0;
+	margin: 0.35rem 0 0;
 }
 
-.awpt-review-bridge > .components-notice p,
 .awpt-review-bridge__notice p {
 	margin: 0.25rem 0 0;
 }
@@ -119,6 +189,16 @@
 	font-size: 0.75rem;
 }
 
+.awpt-review-bridge__error-details {
+	margin-block-start: 0.25rem;
+	font-size: 0.75rem;
+}
+
+.awpt-review-bridge__error-details summary {
+	width: max-content;
+	cursor: pointer;
+}
+
 .awpt-review-bridge__recovery-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -126,15 +206,34 @@
 	margin-block-start: 0.45rem;
 }
 
-/* Flat change summary — no nested “card in a card” */
+/* Secondary evidence stays available without consuming preview height. */
 .awpt-review-bridge__summary {
-	margin-top: 0.35rem;
-	padding: 0;
-	border: 0;
-	background: transparent;
+	display: inline-block;
+	margin-top: 0.2rem;
+	color: #50575e;
+	font-size: 0.75rem;
 }
 
-.awpt-review-bridge__summary-eyebrow {
+.awpt-review-bridge__summary > summary {
+	width: max-content;
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.awpt-review-bridge__summary > summary:hover {
+	color: #135e96;
+}
+
+.awpt-review-bridge__summary > summary:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.awpt-review-bridge__summary-content {
+	margin-top: 0.25rem;
+}
+
+.awpt-review-bridge__summary-label {
 	margin: 0;
 	color: #50575e;
 	font-size: 0.75rem;
@@ -146,7 +245,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.2rem 0.75rem;
-	margin: 0.2rem 0 0;
+	margin: 0.15rem 0 0;
 	padding-left: 0;
 	list-style: none;
 	color: #50575e;
@@ -196,9 +295,32 @@
 	line-height: 1.4;
 }
 
+.awpt-review-bridge > .components-notice p {
+	margin: 0.25rem 0 0;
+}
+
 @media (max-width: 782px) {
-	.awpt-review-bridge__primary {
-		flex-wrap: wrap;
+	.awpt-review-bridge__command {
+		grid-template-columns: minmax(0, 1fr) max-content;
+		grid-template-areas:
+			"identity reset"
+			"request submit";
+	}
+
+	.awpt-review-bridge__identity {
+		grid-area: identity;
+	}
+
+	.awpt-review-bridge__reset {
+		grid-area: reset;
+	}
+
+	.awpt-review-bridge__request {
+		grid-area: request;
+	}
+
+	.awpt-review-bridge__submit {
+		grid-area: submit;
 	}
 
 	.awpt-review-bridge__action {

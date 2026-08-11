@@ -16,8 +16,10 @@ use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionGate;
 use AWPT\Domain\ExistingContentPreservationValidator;
 use AWPT\Domain\PatternCompositionBuilder;
+use AWPT\Domain\PatternEditableSlots;
 use AWPT\Domain\PatternMaterializer;
 use AWPT\Domain\PatternMediaPlacer;
+use AWPT\Domain\PatternMediaSlots;
 use AWPT\Domain\PatternPreparationReceipt;
 use AWPT\Domain\PatternTextUpdater;
 use AWPT\Support\ActionOperations;
@@ -201,10 +203,7 @@ final class ProposePatternReplace implements AbilityInterface {
 
         $expected_expanded = (string) ($receipt['expanded_content_hash'] ?? '');
 
-        if (
-            '' !== $expected_expanded
-            && !hash_equals($expected_expanded, hash('sha256', $base))
-        ) {
+        if ('' !== $expected_expanded && !hash_equals($expected_expanded, hash('sha256', $base))) {
             return new \WP_Error(
                 'awpt_preparation_pattern_stale',
                 __(
@@ -218,13 +217,13 @@ final class ProposePatternReplace implements AbilityInterface {
         $built = new PatternTextUpdater()->apply($base, $text_updates);
 
         if (is_wp_error($built)) {
-            return $built;
+            return $this->prepared_slot_error($built, $receipt);
         }
 
         $built = new PatternMediaPlacer()->apply($built, $media_placements);
 
         if (is_wp_error($built)) {
-            return $built;
+            return $this->prepared_slot_error($built, $receipt);
         }
 
         $pattern_name = $pattern_names[0];
@@ -393,5 +392,26 @@ final class ProposePatternReplace implements AbilityInterface {
         }
 
         return $this->actions->format_action($action_id) ?? [];
+    }
+
+    /** @param array<string, mixed> $receipt */
+    private function prepared_slot_error(\WP_Error $error, array $receipt): \WP_Error {
+        $data = $error->get_error_data();
+        $data = is_array($data) ? $data : [];
+        $content = (string) ($receipt['pattern_content'] ?? '');
+        $data['preparation_id'] = (string) ($receipt['preparation_id'] ?? '');
+        $data['editable_slots'] = new PatternEditableSlots()->from_content($content);
+        $data['media_slots'] = new PatternMediaSlots()->from_content($content);
+        $data['carry_forward'] = is_array($receipt['carry_forward'] ?? null) ? $receipt['carry_forward'] : [];
+        $data['recovery'] = __(
+            'Retry with this preparation_id and a block_path from editable_slots or media_slots. Do not prepare again.',
+            'agent-wordpress-terminal',
+        );
+        $data['retry_example'] = [
+            'preparation_id' => (string) ($receipt['preparation_id'] ?? ''),
+            'pattern_text_updates' => [['block_path' => '0.0', 'content' => 'Replacement copy']],
+        ];
+
+        return new \WP_Error($error->get_error_code(), $error->get_error_message(), $data);
     }
 }

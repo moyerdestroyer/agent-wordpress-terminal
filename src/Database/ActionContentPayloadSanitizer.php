@@ -432,7 +432,7 @@ final class ActionContentPayloadSanitizer {
                 $kind = sanitize_key((string) ($change['kind'] ?? ''));
                 $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
 
-                if (!in_array($kind, ['update_attrs', 'replace_text', 'remove', 'insert'], true) || '' === $path) {
+                if (!in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true) || '' === $path) {
                     return null;
                 }
 
@@ -523,6 +523,8 @@ final class ActionContentPayloadSanitizer {
      * @return list<null|string>
      */
     private function sanitize_inner_content(?array $inner_content, string $inner_html, int $inner_block_count): array {
+        $inner_block_count = max(0, $inner_block_count);
+
         if (null === $inner_content || [] === $inner_content) {
             return 0 === $inner_block_count
                 ? [$inner_html]

@@ -78,6 +78,7 @@ function awpt_test_reset_state(): void {
     ];
     $GLOBALS['awpt_test_registered_patterns'] = [];
     $GLOBALS['awpt_test_transients'] = [];
+    $GLOBALS['awpt_test_uuid_counter'] = 0;
 }
 
 awpt_test_reset_state();
@@ -561,6 +562,14 @@ if (!function_exists('wp_generate_password')) {
         }
 
         return $password;
+    }
+}
+
+if (!function_exists('wp_generate_uuid4')) {
+    function wp_generate_uuid4(): string {
+        $counter = ++$GLOBALS['awpt_test_uuid_counter'];
+
+        return sprintf('00000000-0000-4000-8000-%012d', $counter);
     }
 }
 

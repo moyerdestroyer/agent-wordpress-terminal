@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Domain;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -39,7 +41,8 @@ final class PatternPreparationReceipt {
      *   expanded_content_hash?: string,
      *   pattern_content?: string,
      *   position?: string,
-     *   post_type?: string
+     *   post_type?: string,
+     *   carry_forward?: array<string, mixed>
      * } $data
      * @return array{preparation_id: string, expires_at: int, receipt: array<string, mixed>}
      */
@@ -57,10 +60,7 @@ final class PatternPreparationReceipt {
 
         $preparation_id = function_exists('wp_generate_uuid4')
             ? (string) wp_generate_uuid4()
-            : hash(
-                'sha256',
-                microtime(true) . '|' . random_int(0, PHP_INT_MAX) . '|' . implode(',', $pattern_names),
-            );
+            : hash('sha256', microtime(true) . '|' . random_int(0, PHP_INT_MAX) . '|' . implode(',', $pattern_names));
 
         $expires_at = time() + self::TTL_SECONDS;
         // Sign only compact fields; large pattern markup is stored but integrity-
@@ -79,6 +79,7 @@ final class PatternPreparationReceipt {
             'expanded_content_hash' => sanitize_text_field((string) ($data['expanded_content_hash'] ?? '')),
             'position' => $position,
             'post_type' => sanitize_key((string) ($data['post_type'] ?? '')),
+            'carry_forward' => is_array($data['carry_forward'] ?? null) ? $data['carry_forward'] : [],
             'created_at' => time(),
             'expires_at' => $expires_at,
             'signature' => '',
@@ -109,9 +110,9 @@ final class PatternPreparationReceipt {
             );
         }
 
-        $stored = get_transient($this->transient_key($preparation_id));
+        $stored = ArrayKey::as_map(get_transient($this->transient_key($preparation_id)));
 
-        if (!is_array($stored)) {
+        if ([] === $stored) {
             return new \WP_Error(
                 'awpt_preparation_not_found',
                 __(

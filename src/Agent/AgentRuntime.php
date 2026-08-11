@@ -10,8 +10,11 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Database\ImproveWorkflowRepository;
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\ArrayKey;
+use AWPT\Support\ImprovePagePrompt;
 use AWPT\Support\SessionTitleSuggester;
 
 if (!defined('ABSPATH')) {
@@ -46,13 +49,78 @@ final class AgentRuntime {
 
         $now = current_time('mysql');
 
-        $stored_message = $this->message_with_attachment_summary($message, $turn_context['attachments'] ?? []);
+        // Expand plan/improve slash aliases before storage so TurnProfile sees the
+        // evaluate marker (or redesign brief) and the transcript matches the wire message.
+        $expanded = ImprovePagePrompt::expand_slash_command($message);
+        $wire_message = null !== $expanded ? (string) $expanded['message'] : $message;
+        $workflow_input = is_array($turn_context['workflow'] ?? null) ? $turn_context['workflow'] : [];
+        $workflow_repository = new ImproveWorkflowRepository();
+        $workflow = null;
+
+        if (ImprovePagePrompt::is_evaluate_message($wire_message)) {
+            $summary = $this->sessions->get_summary($session_id);
+            $workflow = $workflow_repository->begin_evaluate(
+                $session_id,
+                (int) ($turn_context['focus_post_id'] ?? $summary['focus_post_id'] ?? 0),
+                sanitize_key((string) ($turn_context['turn_id'] ?? '')),
+            );
+        } elseif (ImprovePagePrompt::is_act_message($wire_message)) {
+            $active = $workflow_repository->get($session_id);
+            $workflow_id = sanitize_text_field((string) ($workflow_input['id'] ?? $active['id'] ?? ''));
+            $summary = $this->sessions->get_summary($session_id);
+            $workflow = $workflow_repository->begin_act(
+                $session_id,
+                $workflow_id,
+                (int) ($turn_context['focus_post_id'] ?? $summary['focus_post_id'] ?? 0),
+                sanitize_key((string) ($turn_context['turn_id'] ?? '')),
+            );
+            if (is_wp_error($workflow)) {
+                return $workflow;
+            }
+            $wire_message = ImprovePagePrompt::act_message((string) ($workflow['plan'] ?? ''));
+        }
+
+        $stored_message = $this->message_with_attachment_summary($wire_message, $turn_context['attachments'] ?? []);
         $this->messages->store_message($session_id, 'user', $stored_message, $now);
 
-        $response = $this->dispatch_message($session_id, $message, $turn_context);
+        $response = $this->dispatch_message($session_id, $wire_message, $turn_context);
 
         if (is_wp_error($response)) {
+            if (is_array($workflow)) {
+                $workflow_repository->fail(
+                    $session_id,
+                    (string) $response->get_error_code(),
+                    $response->get_error_message(),
+                );
+            }
             return $response;
+        }
+
+        if (ImprovePagePrompt::is_evaluate_message($wire_message)) {
+            $outcome = is_array($response['turn_outcome'] ?? null) ? $response['turn_outcome'] : [];
+            $workflow = 'failed' === (string) ($outcome['status'] ?? '')
+                ? $workflow_repository->fail(
+                    $session_id,
+                    (string) ($outcome['error_code'] ?? 'awpt_improve_evaluate_failed'),
+                    (string) ($outcome['message'] ?? __('Page evaluation failed.', 'agent-wordpress-terminal')),
+                )
+                : $workflow_repository->plan_ready($session_id, (string) ($response['content'] ?? ''));
+        } elseif (ImprovePagePrompt::is_act_message($wire_message)) {
+            $action_ids = [];
+            foreach (is_array($response['actions'] ?? null) ? $response['actions'] : [] as $action) {
+                if (is_array($action) && (int) ($action['id'] ?? 0) > 0) {
+                    $action_ids[] = (int) $action['id'];
+                }
+            }
+            $workflow = $workflow_repository->finish_act(
+                $session_id,
+                $action_ids,
+                ArrayKey::as_map($response['turn_outcome'] ?? null),
+            );
+        }
+
+        if (is_array($workflow)) {
+            $response['improve_workflow'] = $workflow;
         }
 
         if ('clear' === ($response['command'] ?? '')) {

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   bin/queue-improve-cohort.sh 848 853 858
-#   bin/queue-improve-cohort.sh --label=post-m3 848 853 858
+#   bin/queue-improve-cohort.sh --class=structural_replace --label=post-change 848 853 858
 #   bin/queue-improve-cohort.sh --scorecard-only tmp-queue-runs/
 #
 # Requires `wp` on PATH for live runs. Scorecard-only mode needs only PHP.
@@ -12,15 +12,17 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL=""
+SCENARIO_CLASS="unclassified"
 SCORECARD_ONLY=0
 POST_IDS=()
 EXTRA_PATHS=()
 
 usage() {
   cat <<'EOF'
-Usage: bin/queue-improve-cohort.sh [--label=NAME] [--scorecard-only] <post_id...> [paths...]
+Usage: bin/queue-improve-cohort.sh [--label=NAME] [--class=CLASS] [--scorecard-only] <post_id...> [paths...]
 
   --label=NAME       Label embedded in cohort summary filename/metadata
+  --class=CLASS      structural_replace, additive_insert, surgical_copy, or no_change
   --scorecard-only   Skip wp runs; only aggregate existing awpt-queue-*.json
   post_id            Numeric post IDs to improve via bin/queue-improve-one.php
   paths              Optional dirs/files/globs for scorecard inputs
@@ -38,6 +40,9 @@ for arg in "$@"; do
       ;;
     --label=*)
       LABEL="${arg#--label=}"
+      ;;
+    --class=*)
+      SCENARIO_CLASS="${arg#--class=}"
       ;;
     ''|*[!0-9]*)
       EXTRA_PATHS+=("$arg")
@@ -60,7 +65,7 @@ if [[ "$SCORECARD_ONLY" -eq 0 ]]; then
   fi
   for id in "${POST_IDS[@]}"; do
     echo "=== queue improve post ${id} ==="
-    wp eval-file "$ROOT/bin/queue-improve-one.php" "$id"
+    wp eval-file "$ROOT/bin/queue-improve-one.php" "$id" "class=${SCENARIO_CLASS}"
   done
 fi
 

@@ -96,11 +96,7 @@ function test_scorecard_aggregate_rates_use_denominators(): void {
     Assert::same(1, $agg['structural']['counts']['prepare_change_success'] ?? null, 'one prepare');
     Assert::same(1, $agg['structural']['counts']['propose_replace_success'] ?? null, 'one replace');
     Assert::same(1, $agg['structural']['counts']['freehand_provenance'] ?? null, 'one freehand');
-    Assert::same(
-        0.3333,
-        $agg['structural']['rates']['server_materialized']['rate'] ?? null,
-        'materialize rate 1/3',
-    );
+    Assert::same(0.3333, $agg['structural']['rates']['server_materialized']['rate'] ?? null, 'materialize rate 1/3');
     Assert::same(3, $agg['structural']['rates']['server_materialized']['denominator'] ?? null, 'denom 3');
     Assert::same(20.0, $agg['wall_s_mean'] ?? null, 'mean wall 20');
     Assert::true(str_contains((string) ($agg['policy'] ?? ''), 'report-only'), 'policy present');
@@ -168,7 +164,57 @@ function test_scorecard_from_files_aggregates_disk_summaries(): void {
     rmdir($dir);
 }
 
+function test_scorecard_v2_uses_declared_classes_and_insert_funnel(): void {
+    $card = new QueueImproveScorecard();
+    $copy = $card->from_run_summary([
+        'run_id' => 'copy-1',
+        'scenario_class' => 'surgical_copy',
+        'meta' => ['prompt_version' => 'improve-page-eval-act-v1'],
+        'tools' => ['awpt/propose-block-batch-update:success'],
+    ]);
+    Assert::false($copy['eligible_structural'], 'declared copy task is not structural');
+    Assert::same('declared_surgical_copy', $copy['eligibility_reason'] ?? null, 'class controls denominator');
+
+    $insert = $card->from_run_summary([
+        'run_id' => 'insert-1',
+        'scenario_class' => 'additive_insert',
+        'path_used' => 'pattern_insert',
+        'server_materialized' => true,
+        'tools' => [
+            'awpt/prepare-pattern-change:success',
+            'awpt/propose-pattern-insert:success',
+        ],
+    ]);
+    Assert::true($insert['eligible_structural'], 'declared insert is structural');
+    Assert::same(1, $insert['propose_insert_success'] ?? null, 'insert tracked separately');
+    Assert::same('server_materialized', $insert['funnel_stage'] ?? null, 'funnel reaches materialization');
+    Assert::same('insert-1', $insert['run_id'] ?? null, 'unique run retained');
+
+    $failed = $card->from_run_summary([
+        'scenario_class' => 'structural_replace',
+        'tools' => [
+            'awpt/prepare-pattern-change:success',
+            'awpt/propose-pattern-replace:error',
+        ],
+    ]);
+    Assert::same('proposal_failed', $failed['funnel_stage'] ?? null, 'failed proposal stage is explicit');
+
+    $corrected = $card->from_run_summary([
+        'scenario_class' => 'additive_insert',
+        'path_used' => 'pattern_insert',
+        'server_materialized' => true,
+        'tools' => [
+            'awpt/prepare-pattern-change:success',
+            'awpt/propose-pattern-insert:error',
+            'awpt/propose-pattern-insert:success',
+        ],
+    ]);
+    Assert::same(1, $corrected['correction_count'] ?? null, 'failed compact proposal counts as correction');
+    Assert::same('prepared_then_corrected', $corrected['funnel_stage'] ?? null, 'recovered proposal is explicit');
+}
+
 test_scorecard_from_run_detects_prepare_replace_and_freehand();
 test_scorecard_aggregate_rates_use_denominators();
 test_scorecard_resolve_input_paths_filters_raw_and_cohort();
 test_scorecard_from_files_aggregates_disk_summaries();
+test_scorecard_v2_uses_declared_classes_and_insert_funnel();

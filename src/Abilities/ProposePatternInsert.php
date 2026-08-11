@@ -9,8 +9,13 @@ use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionGate;
 use AWPT\Domain\ExistingContentPreservationValidator;
+use AWPT\Domain\PatternEditableSlots;
 use AWPT\Domain\PatternMaterializer;
+use AWPT\Domain\PatternMediaPlacer;
+use AWPT\Domain\PatternMediaSlots;
+use AWPT\Domain\PatternPreparationReceipt;
 use AWPT\Domain\PatternStructureEvidence;
+use AWPT\Domain\PatternTextUpdater;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\PatternCatalog;
@@ -46,7 +51,7 @@ final class ProposePatternInsert implements AbilityInterface {
             'name' => 'awpt/propose-pattern-insert',
             'label' => __('Propose Pattern Insert', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages insertion of a registered or reusable pattern at a Gutenberg block path for approval.',
+                'Stages a prepared compact pattern insert, or an uncustomized registered pattern, for approval.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -54,13 +59,28 @@ final class ProposePatternInsert implements AbilityInterface {
                 'properties' => [
                     'session_id' => ['type' => 'integer'],
                     'post_id' => ['type' => 'integer'],
-                    'pattern_name' => ['type' => 'string'],
-                    'block_path' => ['type' => 'string'],
-                    'position' => ['type' => 'string'],
+                    'pattern_name' => [
+                        'type' => 'string',
+                        'description' => 'Exact registered name for the uncustomized legacy path only. Omit after successful preparation.',
+                    ],
+                    'preparation_id' => [
+                        'type' => 'string',
+                        'description' => 'Copy the exact ID from prepare-pattern-change mode=insert. Required after preparation succeeds.',
+                    ],
+                    'pattern_text_updates' => ['type' => 'array', 'items' => ['type' => 'object']],
+                    'media_placements' => ['type' => 'array', 'items' => ['type' => 'object']],
+                    'block_path' => [
+                        'type' => 'string',
+                        'description' => 'Uncustomized legacy path only; prepared inserts use the receipt-bound target.',
+                    ],
+                    'position' => [
+                        'type' => 'string',
+                        'description' => 'Uncustomized legacy path only; prepared inserts use the receipt-bound position.',
+                    ],
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
                 ],
-                'required' => ['session_id', 'post_id', 'pattern_name', 'title', 'description'],
+                'required' => ['session_id', 'post_id', 'title', 'description'],
             ],
             'output_schema' => ['type' => 'object'],
             'permission_callback' => [$this, 'can_propose'],
@@ -93,39 +113,103 @@ final class ProposePatternInsert implements AbilityInterface {
             ]);
         }
 
-        $resolved = $this->patterns->resolve_name((string) ($input['pattern_name'] ?? ''));
+        $preparation_id = sanitize_text_field((string) ($input['preparation_id'] ?? ''));
+        $receipt = [];
 
-        if (null === $resolved) {
-            return new \WP_Error('awpt_pattern_not_found', __('Pattern not found.', 'agent-wordpress-terminal'), [
-                'status' => 404,
-                'requested_name' => (string) ($input['pattern_name'] ?? ''),
-                'suggested_patterns' => $this->patterns->suggestions((string) ($input['pattern_name'] ?? ''), 8),
+        if ('' !== $preparation_id) {
+            $loaded = new PatternPreparationReceipt()->require_for_propose($preparation_id, [
+                'post_id' => $post_id,
+                'session_id' => $session_id,
+                'mode' => PatternPreparationReceipt::MODE_INSERT,
             ]);
-        }
-
-        $pattern = $resolved['pattern'];
-        $pattern_content = (string) ($pattern['content'] ?? '');
-        $pattern_name = $resolved['resolved_name'];
-
-        // Insert still needs structure evidence so agents cannot skip read-pattern.
-        // Catalog content is used for materialization only after a successful read/prep.
-        $read_error = new PatternStructureEvidence()->require_read_for_pattern_name($session_id, $pattern_name);
-        if ($read_error instanceof \WP_Error) {
-            return $read_error;
+            if (is_wp_error($loaded)) {
+                return $loaded;
+            }
+            $receipt = $loaded;
+            $source_hash = hash('sha256', $post->post_content);
+            if (
+                '' !== (string) ($receipt['source_content_hash'] ?? '')
+                && !hash_equals((string) $receipt['source_content_hash'], $source_hash)
+            ) {
+                return new \WP_Error(
+                    'awpt_preparation_source_stale',
+                    __('The post content changed since insert preparation.', 'agent-wordpress-terminal'),
+                    ['status' => 409, 'preparation_id' => $preparation_id],
+                );
+            }
+            $path = sanitize_text_field((string) ($receipt['target_path'] ?? ''));
+            $target = BlockTree::from_content($post->post_content)->get_block($path);
+            $expected_fingerprint = sanitize_text_field((string) ($receipt['expected_fingerprint'] ?? ''));
+            if (!is_array($target) || !hash_equals($expected_fingerprint, BlockTree::fingerprint($target))) {
+                return new \WP_Error(
+                    'awpt_block_fingerprint_mismatch',
+                    __('The insert anchor changed since preparation.', 'agent-wordpress-terminal'),
+                    ['status' => 409, 'preparation_id' => $preparation_id, 'target_path' => $path],
+                );
+            }
+            $pattern_names = is_array($receipt['pattern_names'] ?? null) ? $receipt['pattern_names'] : [];
+            $pattern_name = sanitize_text_field((string) ($pattern_names[0] ?? ''));
+            $pattern_content = (string) ($receipt['pattern_content'] ?? '');
+            if (
+                '' === $pattern_name
+                || '' === trim($pattern_content)
+                || !hash_equals((string) ($receipt['expanded_content_hash'] ?? ''), hash('sha256', $pattern_content))
+            ) {
+                return new \WP_Error(
+                    'awpt_preparation_pattern_stale',
+                    __('Prepared insert pattern content failed integrity verification.', 'agent-wordpress-terminal'),
+                    ['status' => 409, 'preparation_id' => $preparation_id],
+                );
+            }
+            $updated = new PatternTextUpdater()->apply(
+                $pattern_content,
+                is_array($input['pattern_text_updates'] ?? null) ? $input['pattern_text_updates'] : [],
+            );
+            if (is_wp_error($updated)) {
+                return $this->prepared_slot_error($updated, $receipt);
+            }
+            $placed = new PatternMediaPlacer()->apply(
+                $updated,
+                is_array($input['media_placements'] ?? null) ? $input['media_placements'] : [],
+            );
+            if (is_wp_error($placed)) {
+                return $this->prepared_slot_error($placed, $receipt);
+            }
+            $pattern_content = $placed;
+            $position = sanitize_key((string) ($receipt['position'] ?? BlockTree::POSITION_AFTER));
+            $resolved = $this->patterns->resolve_name($pattern_name);
+        } else {
+            $resolved = $this->patterns->resolve_name((string) ($input['pattern_name'] ?? ''));
+            if (null === $resolved) {
+                return new \WP_Error('awpt_pattern_not_found', __('Pattern not found.', 'agent-wordpress-terminal'), [
+                    'status' => 404,
+                    'requested_name' => (string) ($input['pattern_name'] ?? ''),
+                    'suggested_patterns' => $this->patterns->suggestions((string) ($input['pattern_name'] ?? ''), 8),
+                ]);
+            }
+            $pattern = $resolved['pattern'];
+            $pattern_content = (string) ($pattern['content'] ?? '');
+            $pattern_name = $resolved['resolved_name'];
+            $read_error = new PatternStructureEvidence()->require_read_for_pattern_name($session_id, $pattern_name);
+            if ($read_error instanceof \WP_Error) {
+                return $read_error;
+            }
+            $path = sanitize_text_field((string) ($input['block_path'] ?? ''));
+            $position = sanitize_key((string) ($input['position'] ?? BlockTree::POSITION_APPEND));
         }
 
         $materializer = new PatternMaterializer();
         $materialized_content = $materializer->materialize($pattern_name, $pattern_content);
         $blocks = array_values(array_filter(parse_blocks($materialized_content), BlockTree::has_block_name(...)));
-        $path = sanitize_text_field((string) ($input['block_path'] ?? ''));
-        $position = sanitize_key((string) ($input['position'] ?? BlockTree::POSITION_APPEND));
         $update = BlockTree::from_content($post->post_content)->insert_blocks($path, $blocks, $position);
 
         if (is_wp_error($update)) {
             return $update;
         }
 
-        $summary = $this->patterns->summary($pattern, $post->post_type);
+        $summary = null !== $resolved
+            ? $this->patterns->summary($resolved['pattern'], $post->post_type)
+            : ['name' => $pattern_name, 'title' => $pattern_name, 'source' => '', 'owner' => ''];
         // Normalize before domain validation so repairable tagName/wrapper drift
         // does not reject an otherwise valid pattern insert.
         $pipeline = new PostContentStagingPipeline();
@@ -200,6 +284,7 @@ final class ProposePatternInsert implements AbilityInterface {
             'post_content' => $update['content'],
             'block_path' => $path,
             'position' => $position,
+            'preparation_id' => $preparation_id,
             'pattern_name' => $summary['name'],
             'pattern_title' => $summary['title'],
             'pattern_source' => $summary['source'],
@@ -267,5 +352,26 @@ final class ProposePatternInsert implements AbilityInterface {
         }
 
         return $this->actions->format_action($action_id) ?? [];
+    }
+
+    /** @param array<string, mixed> $receipt */
+    private function prepared_slot_error(\WP_Error $error, array $receipt): \WP_Error {
+        $data = $error->get_error_data();
+        $data = is_array($data) ? $data : [];
+        $content = (string) ($receipt['pattern_content'] ?? '');
+        $data['preparation_id'] = (string) ($receipt['preparation_id'] ?? '');
+        $data['editable_slots'] = new PatternEditableSlots()->from_content($content);
+        $data['media_slots'] = new PatternMediaSlots()->from_content($content);
+        $data['carry_forward'] = is_array($receipt['carry_forward'] ?? null) ? $receipt['carry_forward'] : [];
+        $data['recovery'] = __(
+            'Retry with this preparation_id and a block_path from editable_slots or media_slots. Do not prepare again.',
+            'agent-wordpress-terminal',
+        );
+        $data['retry_example'] = [
+            'preparation_id' => (string) ($receipt['preparation_id'] ?? ''),
+            'pattern_text_updates' => [['block_path' => '0.0', 'content' => 'Replacement copy']],
+        ];
+
+        return new \WP_Error($error->get_error_code(), $error->get_error_message(), $data);
     }
 }

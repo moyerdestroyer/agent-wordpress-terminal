@@ -16,6 +16,7 @@ namespace AWPT\Domain;
 
 use AWPT\Database\MessageRepository;
 use AWPT\Database\SessionRepository;
+use AWPT\Support\ArrayKey;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -151,7 +152,7 @@ final class ExistingContentPreservationValidator {
         }
 
         $summary = new SessionRepository()->get_summary($session_id);
-        $post_id = absint($summary['focus_post_id'] ?? 0);
+        $post_id = ArrayKey::as_int($summary['focus_post_id'] ?? 0);
 
         return $post_id > 0 ? ['post_id' => $post_id] : null;
     }

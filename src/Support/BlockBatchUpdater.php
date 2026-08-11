@@ -28,6 +28,7 @@ final class BlockBatchUpdater {
         $counts = [
             'update_attrs' => 0,
             'replace_text' => 0,
+            'update_block' => 0,
             'remove' => 0,
             'insert' => 0,
         ];
@@ -53,6 +54,13 @@ final class BlockBatchUpdater {
             $parts[] = sprintf(
                 _n('%d text replacement', '%d text replacements', $counts['replace_text'], 'agent-wordpress-terminal'),
                 $counts['replace_text'],
+            );
+        }
+
+        if ($counts['update_block'] > 0) {
+            $parts[] = sprintf(
+                _n('%d combined block update', '%d combined block updates', $counts['update_block'], 'agent-wordpress-terminal'),
+                $counts['update_block'],
             );
         }
 
@@ -104,7 +112,7 @@ final class BlockBatchUpdater {
             $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
             $fingerprint = sanitize_text_field((string) ($change['expected_fingerprint'] ?? ''));
 
-            if (!in_array($kind, ['update_attrs', 'replace_text', 'remove', 'insert'], true)) {
+            if (!in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true)) {
                 return $this->error(
                     'awpt_invalid_block_batch_kind',
                     __('Unsupported block batch change.', 'agent-wordpress-terminal'),
@@ -125,7 +133,7 @@ final class BlockBatchUpdater {
                 return $this->error(
                     'awpt_invalid_block_batch_target',
                     __(
-                        'Each path may have one content change plus any number of insertions anchored before or after it.',
+                        'Each path may have one non-insertion mutation plus any number of anchored insertions. When one block needs both attributes and rich text changed, send one update_block change with attrs and content.',
                         'agent-wordpress-terminal',
                     ),
                     $index,
@@ -173,7 +181,7 @@ final class BlockBatchUpdater {
                 'change_index' => $index,
             ];
 
-            if ('update_attrs' === $kind) {
+            if (in_array($kind, ['update_attrs', 'update_block'], true)) {
                 $attrs = is_array($change['attrs'] ?? null)
                     ? new ActionPayloadSanitizer()->sanitize_attrs_map($change['attrs'])
                     : [];
@@ -188,7 +196,9 @@ final class BlockBatchUpdater {
                 }
 
                 $normalized['attrs'] = $attrs;
-            } elseif ('replace_text' === $kind) {
+            }
+
+            if (in_array($kind, ['replace_text', 'update_block'], true)) {
                 if (!array_key_exists('content', $change)) {
                     return $this->error(
                         'awpt_block_batch_content_required',
@@ -199,7 +209,9 @@ final class BlockBatchUpdater {
                 }
 
                 $normalized['content'] = wp_kses_post((string) $change['content']);
-            } elseif ('insert' === $kind) {
+            }
+
+            if ('insert' === $kind) {
                 $block_name = sanitize_text_field((string) ($change['block_name'] ?? ''));
 
                 if (1 !== preg_match('/^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/', $block_name)) {
@@ -249,7 +261,7 @@ final class BlockBatchUpdater {
         $working = $content;
 
         foreach ($validated as $change) {
-            if ('update_attrs' !== $change['kind']) {
+            if (!in_array($change['kind'], ['update_attrs', 'update_block'], true)) {
                 continue;
             }
 
@@ -268,7 +280,7 @@ final class BlockBatchUpdater {
         }
 
         foreach ($validated as $change) {
-            if ('replace_text' !== $change['kind']) {
+            if (!in_array($change['kind'], ['replace_text', 'update_block'], true)) {
                 continue;
             }
 

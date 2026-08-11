@@ -152,7 +152,9 @@ final class SessionRepository {
         );
         $session['actions'] = $this->hydrator->actions(is_array($action_rows) ? $action_rows : []);
         $session['last_turn_outcome'] = Json::decode_array((string) ($session['last_outcome_json'] ?? ''));
+        $session['improve_workflow'] = Json::decode_array((string) ($session['improve_workflow_json'] ?? ''));
         unset($session['last_outcome_json']);
+        unset($session['improve_workflow_json']);
 
         if ($include_ai_logs) {
             $ai_logs = new AiLogRepository()->list_for_session($session_id, min(100, $messages_limit * 4));
@@ -221,13 +223,14 @@ final class SessionRepository {
 
         $wpdb = WpDb::get();
         $table = $wpdb->prefix . 'awpt_sessions';
-        $actions = $wpdb->prefix . 'awpt_actions';
+        // A reviewer may deliberately start fresh. Reuse the newest focused
+        // session, not an older session merely because it accumulated actions.
         $row = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT id, user_id, title, model, provider, focus_post_id, created_at, updated_at
             FROM {$table}
             WHERE user_id = %d AND focus_post_id = %d
-            ORDER BY (SELECT COUNT(*) FROM {$actions} WHERE session_id = {$table}.id) DESC, updated_at DESC
+            ORDER BY updated_at DESC, id DESC
             LIMIT 1",
                 $this->current_user_id(),
                 $post_id,

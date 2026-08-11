@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -38,10 +40,10 @@ final class ProposalConstraintSet {
                 continue;
             }
 
-            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
-            $error_data = is_array($output['error_data'] ?? null) ? $output['error_data'] : [];
+            $output = ArrayKey::as_map($call['output'] ?? null);
+            $error_data = ArrayKey::as_map($output['error_data'] ?? null);
             $normalized = is_array($error_data['constraints'] ?? null) && [] !== $error_data['constraints']
-                ? array_values(array_filter($error_data['constraints'], 'is_array'))
+                ? ArrayKey::list_of_maps($error_data['constraints'])
                 : ProposalFailureNormalizer::normalize(
                     (string) ($output['error_code'] ?? ''),
                     $error_data,
@@ -122,7 +124,7 @@ final class ProposalConstraintSet {
             }
             $lines[] = '' !== $code ? sprintf('- [%s] %s', $code, $summary) : '- ' . $summary;
 
-            $facts = is_array($constraint['facts'] ?? null) ? $constraint['facts'] : [];
+            $facts = ArrayKey::as_map($constraint['facts'] ?? null);
             $fingerprint = trim((string) ($facts['current_fingerprint'] ?? ''));
             $path = trim((string) ($facts['block_path'] ?? ''));
             if ('' !== $fingerprint) {

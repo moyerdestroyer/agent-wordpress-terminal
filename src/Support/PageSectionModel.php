@@ -91,15 +91,15 @@ final class PageSectionModel {
             $heading = self::first_heading($raw, $plain);
             $links = self::extract_links($markup);
             $numeric_tokens = self::extract_numeric_tokens($plain);
-            $role = self::infer_role(
-                $name,
-                $names,
-                $plain,
-                $heading,
-                $has_dynamic,
-                count($sections),
-                $header_assigned,
-            );
+            $role = self::infer_role([
+                'root_name' => $name,
+                'names' => $names,
+                'plain' => $plain,
+                'heading' => $heading,
+                'has_dynamic' => $has_dynamic,
+                'index' => count($sections),
+                'header_assigned' => $header_assigned,
+            ]);
 
             if (self::ROLE_HEADER === $role) {
                 $header_assigned = true;
@@ -280,18 +280,24 @@ final class PageSectionModel {
     }
 
     /**
-     * @param list<string> $names
-     * @param list<string> $collected
+     * @param array{
+     *   root_name: string,
+     *   names: list<string>,
+     *   plain: string,
+     *   heading: string,
+     *   has_dynamic: bool,
+     *   index: int,
+     *   header_assigned: bool
+     * } $section
      */
-    private static function infer_role(
-        string $root_name,
-        array $names,
-        string $plain,
-        string $heading,
-        bool $has_dynamic,
-        int $index,
-        bool $header_assigned,
-    ): string {
+    private static function infer_role(array $section): string {
+        $root_name = $section['root_name'];
+        $names = $section['names'];
+        $plain = $section['plain'];
+        $heading = $section['heading'];
+        $has_dynamic = $section['has_dynamic'];
+        $index = $section['index'];
+        $header_assigned = $section['header_assigned'];
         $plain_l = mb_strtolower($plain, 'UTF-8');
         $heading_l = mb_strtolower($heading, 'UTF-8');
         $name_blob = mb_strtolower(implode(' ', $names) . ' ' . $root_name, 'UTF-8');
@@ -438,7 +444,7 @@ final class PageSectionModel {
         }
 
         if (function_exists('serialize_block')) {
-            $serialized = serialize_block($block);
+            $serialized = new BlockTreePathHelpers()->serialize([$block]);
 
             if (is_string($serialized) && '' !== $serialized) {
                 return $serialized;

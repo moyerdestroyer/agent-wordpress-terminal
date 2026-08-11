@@ -53,6 +53,10 @@ final class ChatController extends RestController {
                         'type' => 'array',
                         'items' => ['type' => 'object'],
                     ],
+                    'workflow' => [
+                        'required' => false,
+                        'type' => 'object',
+                    ],
                 ],
             ],
         ]);
@@ -83,6 +87,7 @@ final class ChatController extends RestController {
         $message = (string) $request->get_param('message');
         $attachments = $this->sanitize_attachments($request->get_param('attachments'));
         $turn_id = sanitize_key((string) $request->get_param('turn_id'));
+        $workflow = $this->sanitize_workflow($request->get_param('workflow'));
         $turn_id = '' !== $turn_id ? $turn_id : (string) wp_generate_uuid4();
 
         if ('' === trim($message) && [] === $attachments) {
@@ -96,6 +101,7 @@ final class ChatController extends RestController {
         $result = $this->runtime->handle_message($session_id, $message, [
             'turn_id' => $turn_id,
             'attachments' => $attachments,
+            'workflow' => $workflow,
         ]);
 
         if (is_wp_error($result)) {
@@ -105,6 +111,30 @@ final class ChatController extends RestController {
 
         $progress->complete($session_id, $turn_id);
         return new \WP_REST_Response($result, 200);
+    }
+
+    /** @return array{id?: string, type?: string, phase?: string} */
+    private function sanitize_workflow(mixed $value): array {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $workflow = [];
+        $id = sanitize_text_field((string) ($value['id'] ?? ''));
+        $type = sanitize_key((string) ($value['type'] ?? ''));
+        $phase = sanitize_key((string) ($value['phase'] ?? ''));
+
+        if ('' !== $id) {
+            $workflow['id'] = $id;
+        }
+        if ('' !== $type) {
+            $workflow['type'] = $type;
+        }
+        if ('' !== $phase) {
+            $workflow['phase'] = $phase;
+        }
+
+        return $workflow;
     }
 
     public function progress(\WP_REST_Request $request): \WP_REST_Response|\WP_Error {

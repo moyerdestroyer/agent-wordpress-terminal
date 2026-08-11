@@ -6,6 +6,7 @@
  */
 
 const EVALUATE_MARKER = '[awpt:improve_evaluate]';
+const ACT_MARKER = '[awpt:improve_act]';
 
 function fromSettings(
 	key: 'improvePagePrompt' | 'improvePageEvaluatePrompt' | 'improvePageActPrompt',
@@ -29,7 +30,7 @@ export function improvePagePrompt(): string {
 		'Read the current page (and block paths/fingerprints when targeting a section). ' +
 		'Prefer prepare-pattern-change → propose-pattern-replace for structural section swaps, ' +
 		'or propose-pattern-insert for additions. Use surgical block edits for copy-only fixes. ' +
-		'Map existing copy into the new structure where it fits. Placeholders are fine for empty slots. ' +
+		'Map existing copy into the new structure and replace required authoring placeholders with credible copy. ' +
 		'Do not invent facts or Media Library URLs. Prefer theme patterns when they fit; ' +
 		'a full-document freehand rewrite is fine when no pattern fits.'
 	);
@@ -51,11 +52,34 @@ export function improvePageEvaluatePrompt(): string {
 		'2. Summarize what to keep vs improve.\n' +
 		'3. For each change, name least-destructive op: batch/attrs, prepare-replace, insert, or no change.\n' +
 		'4. Flag preserve_by_default sections and carry-forward links/numbers.\n' +
-		'5. End with a compact markdown plan. If nothing needs changing, say so clearly.'
+		'5. End with a compact markdown plan, grouping incompatible work into coherent phases. If nothing needs changing, say so clearly.'
 	);
 }
 
-/** Step 2 act brief (without plan body). */
+/** Review-queue context layered onto the canonical read-only evaluation brief. */
+export function improvePageReviewEvaluatePrompt(
+	postId: number,
+	title: string,
+	reviewerNotes = '',
+): string {
+	const notes = reviewerNotes.trim();
+	const pageTitle = title.trim() || 'Untitled';
+	const reviewBrief =
+		'You are preparing the focused WordPress page for final editorial review. ' +
+		'Assess the whole page, not just the first visible defect. Check page-title and heading hierarchy, ' +
+		'section structure, repeated or redundant markup, readability, accessibility, and fit with active-theme patterns. ' +
+		'Plan a polished, coherent result while preserving accurate facts, useful copy, links, numbers, and dynamic sections. ' +
+		'Only plan page-scoped, reversible content or block changes that are safe to apply automatically. ' +
+		'Include all intended work in a compact, executable plan, grouped into coherent phases when operations cannot safely share one proposal.';
+
+	return (
+		`${improvePageEvaluatePrompt()}\n\n## Review queue context\n` +
+		`Focused post: #${postId}\nFocused title: ${pageTitle}\n\n${reviewBrief}` +
+		(notes !== '' ? `\n\n## Reviewer request\n${notes}` : '')
+	);
+}
+
+/** Step 2 act brief (without plan body). Must start with act marker for runtime isolation. */
 export function improvePageActPrompt(): string {
 	const from = fromSettings('improvePageActPrompt');
 	if (from !== '') {
@@ -63,13 +87,17 @@ export function improvePageActPrompt(): string {
 	}
 
 	return (
+		ACT_MARKER +
+		'\n' +
 		'Execute the plan below for this focused page.\n\n' +
-		'Follow the plan’s least-destructive operations. Prefer prepare-pattern-change → ' +
-		'propose-pattern-replace for section swaps, or prepare-pattern-change mode=insert / propose-pattern-insert for additions. ' +
-		'Use surgical block edits for copy-only items. Map existing copy into pattern slots; use carry_forward for links and numbers. ' +
-		'Placeholders are fine for empty slots. Do not invent facts or Media Library URLs. ' +
-		'Full-document freehand is only appropriate when the plan says no pattern fits. ' +
-		'Do not invent preparation_id values — call prepare first when using propose-pattern-replace/insert.'
+		'The plan is authoritative. Do not re-evaluate the page or restart open-ended discovery.\n\n' +
+		'1. Trust the plan’s operations, paths, and preserve list.\n' +
+		'2. At most one targeted re-read if fingerprints are missing (read-block-tree or get-block).\n' +
+		'3. Stage batch/attrs and prepare-replace/insert as the plan named; one coherent proposal for the first incomplete phase(s).\n' +
+		'For a block batch, use only one non-insertion mutation per path. Use one update_block with attrs and content when the same block needs both; never split those edits across update_attrs and replace_text.\n' +
+		'4. Map existing copy into slots, carry links/numbers forward, and replace required authoring placeholders before staging.\n' +
+		'5. Full-document freehand only if the plan says no pattern fits.\n' +
+		'6. Do not invent preparation_id values.'
 	);
 }
 

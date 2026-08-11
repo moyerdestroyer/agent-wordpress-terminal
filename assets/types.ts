@@ -141,12 +141,14 @@ export interface ActionPayload {
 	template_area?: string;
 	attrs?: Record<string, unknown>;
 	batch_changes?: Array<{
-		kind: 'update_attrs' | 'replace_text' | 'remove';
+		kind: 'update_attrs' | 'replace_text' | 'update_block' | 'remove' | 'insert';
 		block_path: string;
 		expected_fingerprint?: string;
 		block_name?: string;
 		attrs?: Record<string, unknown>;
 		content?: string;
+		position?: 'before' | 'after';
+		inner_html?: string;
 	}>;
 	settings_changes?: Record<string, string | number | boolean>;
 	original_settings?: Record<string, string | number | boolean>;
@@ -461,6 +463,39 @@ export interface ChatResponse {
 	removed_action_ids?: number[];
 	revised_action_id?: number | null;
 	revision_kind?: 'created' | 'revised' | string;
+	improve_workflow?: ImproveWorkflow;
+}
+
+export interface ImproveWorkflow {
+	id: string;
+	type: 'improve';
+	version: string;
+	state:
+		| 'evaluating'
+		| 'plan_ready'
+		| 'acting'
+		| 'staged'
+		| 'no_change'
+		| 'failed'
+		| 'applied'
+		| 'rejected'
+		| 'rolled_back';
+	focus_post_id: number;
+	evaluate_turn_id: string;
+	act_turn_id: string;
+	plan: string;
+	action_ids: number[];
+	error_code: string;
+	error_message: string;
+	created_at: string;
+	updated_at: string;
+	expires_at: number;
+}
+
+export interface ImproveWorkflowRequest {
+	id?: string;
+	type: 'improve';
+	phase: 'evaluate' | 'act';
 }
 
 export interface TurnOutcome {

@@ -37,7 +37,7 @@ final class TurnToolEvidence {
     }
 
     /**
-     * @param array{tool?: string, input?: mixed, output?: mixed, status?: string} $call
+     * @param array{tool?: string, input?: mixed, output?: mixed, status?: string, provider_call_id?: string} $call
      */
     public static function record(int $session_id, array $call): void {
         if ($session_id <= 0) {

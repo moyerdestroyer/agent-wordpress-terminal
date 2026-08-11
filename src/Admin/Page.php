@@ -157,6 +157,10 @@ final class Page {
             'environment' => Environment::status(),
             'connection' => $selection->active_connection_summary(),
             'proposalTools' => ProposalAbilities::names(),
+            // Same Improve briefs as the review bridge so terminal Plan/Improve stay aligned.
+            'improvePagePrompt' => \AWPT\Support\ImprovePagePrompt::text(),
+            'improvePageEvaluatePrompt' => \AWPT\Support\ImprovePagePrompt::evaluate_text(),
+            'improvePageActPrompt' => \AWPT\Support\ImprovePagePrompt::act_text(),
         ]);
     }
 

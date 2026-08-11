@@ -19,6 +19,7 @@ function test_pattern_action_payload_preserves_nested_composition(): void {
         'pattern_title' => 'Hero',
         'block_path' => '',
         'position' => 'append',
+        'preparation_id' => 'insert-prep-1',
         'blocks' => [[
             'blockName' => 'core/group',
             'attrs' => ['layout' => ['type' => 'constrained']],
@@ -44,6 +45,7 @@ function test_pattern_action_payload_preserves_nested_composition(): void {
         $payload['operation'] ?? null,
         'pattern operation should survive sanitization',
     );
+    Assert::same('insert-prep-1', $payload['preparation_id'] ?? null, 'insert preparation provenance survives');
     Assert::same('core/group', $payload['blocks'][0]['blockName'] ?? null, 'outer pattern block should be stored');
     Assert::same(
         'core/paragraph',

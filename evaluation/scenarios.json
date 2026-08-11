@@ -1,175 +1,143 @@
 {
-  "schema_version": 1,
-  "description": "Task-shaped terminal scenarios for pattern-native paths. Soft expected paths are observational, not hard locks. Do not force freehand bans to inflate rates.",
-  "defaults": {
-    "fresh_session": true,
-    "apply_review_safe": true,
-    "out_dir": "tmp-queue-runs"
-  },
-  "scenarios": [
-    {
-      "id": "S1-middle-swap",
-      "family": "section_replace",
-      "title": "Replace middle section; keep intro",
-      "post_id": 848,
-      "post_candidates": [848, 858],
-      "prompt": "On this focused page, replace the middle top-level section with a staff directory (or the closest active-theme section pattern). Keep the page introduction/header and any final section intact. Prefer prepare-pattern-change (mode=replace) with the correct target_path, then propose-pattern-replace. Do not invent facts. Do not rewrite unrelated sections freehand unless no section pattern fits.",
-      "soft_expected_path": "pattern_replace",
-      "soft_expected_tools": [
-        "awpt/prepare-pattern-change",
-        "awpt/propose-pattern-replace"
-      ],
-      "hard_pass": [
-        "non_target_sections_preserved_if_replace",
-        "no_invented_preparation_id"
-      ],
-      "observe": [
-        "prepare_change_attempted",
-        "propose_replace_success",
-        "server_materialized",
-        "target_section_role"
-      ]
-    },
-    {
-      "id": "S2-faq-replace",
-      "family": "section_replace",
-      "title": "Replace FAQ section by role",
-      "post_id": 853,
-      "post_candidates": [853, 864, 867],
-      "prompt": "On this focused page, replace only the FAQ section with a cleaner FAQ/accordion pattern from the active theme. Keep the header and non-FAQ body sections. Prefer prepare-pattern-change → propose-pattern-replace targeted at the FAQ section (use read-block-tree top_level_sections roles/headings to pick the path). Map existing FAQ copy into slots when possible. Do not redesign the whole page freehand unless no FAQ pattern exists.",
-      "soft_expected_path": "pattern_replace",
-      "soft_expected_tools": [
-        "awpt/read-block-tree",
-        "awpt/prepare-pattern-change",
-        "awpt/propose-pattern-replace"
-      ],
-      "hard_pass": [
-        "non_target_sections_preserved_if_replace"
-      ],
-      "observe": [
-        "prepare_change_attempted",
-        "target_role_faq",
-        "section_suggestions_used"
-      ]
-    },
-    {
-      "id": "S3-header-only",
-      "family": "section_replace",
-      "title": "Replace header band only",
-      "post_id": 848,
-      "post_candidates": [848, 858, 864],
-      "prompt": "Replace only the header/title band (usually top-level path 0) with a better active-theme header or page-introduction pattern. Do not rewrite body copy or later sections. Prefer prepare-pattern-change mode=replace on the header path, then propose-pattern-replace.",
-      "soft_expected_path": "pattern_replace",
-      "soft_expected_tools": [
-        "awpt/prepare-pattern-change",
-        "awpt/propose-pattern-replace"
-      ],
-      "hard_pass": [
-        "non_target_sections_preserved_if_replace"
-      ],
-      "observe": [
-        "target_path_0_or_header_role",
-        "prepare_change_attempted"
-      ]
-    },
-    {
-      "id": "S4-insert-cta",
-      "family": "section_insert",
-      "title": "Add CTA section without replacing",
-      "post_id": 858,
-      "post_candidates": [858, 848],
-      "prompt": "Add a contact/apply call-to-action section after the main content. Do not replace existing sections. Prefer prepare-pattern-change with mode=insert (or propose-pattern-insert) using an active-theme CTA pattern. Placeholders are fine for empty slots.",
-      "soft_expected_path": "pattern_insert",
-      "soft_expected_tools": [
-        "awpt/prepare-pattern-change",
-        "awpt/propose-pattern-insert"
-      ],
-      "hard_pass": [
-        "existing_sections_intact_if_insert"
-      ],
-      "observe": [
-        "prepare_insert_or_pattern_insert",
-        "server_materialized"
-      ]
-    },
-    {
-      "id": "S5-copy-only",
-      "family": "surgical",
-      "title": "Copy-only fix; no redesign",
-      "post_id": 848,
-      "post_candidates": [848, 853],
-      "prompt": "Make a minimal copy edit only: fix wording or a small typo in one paragraph on this page. Do not redesign layout. Do not call prepare-pattern-change or freehand rewrite the whole document. Prefer surgical tools (batch/attrs/content update of a single block).",
-      "soft_expected_path": "surgical_or_other",
-      "soft_expected_tools": [
-        "awpt/read-block-tree",
-        "awpt/propose-block-batch-update"
-      ],
-      "hard_pass": [
-        "no_full_document_freehand_required"
-      ],
-      "observe": [
-        "prepare_change_attempted_should_be_0",
-        "server_materialized_should_be_0"
-      ]
-    },
-    {
-      "id": "S6-carry-forward",
-      "family": "section_replace",
-      "title": "Restyle section; keep links and numbers",
-      "post_id": 853,
-      "post_candidates": [853, 848],
-      "prompt": "Restyle the main body or FAQ section with a fitting theme pattern, but preserve every existing URL and phone/numeric token from that section (use prepare carry_forward / map into slots). Prefer prepare-pattern-change → propose-pattern-replace. Do not invent new URLs.",
-      "soft_expected_path": "pattern_replace",
-      "soft_expected_tools": [
-        "awpt/prepare-pattern-change",
-        "awpt/propose-pattern-replace"
-      ],
-      "hard_pass": [
-        "links_and_numeric_tokens_preserved_if_materialized"
-      ],
-      "observe": [
-        "carry_forward_present_on_prepare",
-        "prepare_change_attempted"
-      ]
-    },
-    {
-      "id": "S9-improve-baseline",
-      "family": "open_ended",
-      "title": "Legacy one-shot Improve brief (adoption thermometer)",
-      "post_id": 848,
-      "post_candidates": [848, 853, 858, 841, 850],
-      "prompt": null,
-      "prompt_source": "ImprovePagePrompt",
-      "soft_expected_path": null,
-      "soft_expected_tools": [],
-      "hard_pass": [],
-      "observe": [
-        "path_used",
-        "prepare_change_attempted",
-        "freehand_provenance",
-        "server_materialized"
-      ],
-      "notes": "Legacy one-shot. Prefer queue-improve-one.php (eval→act) for production-shaped Improve measurement. Not a capability fail if freehand wins."
-    },
-    {
-      "id": "S9b-improve-two-step",
-      "family": "open_ended",
-      "title": "Improve evaluate→act (production-shaped)",
-      "post_id": 848,
-      "post_candidates": [848, 853, 858],
-      "prompt": null,
-      "prompt_source": "ImprovePageTwoStep",
-      "soft_expected_path": null,
-      "soft_expected_tools": [],
-      "hard_pass": [],
-      "observe": [
-        "evaluate_plan_non_empty",
-        "evaluate_no_propose",
-        "path_used",
-        "prepare_change_attempted",
-        "freehand_provenance"
-      ],
-      "notes": "Production-shaped Improve. run-scenario.php S9b runs evaluate→act (same as queue-improve-one.php default)."
-    }
-  ]
+	"schema_version": 1,
+	"description": "Task-shaped terminal scenarios for pattern-native paths. Soft expected paths are observational, not hard locks. Do not force freehand bans to inflate rates.",
+	"defaults": {
+		"fresh_session": true,
+		"apply_review_safe": true,
+		"out_dir": "tmp-queue-runs"
+	},
+	"scenarios": [
+		{
+			"id": "S1-middle-swap",
+			"family": "section_replace",
+			"title": "Replace middle section; keep intro",
+			"post_id": 848,
+			"post_candidates": [848, 858],
+			"prompt": "On this focused page, replace the middle top-level section with a staff directory (or the closest active-theme section pattern). Keep the page introduction/header and any final section intact. Prefer prepare-pattern-change (mode=replace) with the correct target_path, then propose-pattern-replace. Do not invent facts. Do not rewrite unrelated sections freehand unless no section pattern fits.",
+			"soft_expected_path": "pattern_replace",
+			"soft_expected_tools": ["awpt/prepare-pattern-change", "awpt/propose-pattern-replace"],
+			"hard_pass": ["non_target_sections_preserved_if_replace", "no_invented_preparation_id"],
+			"observe": [
+				"prepare_change_attempted",
+				"propose_replace_success",
+				"server_materialized",
+				"target_section_role"
+			]
+		},
+		{
+			"id": "S2-faq-replace",
+			"family": "section_replace",
+			"title": "Replace FAQ section by role",
+			"post_id": 853,
+			"post_candidates": [853, 864, 867],
+			"prompt": "On this focused page, replace only the FAQ section with a cleaner FAQ/accordion pattern from the active theme. Keep the header and non-FAQ body sections. Prefer prepare-pattern-change → propose-pattern-replace targeted at the FAQ section (use read-block-tree top_level_sections roles/headings to pick the path). Map existing FAQ copy into slots when possible. Do not redesign the whole page freehand unless no FAQ pattern exists.",
+			"soft_expected_path": "pattern_replace",
+			"soft_expected_tools": [
+				"awpt/read-block-tree",
+				"awpt/prepare-pattern-change",
+				"awpt/propose-pattern-replace"
+			],
+			"hard_pass": ["non_target_sections_preserved_if_replace"],
+			"observe": ["prepare_change_attempted", "target_role_faq", "section_suggestions_used"]
+		},
+		{
+			"id": "S3-header-only",
+			"family": "section_replace",
+			"title": "Replace header band only",
+			"post_id": 848,
+			"post_candidates": [848, 858, 864],
+			"prompt": "Replace only the header/title band (usually top-level path 0) with a better active-theme header or page-introduction pattern. Do not rewrite body copy or later sections. Prefer prepare-pattern-change mode=replace on the header path, then propose-pattern-replace.",
+			"soft_expected_path": "pattern_replace",
+			"soft_expected_tools": ["awpt/prepare-pattern-change", "awpt/propose-pattern-replace"],
+			"hard_pass": ["non_target_sections_preserved_if_replace"],
+			"observe": ["target_path_0_or_header_role", "prepare_change_attempted"]
+		},
+		{
+			"id": "S4-insert-cta",
+			"family": "section_insert",
+			"title": "Add CTA section without replacing",
+			"post_id": 858,
+			"post_candidates": [858, 848],
+			"prompt": "Add a contact/apply call-to-action section after the main content. Do not replace existing sections. Prefer prepare-pattern-change with mode=insert (or propose-pattern-insert) using an active-theme CTA pattern. Replace required authoring placeholders with credible copy before staging.",
+			"soft_expected_path": "pattern_insert",
+			"soft_expected_tools": ["awpt/prepare-pattern-change", "awpt/propose-pattern-insert"],
+			"hard_pass": ["existing_sections_intact_if_insert"],
+			"observe": ["prepare_insert_or_pattern_insert", "server_materialized"]
+		},
+		{
+			"id": "S5-copy-only",
+			"family": "surgical",
+			"title": "Copy-only fix; no redesign",
+			"post_id": 848,
+			"post_candidates": [848, 853],
+			"prompt": "Make a minimal copy edit only: fix wording or a small typo in one paragraph on this page. Do not redesign layout. Do not call prepare-pattern-change or freehand rewrite the whole document. Prefer surgical tools (batch/attrs/content update of a single block).",
+			"soft_expected_path": "surgical_or_other",
+			"soft_expected_tools": ["awpt/read-block-tree", "awpt/propose-block-batch-update"],
+			"hard_pass": ["no_full_document_freehand_required"],
+			"observe": ["prepare_change_attempted_should_be_0", "server_materialized_should_be_0"]
+		},
+		{
+			"id": "S6-carry-forward",
+			"family": "section_replace",
+			"title": "Restyle section; keep links and numbers",
+			"post_id": 853,
+			"post_candidates": [853, 848],
+			"prompt": "Restyle the main body or FAQ section with a fitting theme pattern, but preserve every existing URL and phone/numeric token from that section (use prepare carry_forward / map into slots). Prefer prepare-pattern-change → propose-pattern-replace. Do not invent new URLs.",
+			"soft_expected_path": "pattern_replace",
+			"soft_expected_tools": ["awpt/prepare-pattern-change", "awpt/propose-pattern-replace"],
+			"hard_pass": ["links_and_numeric_tokens_preserved_if_materialized"],
+			"observe": ["carry_forward_present_on_prepare", "prepare_change_attempted"]
+		},
+		{
+			"id": "S7-no-change",
+			"family": "no_change",
+			"title": "Verify a sound page needs no change",
+			"post_id": 848,
+			"post_candidates": [848, 853, 858],
+			"prompt": "Evaluate whether this focused page already has a coherent hierarchy, readable copy, and a clear next step. If it does, make no proposal and report no change. Do not redesign merely to create activity; stage only a narrowly justified correction.",
+			"soft_expected_path": null,
+			"soft_expected_tools": ["awpt/read-block-tree"],
+			"hard_pass": ["no_unjustified_proposal"],
+			"observe": ["no_change_when_already_sound", "server_materialized_should_be_0"]
+		},
+		{
+			"id": "S9-improve-baseline",
+			"family": "open_ended",
+			"title": "Legacy one-shot Improve brief (adoption thermometer)",
+			"post_id": 848,
+			"post_candidates": [848, 853, 858, 841, 850],
+			"prompt": null,
+			"prompt_source": "ImprovePagePrompt",
+			"soft_expected_path": null,
+			"soft_expected_tools": [],
+			"hard_pass": [],
+			"observe": [
+				"path_used",
+				"prepare_change_attempted",
+				"freehand_provenance",
+				"server_materialized"
+			],
+			"notes": "Legacy one-shot. Prefer queue-improve-one.php (eval→act) for production-shaped Improve measurement. Not a capability fail if freehand wins."
+		},
+		{
+			"id": "S9b-improve-two-step",
+			"family": "open_ended",
+			"title": "Improve evaluate→act (production-shaped)",
+			"post_id": 848,
+			"post_candidates": [848, 853, 858],
+			"prompt": null,
+			"prompt_source": "ImprovePageTwoStep",
+			"soft_expected_path": null,
+			"soft_expected_tools": [],
+			"hard_pass": [],
+			"observe": [
+				"evaluate_plan_non_empty",
+				"evaluate_no_propose",
+				"path_used",
+				"prepare_change_attempted",
+				"freehand_provenance"
+			],
+			"notes": "Production-shaped Improve. run-scenario.php S9b runs evaluate→act (same as queue-improve-one.php default)."
+		}
+	]
 }

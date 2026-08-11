@@ -273,7 +273,12 @@ final class BlockTreeMutator {
 
         $working = $blocks;
         $result_paths = [];
-        $removed = $this->replace_at($working, $segments, $normalized, $expected_fingerprint, $result_paths, '');
+        $replacement = [
+            'new_blocks' => $normalized,
+            'expected_fingerprint' => $expected_fingerprint,
+            'result_paths' => $result_paths,
+        ];
+        $removed = $this->replace_at($working, $segments, $replacement, '');
 
         if (is_wp_error($removed)) {
             return $removed;
@@ -282,7 +287,7 @@ final class BlockTreeMutator {
         return [
             'content' => $this->paths->serialize($working),
             'blocks' => $normalized,
-            'paths' => $result_paths,
+            'paths' => $replacement['result_paths'],
             'removed' => $removed,
         ];
     }
@@ -599,16 +604,17 @@ final class BlockTreeMutator {
     /**
      * @param array<int|string, array<string, mixed>> $blocks
      * @param list<int>                               $segments
-     * @param list<array<string, mixed>>              $new_blocks
-     * @param list<string>                            $result_paths
+     * @param array{
+     *   new_blocks: list<array<string, mixed>>,
+     *   expected_fingerprint: string,
+     *   result_paths: list<string>
+     * } $replacement
      * @return array<string, mixed>|\WP_Error
      */
     private function replace_at(
         array &$blocks,
         array $segments,
-        array $new_blocks,
-        string $expected_fingerprint,
-        array &$result_paths,
+        array &$replacement,
         string $parent_prefix,
     ): array|\WP_Error {
         $target = array_shift($segments);
@@ -640,9 +646,7 @@ final class BlockTreeMutator {
                 $removed = $this->replace_at(
                     $inner,
                     $segments,
-                    $new_blocks,
-                    $expected_fingerprint,
-                    $result_paths,
+                    $replacement,
                     $prefix,
                 );
                 $block['innerBlocks'] = $inner;
@@ -679,6 +683,8 @@ final class BlockTreeMutator {
 
         $block = $blocks[$raw_index];
 
+        $expected_fingerprint = $replacement['expected_fingerprint'];
+
         if ('' !== $expected_fingerprint && !hash_equals($expected_fingerprint, BlockTreeView::fingerprint($block))) {
             return $this->paths->error(
                 'awpt_block_fingerprint_mismatch',
@@ -687,11 +693,14 @@ final class BlockTreeMutator {
             );
         }
 
+        $new_blocks = $replacement['new_blocks'];
         array_splice($blocks, $raw_index, 1, $new_blocks);
 
         for ($i = 0; $i < count($new_blocks); ++$i) {
             $visible = $target + $i;
-            $result_paths[] = '' === $parent_prefix ? (string) $visible : $parent_prefix . '.' . $visible;
+            $replacement['result_paths'][] = '' === $parent_prefix
+                ? (string) $visible
+                : $parent_prefix . '.' . $visible;
         }
 
         return $block;

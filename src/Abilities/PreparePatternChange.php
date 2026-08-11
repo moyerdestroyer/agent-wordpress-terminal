@@ -74,11 +74,17 @@ final class PreparePatternChange implements AbilityInterface {
                     'position' => [
                         'type' => 'string',
                         'enum' => ['before', 'after', 'append'],
-                        'description' => __('Insert position when mode=insert. Defaults to after.', 'agent-wordpress-terminal'),
+                        'description' => __(
+                            'Insert position when mode=insert. Defaults to after.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                     'media_count' => [
                         'type' => 'integer',
-                        'description' => __('Recent Media Library image candidates to include.', 'agent-wordpress-terminal'),
+                        'description' => __(
+                            'Recent Media Library image candidates to include.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                 ],
                 'required' => ['post_id', 'intent', 'mode', 'target_path'],
@@ -190,8 +196,11 @@ final class PreparePatternChange implements AbilityInterface {
         }
 
         $live_fingerprint = BlockTree::fingerprint($target);
-        $target_section = PageSectionModel::find_by_path($section_menu, $target_path)
-            ?? $this->minimal_target_section($target_path, $target, $live_fingerprint);
+        $target_section = PageSectionModel::find_by_path($section_menu, $target_path) ?? $this->minimal_target_section(
+            $target_path,
+            $target,
+            $live_fingerprint,
+        );
         $routing = PageSectionModel::recommend_operation($intent, $target_section, $mode);
         $carry_forward = $this->carry_forward_from_section($target_section);
         $warnings = $this->section_warnings($intent, $mode, $target_section);
@@ -242,16 +251,25 @@ final class PreparePatternChange implements AbilityInterface {
                 'recommended_operation' => $routing,
                 'warnings' => $warnings,
                 'page_sections' => $section_menu,
-                'reason' => __('No compatible section pattern was available for this change.', 'agent-wordpress-terminal'),
+                'reason' => __(
+                    'No compatible section pattern was available for this change.',
+                    'agent-wordpress-terminal',
+                ),
                 'fallback_code' => 'scope_mismatch',
                 'media' => $this->media_candidates($media_count),
                 'agent_feedback' => AgentFeedback::make(
                     'fallback',
-                    __('No theme section pattern fit this change; use surgical tools or honest custom composition.', 'agent-wordpress-terminal'),
+                    __(
+                        'No theme section pattern fit this change; use surgical tools or honest custom composition.',
+                        'agent-wordpress-terminal',
+                    ),
                     [
                         'next_actions' => [[
                             'ability' => 'awpt/propose-block-batch-update',
-                            'reason' => __('Prefer surgical edits when no section pattern fits.', 'agent-wordpress-terminal'),
+                            'reason' => __(
+                                'Prefer surgical edits when no section pattern fits.',
+                                'agent-wordpress-terminal',
+                            ),
                         ]],
                     ],
                 ),
@@ -282,6 +300,7 @@ final class PreparePatternChange implements AbilityInterface {
             'pattern_content' => $expanded,
             'position' => PatternPreparationReceipt::MODE_INSERT === $mode ? $position : '',
             'post_type' => $post->post_type,
+            'carry_forward' => $carry_forward,
         ]);
 
         $propose_ability = PatternPreparationReceipt::MODE_REPLACE === $mode
@@ -340,7 +359,8 @@ final class PreparePatternChange implements AbilityInterface {
                         'input' => [
                             'preparation_id' => $minted['preparation_id'],
                             'post_id' => $post_id,
-                            'pattern_name' => $pattern_name,
+                            'pattern_text_updates' => [],
+                            'media_placements' => [],
                         ],
                     ]],
                 ],
@@ -370,7 +390,13 @@ final class PreparePatternChange implements AbilityInterface {
             $role = sanitize_key((string) ($domain['role'] ?? ''));
             $scope = sanitize_key((string) ($pattern['composition_scope'] ?? ''));
             $blob = mb_strtolower(
-                $role . ' ' . $scope . ' ' . (string) ($pattern['name'] ?? '') . ' ' . (string) ($pattern['title'] ?? ''),
+                $role
+                . ' '
+                . $scope
+                . ' '
+                . (string) ($pattern['name'] ?? '')
+                . ' '
+                . (string) ($pattern['title'] ?? ''),
                 'UTF-8',
             );
             $is_layout = in_array($role, ['page-layout', 'page'], true) || in_array($scope, ['page', 'layout'], true);
@@ -440,7 +466,9 @@ final class PreparePatternChange implements AbilityInterface {
      */
     private function minimal_target_section(string $path, array $target, string $fingerprint): array {
         $name = (string) ($target['blockName'] ?? $target['name'] ?? '');
-        $markup = function_exists('serialize_block') ? (string) serialize_block($target) : (string) ($target['innerHTML'] ?? '');
+        $markup = function_exists('serialize_block')
+            ? new \AWPT\Support\BlockTreePathHelpers()->serialize([$target])
+            : (string) ($target['innerHTML'] ?? '');
         $plain = trim(wp_strip_all_tags($markup));
 
         return [

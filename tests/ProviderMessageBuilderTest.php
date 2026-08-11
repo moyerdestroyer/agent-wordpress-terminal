@@ -119,13 +119,12 @@ function test_presentation_edit_prompt_requires_structural_and_visual_judgment()
         'redesign prompts should describe theme-enhanced redesign',
     );
     Assert::true(
-        str_contains($system, 'awpt/prepare-pattern-change')
-        || str_contains($system, 'awpt/recommend-patterns'),
+        str_contains($system, 'awpt/prepare-pattern-change') || str_contains($system, 'awpt/recommend-patterns'),
         'redesign should prefer pattern change prep or recommendation',
     );
     Assert::true(
-        str_contains($system, 'Placeholders are fine'),
-        'redesign may use placeholders for empty slots',
+        str_contains($system, 'replace required authoring placeholders'),
+        'redesign must resolve authoring placeholders before staging',
     );
     Assert::true(
         str_contains($system, 'awpt/prepare-pattern-change')
@@ -134,10 +133,7 @@ function test_presentation_edit_prompt_requires_structural_and_visual_judgment()
         || str_contains($system, 'awpt/read-pattern'),
         'redesign should mention pattern prepare/replace or recommendation paths',
     );
-    Assert::true(
-        str_contains($system, 'Do not invent factual claims'),
-        'redesign still forbids inventing facts',
-    );
+    Assert::true(str_contains($system, 'Do not invent factual claims'), 'redesign still forbids inventing facts');
     Assert::true(
         str_contains($system, 'pattern_unfit_code') || str_contains($system, 'no_recommendations'),
         'redesign prompt should describe honest unfit codes',
@@ -147,14 +143,10 @@ function test_presentation_edit_prompt_requires_structural_and_visual_judgment()
         'default redesign must not require full-content preservation checklists',
     );
     Assert::true(
-        str_contains($system, 'awpt/propose-content-update')
-            || str_contains($system, 'propose-pattern-insert'),
+        str_contains($system, 'awpt/propose-content-update') || str_contains($system, 'propose-pattern-insert'),
         'redesign should expose pattern-backed update paths',
     );
-    Assert::true(
-        str_contains($system, 'Media Library'),
-        'redesign module should forbid inventing local media URLs',
-    );
+    Assert::true(str_contains($system, 'Media Library'), 'redesign module should forbid inventing local media URLs');
     Assert::true(
         str_contains($system, 'Stage exactly one coherent proposal'),
         'redesign guidance must forbid multi-propose batches',

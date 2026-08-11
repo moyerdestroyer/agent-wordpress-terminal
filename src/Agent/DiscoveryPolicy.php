@@ -23,7 +23,11 @@ final class DiscoveryPolicy {
     /**
      * @param array<int, array<string, mixed>> $all_calls
      * @param array<int, array<string, mixed>> $latest_calls
-     * @param array{content_turn?: bool, presentation_edit?: bool} $context
+     * @param array{
+     *   content_turn?: bool,
+     *   presentation_edit?: bool,
+     *   improve_act?: bool
+     * } $context
      * @return array{compose: bool, reason: string, coverage: list<string>}
      */
     public function decide(
@@ -34,12 +38,64 @@ final class DiscoveryPolicy {
         array $context = [],
     ): array {
         $is_content_turn = true === ($context['content_turn'] ?? false);
+        $is_improve_act = true === ($context['improve_act'] ?? false);
 
-        if (!$is_content_turn || $this->has_successful_proposal($all_calls)) {
+        if (!$is_content_turn && !$is_improve_act || $this->has_successful_proposal($all_calls)) {
             return ['compose' => false, 'reason' => '', 'coverage' => []];
         }
 
         $coverage = $this->coverage($all_calls);
+
+        // Execute-plan: the plan is evidence. Stage after a light re-read or prepare.
+        if ($is_improve_act) {
+            $plan_offset = strpos($user_message, '## Plan');
+            $plan_text = false === $plan_offset ? $user_message : substr($user_message, $plan_offset);
+            $requires_bound_pattern_change =
+                str_contains($plan_text, 'prepare-pattern-change')
+                && (
+                    str_contains($plan_text, 'propose-pattern-replace')
+                    || str_contains($plan_text, 'propose-pattern-insert')
+                    || str_contains($plan_text, 'mode=replace')
+                    || str_contains($plan_text, 'mode=insert')
+                );
+            $knows_page =
+                in_array('page_analysis', $coverage, true)
+                || in_array('content_read', $coverage, true)
+                || in_array('block_tree', $coverage, true)
+                || in_array('block_detail', $coverage, true);
+            $prepared =
+                in_array('pattern_draft', $coverage, true)
+                || in_array('pattern_change', $coverage, true)
+                || in_array('pattern_structure', $coverage, true);
+            $custom_fallback = in_array('custom_fallback', $coverage, true);
+
+            if ($requires_bound_pattern_change && !in_array('pattern_change', $coverage, true) && !$custom_fallback) {
+                return [
+                    'compose' => false,
+                    'reason' => 'The approved plan requires a bound pattern change; prepare-pattern-change must succeed first.',
+                    'coverage' => $coverage,
+                ];
+            }
+
+            if ($prepared || $custom_fallback) {
+                return [
+                    'compose' => true,
+                    'reason' => 'The approved plan and a bound preparation (or custom_fallback) are ready to stage.',
+                    'coverage' => $coverage,
+                ];
+            }
+
+            // Paths often live in the plan text; one page re-read is enough to stage batch ops.
+            if ($knows_page || $elapsed_seconds >= 20 || $this->plan_embeds_paths($user_message)) {
+                return [
+                    'compose' => true,
+                    'reason' => 'The approved plan is authoritative; stage the named operations without further discovery.',
+                    'coverage' => $coverage,
+                ];
+            }
+
+            return ['compose' => false, 'reason' => '', 'coverage' => $coverage];
+        }
         // Redesign: know the page, then require pattern *structure* (or honest empty/fallback).
         // Recommend alone is not enough when recommendations were non-empty (Ollie-inspired).
         $presentation_edit = true === ($context['presentation_edit'] ?? false);
@@ -49,11 +105,9 @@ final class DiscoveryPolicy {
                 || in_array('content_read', $coverage, true)
                 || in_array('block_tree', $coverage, true);
             $has_structure =
-                in_array('pattern_structure', $coverage, true)
-                || in_array('pattern_draft', $coverage, true);
+                in_array('pattern_structure', $coverage, true) || in_array('pattern_draft', $coverage, true);
             $honest_empty_catalog =
-                in_array('pattern_consulted', $coverage, true)
-                && !in_array('pattern_recommendation', $coverage, true);
+                in_array('pattern_consulted', $coverage, true) && !in_array('pattern_recommendation', $coverage, true);
             $custom_fallback = in_array('custom_fallback', $coverage, true);
             $pattern_ready = $has_structure || $custom_fallback || $honest_empty_catalog;
 
@@ -181,12 +235,16 @@ final class DiscoveryPolicy {
                 continue;
             }
 
-            if (in_array(
-                $tool,
-                ['awpt/analyze-page', 'awpt/read-block-tree', 'awpt/list-blocks', 'awpt/read-content'],
-                true,
-            )) {
+            if ('awpt/read-block-tree' === $tool) {
                 $coverage['page_analysis'] = true;
+                $coverage['block_tree'] = true;
+            } elseif (in_array($tool, ['awpt/analyze-page', 'awpt/list-blocks'], true)) {
+                $coverage['page_analysis'] = true;
+            } elseif (in_array($tool, ['awpt/read-content', 'core/read-content'], true)) {
+                $coverage['page_analysis'] = true;
+                $coverage['content_read'] = true;
+            } elseif ('awpt/get-block' === $tool) {
+                $coverage['block_detail'] = true;
             } elseif ('awpt/list-patterns' === $tool) {
                 $coverage['pattern_inventory'] = true;
             } elseif ('awpt/recommend-patterns' === $tool) {
@@ -247,6 +305,14 @@ final class DiscoveryPolicy {
         }
 
         return array_values(array_keys($coverage));
+    }
+
+    /** Plan bodies usually name Gutenberg paths (e.g. path 0, `0.0`, path `[0]`). */
+    private function plan_embeds_paths(string $user_message): bool {
+        return (bool) preg_match(
+            '/\bpath\s*(?:\[)?\d+(?:\.\d+)*(?:\])?|\bpaths?\s+\d|\b\[\s*\d+\s*\]|\bblock_path\b/i',
+            $user_message,
+        );
     }
 
     /** @param array<int, array<string, mixed>> $calls */

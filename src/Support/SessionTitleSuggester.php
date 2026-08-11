@@ -51,6 +51,11 @@ final class SessionTitleSuggester {
             return null;
         }
 
+        // Evaluate briefs are long machine prompts; keep session titles short.
+        if (ImprovePagePrompt::is_evaluate_message($message)) {
+            return __('Plan focused page', 'agent-wordpress-terminal');
+        }
+
         $message = preg_replace('/https?:\/\/\S+/i', '', $message);
         $message = preg_replace('/\s+/', ' ', is_string($message) ? $message : '');
         $message = trim((string) $message, " \t\n\r\0\x0B.,!?;:\"'`");

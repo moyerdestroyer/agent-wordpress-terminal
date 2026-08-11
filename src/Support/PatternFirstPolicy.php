@@ -47,13 +47,7 @@ final class PatternFirstPolicy {
             }
 
             $output = is_array($call['output'] ?? null) ? $call['output'] : [];
-            $items = is_array($output['recommendations'] ?? null) ? $output['recommendations'] : [];
-
-            foreach ($items as $item) {
-                if (!is_array($item)) {
-                    continue;
-                }
-
+            foreach (ArrayKey::list_of_maps($output['recommendations'] ?? null) as $item) {
                 $recommendations[] = $item;
             }
         }
