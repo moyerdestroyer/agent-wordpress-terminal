@@ -6,6 +6,7 @@
 .awpt-review-bridge__command {
 	display: grid;
 	grid-template-columns: max-content max-content minmax(10rem, 1fr) max-content;
+	grid-template-areas: "identity reset request submit";
 	align-items: center;
 	gap: 0.45rem;
 	padding: 0.35rem 0.45rem;
@@ -15,6 +16,7 @@
 }
 
 .awpt-review-bridge__identity {
+	grid-area: identity;
 	display: flex;
 	align-items: baseline;
 	gap: 0.4rem;
@@ -35,6 +37,7 @@
 }
 
 .awpt-review-bridge__reset.components-button {
+	grid-area: reset;
 	height: 30px;
 	min-height: 30px;
 	padding-inline: 0.35rem;
@@ -42,6 +45,7 @@
 }
 
 .awpt-review-bridge__request {
+	grid-area: request;
 	min-width: 0;
 }
 
@@ -56,15 +60,17 @@
 .awpt-review-bridge__request input.components-text-control__input {
 	width: 100%;
 	min-width: 0;
-	height: 32px;
-	min-height: 32px;
-	padding-inline: 0.55rem;
-	font-size: 0.8rem;
+	height: 36px;
+	min-height: 36px;
+	padding-inline: 0.65rem;
+	font-size: 0.875rem;
 }
 
 .awpt-review-bridge__submit.components-button {
-	height: 32px;
-	min-height: 32px;
+	grid-area: submit;
+	height: 36px;
+	min-height: 36px;
+	padding-inline: 1rem;
 }
 
 .awpt-review-bridge__progress {
@@ -305,22 +311,6 @@
 		grid-template-areas:
 			"identity reset"
 			"request submit";
-	}
-
-	.awpt-review-bridge__identity {
-		grid-area: identity;
-	}
-
-	.awpt-review-bridge__reset {
-		grid-area: reset;
-	}
-
-	.awpt-review-bridge__request {
-		grid-area: request;
-	}
-
-	.awpt-review-bridge__submit {
-		grid-area: submit;
 	}
 
 	.awpt-review-bridge__action {
