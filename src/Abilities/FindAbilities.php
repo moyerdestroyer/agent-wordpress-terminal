@@ -78,19 +78,20 @@ final class FindAbilities implements AbilityInterface {
         }
 
         if ('' !== $query) {
-            $catalog_args['item_include_callback'] = static function (\WP_Ability $ability) use ($query): bool {
-                return str_contains(mb_strtolower($ability->get_name() . ' ' . $ability->get_description()), $query);
-            };
+            $catalog_args['item_include_callback'] = static fn(\WP_Ability $ability) => str_contains(
+                mb_strtolower($ability->get_name() . ' ' . $ability->get_description()),
+                $query,
+            );
         }
 
         foreach (new CoreAbilityCatalog()->all($catalog_args) as $ability) {
-            $name = (string) $ability->get_name();
+            $name = $ability->get_name();
 
             if ('awpt/find-abilities' === $name || !$registry->can_auto_execute($name)) {
                 continue;
             }
 
-            $description = (string) $ability->get_description();
+            $description = $ability->get_description();
             $annotations = $registry->annotations_for($name);
 
             if ('' !== $query && !str_contains(mb_strtolower($name . ' ' . $description), $query)) {
@@ -101,7 +102,7 @@ final class FindAbilities implements AbilityInterface {
                 continue;
             }
 
-            if ('' !== $category && $category !== (string) $ability->get_category()) {
+            if ('' !== $category && $category !== $ability->get_category()) {
                 continue;
             }
 
@@ -120,7 +121,7 @@ final class FindAbilities implements AbilityInterface {
             }
         }
 
-        $activated = array_values(array_map(static fn(array $tool): string => (string) $tool['name'], $matches));
+        $activated = array_values(array_map(static fn(array $tool): string => $tool['name'], $matches));
 
         return [
             'count' => count($matches),

@@ -143,7 +143,7 @@ final class PatternTextUpdater {
             $match_count = 0;
             $updated = preg_replace_callback(
                 '/^(\s*<([a-z][a-z0-9-]*)\b[^>]*>).*?(<\/\2>\s*)$/is',
-                static fn(array $matches): string => (string) $matches[1] . $replacement . (string) $matches[3],
+                static fn(array $matches): string => $matches[1] . $replacement . $matches[3],
                 $inner_html,
                 1,
                 $match_count,

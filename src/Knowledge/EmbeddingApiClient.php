@@ -210,10 +210,12 @@ final class EmbeddingApiClient {
         $dims = 0;
 
         foreach ($vectors as $vector) {
-            if (is_array($vector)) {
-                $dims = count($vector);
-                break;
+            if (!is_array($vector)) {
+                continue;
             }
+
+            $dims = count($vector);
+            break;
         }
 
         AiLogger::log_embedding([

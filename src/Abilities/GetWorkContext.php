@@ -58,7 +58,7 @@ final class GetWorkContext implements AbilityInterface {
                     $abilities = ArrayKey::list_of_strings($gate['abilities'] ?? null);
 
                     return [
-                        'ability' => (string) ($abilities[0] ?? 'awpt/find-abilities'),
+                        'ability' => $abilities[0] ?? 'awpt/find-abilities',
                         'reason' => (string) ($gate['evidence'] ?? ''),
                         'input' => [],
                     ];

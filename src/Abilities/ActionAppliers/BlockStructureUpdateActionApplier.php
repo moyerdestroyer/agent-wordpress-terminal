@@ -78,11 +78,7 @@ final class BlockStructureUpdateActionApplier {
                 $blocks[] = new BlockTreeEditor()->normalize_block($raw);
             }
 
-            $result = $tree->replace_blocks(
-                $path,
-                $blocks,
-                (string) ($payload['expected_fingerprint'] ?? ''),
-            );
+            $result = $tree->replace_blocks($path, $blocks, (string) ($payload['expected_fingerprint'] ?? ''));
 
             return is_wp_error($result) ? $result : $result['content'];
         }

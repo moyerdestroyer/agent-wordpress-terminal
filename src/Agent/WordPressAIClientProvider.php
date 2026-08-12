@@ -201,7 +201,7 @@ final class WordPressAIClientProvider implements ProviderInterface {
 
             $function_name = \WP_AI_Client_Ability_Function_Resolver::ability_name_to_function_name($ability_name);
             $raw_schema = method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : [];
-            $schema = is_array($raw_schema) ? $raw_schema : [];
+            $schema = $raw_schema;
             $normalized_schema = new AbilityTransportCodec()->provider_schema($schema);
 
             $declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(

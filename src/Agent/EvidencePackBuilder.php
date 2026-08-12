@@ -208,7 +208,7 @@ final class EvidencePackBuilder {
             if ('awpt/read-block-tree' === $tool && count($content_reads) < 4) {
                 // Only pack the first successful tree.
                 foreach ($content_reads as $existing) {
-                    if ('awpt/read-block-tree' === ($existing['tool'] ?? '')) {
+                    if ('awpt/read-block-tree' === $existing['tool']) {
                         continue 2;
                     }
                 }
@@ -222,7 +222,7 @@ final class EvidencePackBuilder {
                     'input' => $input,
                     'output' => [
                         'blocks' => $compact['blocks'],
-                        'count' => (int) ($compact['count'] ?? $output['count'] ?? 0),
+                        'count' => (int) $compact['count'],
                         'path_format' => (string) ($output['path_format'] ?? ''),
                         'truncated_excerpts' => !empty($compact['truncated_excerpts']),
                         'flat_index' => !empty($compact['flat_index']),
@@ -260,10 +260,9 @@ final class EvidencePackBuilder {
                     continue;
                 }
 
-                $content_reads[] = $this->tree_content_read(
-                    ArrayKey::list_of_maps($blocks),
-                    ['source' => 'analyze-page'],
-                );
+                $content_reads[] = $this->tree_content_read(ArrayKey::list_of_maps($blocks), [
+                    'source' => 'analyze-page',
+                ]);
                 break;
             }
         }
@@ -431,9 +430,11 @@ final class EvidencePackBuilder {
         $brief = [];
 
         foreach (['title', 'status', 'url', 'risk_level'] as $key) {
-            if (isset($output[$key]) && (is_string($output[$key]) || is_scalar($output[$key]))) {
-                $brief[$key] = $output[$key];
+            if (!(isset($output[$key]) && (is_string($output[$key]) || is_scalar($output[$key])))) {
+                continue;
             }
+
+            $brief[$key] = $output[$key];
         }
 
         if (is_array($output['headings'] ?? null)) {
@@ -441,9 +442,11 @@ final class EvidencePackBuilder {
         }
 
         foreach (['shortcodes', 'forms', 'custom_blocks', 'recommended_next_actions'] as $key) {
-            if (is_array($output[$key] ?? null)) {
-                $brief[$key] = array_slice($output[$key], 0, 12);
+            if (!is_array($output[$key] ?? null)) {
+                continue;
             }
+
+            $brief[$key] = array_slice($output[$key], 0, 12);
         }
 
         $plain = trim((string) ($output['plain_text'] ?? ''));
@@ -503,10 +506,7 @@ final class EvidencePackBuilder {
             $brief['html_snippet'] = mb_substr($snippet, 0, 800, 'UTF-8');
         }
 
-        return array_filter(
-            $brief,
-            static fn(mixed $value): bool => !(is_string($value) && '' === $value),
-        );
+        return array_filter($brief, static fn(mixed $value): bool => !(is_string($value) && '' === $value));
     }
 
     /**
@@ -609,7 +609,7 @@ final class EvidencePackBuilder {
 
         $post = get_post($post_id);
 
-        if (!$post || !is_string($post->post_content ?? null) || '' === $post->post_content) {
+        if (!$post || '' === $post->post_content) {
             return null;
         }
 
@@ -620,13 +620,10 @@ final class EvidencePackBuilder {
             return null;
         }
 
-        return $this->tree_content_read(
-            ArrayKey::list_of_maps($blocks),
-            [
-                'id' => $post_id,
-                'source' => 'compose-synthesis',
-            ],
-        );
+        return $this->tree_content_read(ArrayKey::list_of_maps($blocks), [
+            'id' => $post_id,
+            'source' => 'compose-synthesis',
+        ]);
     }
 
     /**
@@ -642,7 +639,7 @@ final class EvidencePackBuilder {
             'input' => $input,
             'output' => [
                 'blocks' => $compact['blocks'],
-                'count' => (int) ($compact['count'] ?? count($blocks)),
+                'count' => (int) $compact['count'],
                 'path_format' => 'Dotted zero-based visible block path, e.g. 0 or 2.1.',
                 'truncated_excerpts' => !empty($compact['truncated_excerpts']),
                 'flat_index' => !empty($compact['flat_index']),

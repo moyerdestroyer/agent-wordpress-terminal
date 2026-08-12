@@ -52,7 +52,7 @@ final class AgentRuntime {
         // Expand plan/improve slash aliases before storage so TurnProfile sees the
         // evaluate marker (or redesign brief) and the transcript matches the wire message.
         $expanded = ImprovePagePrompt::expand_slash_command($message);
-        $wire_message = null !== $expanded ? (string) $expanded['message'] : $message;
+        $wire_message = null !== $expanded ? $expanded['message'] : $message;
         $workflow_input = is_array($turn_context['workflow'] ?? null) ? $turn_context['workflow'] : [];
         $workflow_repository = new ImproveWorkflowRepository();
         $workflow = null;
@@ -108,9 +108,11 @@ final class AgentRuntime {
         } elseif (ImprovePagePrompt::is_act_message($wire_message)) {
             $action_ids = [];
             foreach (is_array($response['actions'] ?? null) ? $response['actions'] : [] as $action) {
-                if (is_array($action) && (int) ($action['id'] ?? 0) > 0) {
-                    $action_ids[] = (int) $action['id'];
+                if (!(is_array($action) && (int) ($action['id'] ?? 0) > 0)) {
+                    continue;
                 }
+
+                $action_ids[] = (int) $action['id'];
             }
             $workflow = $workflow_repository->finish_act(
                 $session_id,

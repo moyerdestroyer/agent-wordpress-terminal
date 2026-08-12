@@ -92,7 +92,7 @@ final class ReadProposal implements AbilityInterface {
                 continue;
             }
 
-            $name = trim((string) $pattern['name']);
+            $name = trim($pattern['name']);
 
             if ('' !== $name) {
                 $pattern_names[] = $name;

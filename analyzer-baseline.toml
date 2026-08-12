@@ -199,18 +199,6 @@ message = "Redundant null coalesce: left-hand side can never be `null` or undefi
 count = 5
 
 [[issues]]
-file = "src/Agent/ProviderRuntime.php"
-code = "redundant-type-comparison"
-message = "Redundant type assertion: `$follow_up` is already `WP_Error`."
-count = 1
-
-[[issues]]
-file = "src/Agent/ToolExecutor.php"
-code = "mixed-assignment"
-message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
-count = 2
-
-[[issues]]
 file = "src/Agent/ToolExecutor.php"
 code = "redundant-docblock-type"
 message = "Redundant docblock type for variable `$ability`."

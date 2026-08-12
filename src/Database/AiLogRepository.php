@@ -92,10 +92,6 @@ final class AiLogRepository {
         $out = [];
 
         foreach (array_reverse($rows) as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
             $out[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'session_id' => (int) ($row['session_id'] ?? 0),

@@ -361,7 +361,7 @@ final class ActionRepository {
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
         ];
-        $payload = is_array($action['payload']) ? $action['payload'] : [];
+        $payload = $action['payload'];
 
         if (!is_array($payload['agent_feedback'] ?? null)) {
             $payload['agent_feedback'] = AgentFeedback::make(

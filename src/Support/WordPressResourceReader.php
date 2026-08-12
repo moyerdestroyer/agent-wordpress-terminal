@@ -210,7 +210,7 @@ final class WordPressResourceReader {
             return $terms;
         }
 
-        return array_values(array_map(fn(\WP_Term $term): array => $this->term_row($term), $terms));
+        return array_values(array_map($this->term_row(...), $terms));
     }
 
     /** @return array<string, mixed>|\WP_Error */
@@ -239,7 +239,7 @@ final class WordPressResourceReader {
 
     /** @return list<array<string, mixed>> */
     private function menus(): array {
-        return array_values(array_map(fn(\WP_Term $menu): array => $this->menu_row($menu), wp_get_nav_menus()));
+        return array_values(array_map($this->menu_row(...), wp_get_nav_menus()));
     }
 
     /** @return array<string, mixed> */
@@ -269,7 +269,7 @@ final class WordPressResourceReader {
             return [];
         }
 
-        return array_values(array_map(fn(\WP_Post $item): array => $this->menu_item_row($item), $items));
+        return array_values(array_map($this->menu_item_row(...), $items));
     }
 
     /** @return array<string, mixed> */
@@ -300,7 +300,7 @@ final class WordPressResourceReader {
             $args['search_columns'] = ['user_login', 'user_nicename', 'user_email', 'display_name'];
         }
 
-        return array_values(array_map(fn(\WP_User $user): array => $this->user_row($user), get_users($args)));
+        return array_values(array_map($this->user_row(...), get_users($args)));
     }
 
     /** @return array<string, mixed> */
@@ -342,9 +342,11 @@ final class WordPressResourceReader {
         $items = [];
 
         foreach ($comments as $comment) {
-            if ($comment instanceof \WP_Comment) {
-                $items[] = $this->comment_row($comment);
+            if (!$comment instanceof \WP_Comment) {
+                continue;
             }
+
+            $items[] = $this->comment_row($comment);
         }
 
         return $items;
@@ -400,7 +402,7 @@ final class WordPressResourceReader {
             }
 
             /** @var array<string, mixed> $setting */
-            $items[] = $this->setting_row((string) $name, is_array($setting) ? $setting : []);
+            $items[] = $this->setting_row((string) $name, $setting);
         }
 
         return $items;

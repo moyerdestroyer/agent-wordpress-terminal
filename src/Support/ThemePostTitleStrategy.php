@@ -29,11 +29,11 @@ final class ThemePostTitleStrategy {
 
         if ('page' === $post_type && '' !== $page_template && 'default' !== $page_template) {
             $path = str_replace('\\', '/', $page_template);
-            $slug = (string) pathinfo(basename($path), PATHINFO_FILENAME);
+            $slug = pathinfo(basename($path), PATHINFO_FILENAME);
         }
 
         $template = get_block_template(get_stylesheet() . '//' . $slug, 'wp_template');
-        $content = is_object($template) && is_string($template->content ?? null) ? $template->content : '';
+        $content = is_object($template) ? $template->content : '';
 
         if ('' === trim($content)) {
             return self::UNKNOWN;

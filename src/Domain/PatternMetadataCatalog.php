@@ -51,14 +51,14 @@ final class PatternMetadataCatalog {
             $patterns = array_replace_recursive($header_patterns, $patterns);
 
             foreach ($patterns as $name => $metadata) {
-                if (!is_string($name) || !is_array($metadata) || !str_contains($name, '/')) {
+                if (!is_array($metadata) || !str_contains($name, '/')) {
                     continue;
                 }
 
                 $metadata['pack_id'] = (string) $pack['id'];
                 $metadata['pack_version'] = (string) $pack['version'];
                 $metadata['name'] = sanitize_text_field($name);
-                $items[(string) $metadata['name']] = $this->sanitize(ArrayKey::string_map($metadata));
+                $items[$metadata['name']] = $this->sanitize(ArrayKey::string_map($metadata));
             }
         }
 
@@ -218,7 +218,7 @@ final class PatternMetadataCatalog {
         $items = [];
 
         foreach (is_array($files) ? array_slice($files, 0, 200) : [] as $file) {
-            if (!is_string($file) || !is_readable($file)) {
+            if (!is_readable($file)) {
                 continue;
             }
 
@@ -229,20 +229,18 @@ final class PatternMetadataCatalog {
                 'docs' => 'Docs',
                 'keywords' => 'Keywords',
             ]);
-            $slug = sanitize_text_field((string) ($headers['slug'] ?? ''));
+            $slug = sanitize_text_field($headers['slug'] ?? '');
 
             if ('' === $slug) {
                 continue;
             }
 
             $items[$slug] = [
-                'summary' => sanitize_textarea_field(
-                    (string) ($headers['guidelines'] ?? $headers['description'] ?? ''),
-                ),
-                'docs' => sanitize_text_field((string) ($headers['docs'] ?? '')),
+                'summary' => sanitize_textarea_field($headers['guidelines'] ?? $headers['description'] ?? ''),
+                'docs' => sanitize_text_field($headers['docs'] ?? ''),
                 'search_terms' => array_values(array_filter(array_map('trim', explode(
                     ',',
-                    (string) ($headers['keywords'] ?? ''),
+                    $headers['keywords'] ?? '',
                 )))),
             ];
         }

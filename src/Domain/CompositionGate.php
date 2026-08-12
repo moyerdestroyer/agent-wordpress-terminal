@@ -27,10 +27,7 @@ final class CompositionGate {
 
     private PostCompositionValidator $structure;
 
-    public function __construct(
-        ?DomainValidationService $domain = null,
-        ?PostCompositionValidator $structure = null,
-    ) {
+    public function __construct(?DomainValidationService $domain = null, ?PostCompositionValidator $structure = null) {
         $this->domain = $domain ?? new DomainValidationService();
         $this->structure = $structure ?? new PostCompositionValidator();
     }

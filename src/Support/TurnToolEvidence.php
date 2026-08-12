@@ -44,7 +44,7 @@ final class TurnToolEvidence {
             return;
         }
 
-        $tool = (string) ($call['tool'] ?? '');
+        $tool = $call['tool'] ?? '';
         if ('' === $tool) {
             return;
         }
@@ -53,7 +53,7 @@ final class TurnToolEvidence {
             'tool' => $tool,
             'input' => $call['input'] ?? null,
             'output' => $call['output'] ?? null,
-            'status' => (string) ($call['status'] ?? 'success'),
+            'status' => $call['status'] ?? 'success',
         ];
     }
 

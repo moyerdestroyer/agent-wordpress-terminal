@@ -294,7 +294,7 @@ final class PreparePatternChange implements AbilityInterface {
             'target_path' => $target_path,
             'expected_fingerprint' => $live_fingerprint,
             'source_content_hash' => $source_hash,
-            'source_modified_gmt' => (string) $post->post_modified_gmt,
+            'source_modified_gmt' => $post->post_modified_gmt,
             'pattern_names' => [$pattern_name],
             'expanded_content_hash' => $content_hash,
             'pattern_content' => $expanded,
@@ -411,10 +411,12 @@ final class PreparePatternChange implements AbilityInterface {
 
             if ('' !== $target_role && [] === $role_match) {
                 foreach ($this->role_match_needles($target_role) as $needle) {
-                    if ('' !== $needle && str_contains($blob, $needle)) {
-                        $role_match = $recommendation;
-                        break;
+                    if (!('' !== $needle && str_contains($blob, $needle))) {
+                        continue;
                     }
+
+                    $role_match = $recommendation;
+                    break;
                 }
             }
 

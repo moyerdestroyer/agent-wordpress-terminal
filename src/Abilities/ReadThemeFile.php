@@ -169,13 +169,11 @@ final class ReadThemeFile implements AbilityInterface {
             'truncated' => $truncated,
             'match_count' => count($matches),
             'matches' => array_map(
-                static function (array $match): array {
-                    return [
-                        'offset' => $match['offset'],
-                        'term' => $match['term'],
-                        'excerpt' => $match['excerpt'],
-                    ];
-                },
+                static fn(array $match): array => [
+                    'offset' => $match['offset'],
+                    'term' => $match['term'],
+                    'excerpt' => $match['excerpt'],
+                ],
                 array_slice($matches, 0, 8),
             ),
             'content' => $content,

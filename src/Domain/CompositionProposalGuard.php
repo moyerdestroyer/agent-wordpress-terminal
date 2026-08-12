@@ -139,7 +139,7 @@ final class CompositionProposalGuard {
             }
 
             if ($previous_level > 0 && $level > ($previous_level + 1)) {
-                $text = trim(wp_strip_all_tags((string) ($match[2] ?? '')));
+                $text = trim(wp_strip_all_tags($match[2] ?? ''));
 
                 return new \WP_Error(
                     'awpt_heading_level_skipped',
@@ -178,11 +178,11 @@ final class CompositionProposalGuard {
             $text = trim((string) preg_replace(
                 '/\s+/u',
                 ' ',
-                html_entity_decode(wp_strip_all_tags((string) ($match[2] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                html_entity_decode(wp_strip_all_tags($match[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
             ));
             $normalized = mb_strtolower($text, 'UTF-8');
 
-            if ('1' === (string) ($match[1] ?? '')) {
+            if ('1' === ($match[1] ?? '')) {
                 $h1 = $normalized;
             } elseif ('' !== $normalized) {
                 $subordinate[$normalized] = $text;

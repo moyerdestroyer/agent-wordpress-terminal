@@ -24,7 +24,14 @@ final class SiteDesignContext {
     public const LEVEL_COMPOSITION = 'composition';
 
     /**
-     * @var array<string, mixed>|null
+     * @var array{
+     *     theme_name: string,
+     *     stylesheet: string,
+     *     template: string,
+     *     parent_theme_name: string,
+     *     preferred_pattern_namespaces: list<string>,
+     *     design_tokens: array<string, mixed>
+     * }|null
      */
     private ?array $resolved = null;
 
@@ -40,18 +47,7 @@ final class SiteDesignContext {
      */
     public function resolve(): array {
         if (is_array($this->resolved)) {
-            /** @var array{
-             *     theme_name: string,
-             *     stylesheet: string,
-             *     template: string,
-             *     parent_theme_name: string,
-             *     preferred_pattern_namespaces: list<string>,
-             *     design_tokens: array<string, mixed>
-             * } $resolved
-             */
-            $resolved = $this->resolved;
-
-            return $resolved;
+            return $this->resolved;
         }
 
         $stylesheet = sanitize_key(get_stylesheet());
@@ -86,9 +82,7 @@ final class SiteDesignContext {
          *     design_tokens: array<string, mixed>
          * } $resolved
          */
-        $resolved = $this->resolved;
-
-        return $resolved;
+        return $this->resolved;
     }
 
     public function request_level(string $message): string {

@@ -62,7 +62,6 @@ final class KnowledgeIndexMaintenance {
         $chunks_table = $wpdb->prefix . 'awpt_knowledge_chunks';
         $placeholders = implode(',', array_fill(0, count($source_ids), '%s'));
         $sql = "SELECT id FROM {$index_table} WHERE source_id NOT IN ({$placeholders})";
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- placeholders built dynamically from count.
         $rows = $wpdb->get_col($wpdb->prepare($sql, ...$source_ids));
 
         if (!is_array($rows)) {

@@ -77,7 +77,7 @@ final class ConnectorCatalog {
         $connectors = [];
 
         foreach (wp_get_connectors() as $connector_id => $data) {
-            if ('ai_provider' !== ($data['type'] ?? '')) {
+            if ('ai_provider' !== $data['type']) {
                 continue;
             }
 
@@ -90,7 +90,7 @@ final class ConnectorCatalog {
             $connectors[] = [
                 'id' => $connector_id,
                 'name' => $this->inspector->connector_name_from_data($connector_id, $data),
-                'description' => is_string($data['description'] ?? null) ? $data['description'] : '',
+                'description' => $data['description'],
                 'active' => $status['active'],
                 'authenticated' => $status['authenticated'],
                 'ready' => $status['ready'],
@@ -145,7 +145,7 @@ final class ConnectorCatalog {
 
         return (
             is_array($connector)
-            && 'ai_provider' === ($connector['type'] ?? '')
+            && 'ai_provider' === $connector['type']
             && $this->inspector->is_installed($connector)
         );
     }

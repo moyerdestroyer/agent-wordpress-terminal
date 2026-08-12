@@ -47,12 +47,11 @@ final class PatternPreparationReceipt {
      * @return array{preparation_id: string, expires_at: int, receipt: array<string, mixed>}
      */
     public function mint(array $data): array {
-        $mode = sanitize_key((string) ($data['mode'] ?? ''));
-        $pattern_names = array_values(array_filter(array_map(
-            static fn(mixed $name): string => sanitize_text_field(is_scalar($name) ? (string) $name : ''),
-            is_array($data['pattern_names'] ?? null) ? $data['pattern_names'] : [],
-        )));
-        $position = sanitize_key((string) ($data['position'] ?? ''));
+        $mode = sanitize_key($data['mode']);
+        $pattern_names = array_values(array_filter(array_map(static fn(mixed $name): string => sanitize_text_field(
+            is_scalar($name) ? $name : '',
+        ), $data['pattern_names'])));
+        $position = sanitize_key($data['position'] ?? '');
 
         if (!in_array($position, ['before', 'after', 'append'], true)) {
             $position = '';
@@ -70,20 +69,20 @@ final class PatternPreparationReceipt {
             'post_id' => max(0, (int) ($data['post_id'] ?? 0)),
             'session_id' => max(0, (int) ($data['session_id'] ?? 0)),
             'mode' => $mode,
-            'intent' => sanitize_text_field((string) ($data['intent'] ?? '')),
-            'target_path' => sanitize_text_field((string) ($data['target_path'] ?? '')),
-            'expected_fingerprint' => sanitize_text_field((string) ($data['expected_fingerprint'] ?? '')),
-            'source_content_hash' => sanitize_text_field((string) ($data['source_content_hash'] ?? '')),
-            'source_modified_gmt' => sanitize_text_field((string) ($data['source_modified_gmt'] ?? '')),
+            'intent' => sanitize_text_field($data['intent'] ?? ''),
+            'target_path' => sanitize_text_field($data['target_path'] ?? ''),
+            'expected_fingerprint' => sanitize_text_field($data['expected_fingerprint'] ?? ''),
+            'source_content_hash' => sanitize_text_field($data['source_content_hash'] ?? ''),
+            'source_modified_gmt' => sanitize_text_field($data['source_modified_gmt'] ?? ''),
             'pattern_names' => $pattern_names,
-            'expanded_content_hash' => sanitize_text_field((string) ($data['expanded_content_hash'] ?? '')),
+            'expanded_content_hash' => sanitize_text_field($data['expanded_content_hash'] ?? ''),
             'position' => $position,
-            'post_type' => sanitize_key((string) ($data['post_type'] ?? '')),
+            'post_type' => sanitize_key($data['post_type'] ?? ''),
             'carry_forward' => is_array($data['carry_forward'] ?? null) ? $data['carry_forward'] : [],
             'created_at' => time(),
             'expires_at' => $expires_at,
             'signature' => '',
-            'pattern_content' => (string) ($data['pattern_content'] ?? ''),
+            'pattern_content' => $data['pattern_content'] ?? '',
         ];
         $receipt['signature'] = $this->sign($receipt);
 
@@ -214,7 +213,7 @@ final class PatternPreparationReceipt {
 
     private function secret(): string {
         if (function_exists('wp_salt')) {
-            return (string) wp_salt('auth');
+            return wp_salt('auth');
         }
 
         return 'awpt-pattern-preparation';

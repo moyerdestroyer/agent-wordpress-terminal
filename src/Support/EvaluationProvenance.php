@@ -38,9 +38,7 @@ final class EvaluationProvenance {
             'plugin_commit' => $commit,
             'plugin_dirty' => null === $status ? null : '' !== $status,
             'active_theme' => function_exists('get_stylesheet') ? get_stylesheet() : '',
-            'active_theme_version' => is_object($theme) && method_exists($theme, 'get')
-                ? (string) $theme->get('Version')
-                : '',
+            'active_theme_version' => is_object($theme) && method_exists($theme, 'get') ? $theme->get('Version') : '',
             'active_domain_packs' => $packs,
             'pattern_catalog_hash' => hash(
                 'sha256',

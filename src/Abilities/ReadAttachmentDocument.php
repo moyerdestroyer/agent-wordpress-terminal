@@ -95,7 +95,7 @@ final class ReadAttachmentDocument implements AbilityInterface {
 
         $mime = (string) get_post_mime_type($id);
         $extracted = new DocumentTextExtractor()->extract($path, $mime, basename($path));
-        $text = (string) $extracted['text'];
+        $text = $extracted['text'];
 
         if ('' === trim($text)) {
             return new \WP_Error(

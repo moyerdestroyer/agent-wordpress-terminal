@@ -432,7 +432,10 @@ final class ActionContentPayloadSanitizer {
                 $kind = sanitize_key((string) ($change['kind'] ?? ''));
                 $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
 
-                if (!in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true) || '' === $path) {
+                if (
+                    !in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true)
+                    || '' === $path
+                ) {
                     return null;
                 }
 
@@ -526,9 +529,7 @@ final class ActionContentPayloadSanitizer {
         $inner_block_count = max(0, $inner_block_count);
 
         if (null === $inner_content || [] === $inner_content) {
-            return 0 === $inner_block_count
-                ? [$inner_html]
-                : array_fill(0, $inner_block_count, null);
+            return 0 === $inner_block_count ? [$inner_html] : array_fill(0, $inner_block_count, null);
         }
 
         $clean = [];

@@ -22,8 +22,6 @@ final class ToolResultTruncator {
     private const STORAGE_MAX_CHARS = 32_000;
     private const META_VALUE_MAX_CHARS = 4_096;
 
-    /**
-     */
     public function for_provider(string $tool, mixed $output): mixed {
         if ('awpt/read-pattern' === $tool && is_array($output)) {
             // Raw content is what the model adapts. The normalized tree repeats
@@ -34,8 +32,6 @@ final class ToolResultTruncator {
         return $this->truncate($tool, $output, self::PROVIDER_MAX_CHARS, 'provider');
     }
 
-    /**
-     */
     public function for_storage(string $tool, mixed $output): mixed {
         return $this->truncate($tool, $output, self::STORAGE_MAX_CHARS, 'storage');
     }
@@ -91,7 +87,7 @@ final class ToolResultTruncator {
                 self::PROVIDER_MAX_CHARS - 500,
             );
             $output['blocks'] = $compact['blocks'];
-            $output['count'] = (int) ($compact['count'] ?? $output['count'] ?? 0);
+            $output['count'] = (int) $compact['count'];
 
             if (!empty($compact['flat_index'])) {
                 $output['flat_index'] = true;
@@ -122,9 +118,11 @@ final class ToolResultTruncator {
             }
 
             foreach (['headings', 'shortcodes', 'forms', 'custom_blocks', 'recommended_next_actions'] as $key) {
-                if (array_key_exists($key, $output)) {
-                    $output[$key] = $this->clip_array_items($output[$key] ?? [], 24);
+                if (!array_key_exists($key, $output)) {
+                    continue;
                 }
+
+                $output[$key] = $this->clip_array_items($output[$key] ?? [], 24);
             }
         }
 
@@ -228,11 +226,11 @@ final class ToolResultTruncator {
 
         if ('awpt/analyze-page' === $tool) {
             foreach (['headings', 'risk_level', 'recommended_next_actions'] as $key) {
-                if (array_key_exists($key, $output)) {
-                    $summary[$key] = is_array($output[$key])
-                        ? $this->clip_array_items($output[$key], 16)
-                        : $output[$key];
+                if (!array_key_exists($key, $output)) {
+                    continue;
                 }
+
+                $summary[$key] = is_array($output[$key]) ? $this->clip_array_items($output[$key], 16) : $output[$key];
             }
 
             $summary['plain_text'] = $this->clip_string((string) ($output['plain_text'] ?? ''), 800);

@@ -39,7 +39,7 @@ final class ToolsPayloadBuilder {
         $ability_names = [];
 
         foreach (new CoreAbilityCatalog()->all() as $ability) {
-            $name = (string) $ability->get_name();
+            $name = $ability->get_name();
             $item = $this->decorate($this->ability_item_with_schemas($ability), $name, $prefs, 'ability');
             $ability_names[$name] = true;
 
@@ -79,7 +79,7 @@ final class ToolsPayloadBuilder {
         $plugin = [];
 
         foreach (new CoreAbilityCatalog()->all() as $ability) {
-            $name = (string) $ability->get_name();
+            $name = $ability->get_name();
 
             if (!str_starts_with($name, 'awpt/')) {
                 continue;
@@ -151,9 +151,11 @@ final class ToolsPayloadBuilder {
             );
 
         foreach (new AbilityReplacementRegistry()->active() as $fallback => $replacement) {
-            if ($name === $replacement) {
-                $item['replaces'] = $fallback;
+            if ($name !== $replacement) {
+                continue;
             }
+
+            $item['replaces'] = $fallback;
         }
 
         return $item;

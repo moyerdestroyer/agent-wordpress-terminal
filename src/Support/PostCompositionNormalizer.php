@@ -60,10 +60,10 @@ final class PostCompositionNormalizer {
         $normalized = preg_replace_callback(
             '/<!--\\s+wp:([^\\s]+)\\s+(\\{.*?\\})\\s*-->/s',
             static function (array $match) use (&$repaired): string {
-                $json = (string) ($match[2] ?? '');
+                $json = $match[2] ?? '';
 
                 if (is_array(json_decode($json, true))) {
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 $balance = 0;
@@ -92,18 +92,18 @@ final class PostCompositionNormalizer {
                 }
 
                 if ($quoted || $balance < 1 || $balance > 3) {
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 $candidate = $json . str_repeat('}', $balance);
 
                 if (!is_array(json_decode($candidate, true))) {
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 $repaired = true;
 
-                return '<!-- wp:' . (string) $match[1] . ' ' . $candidate . ' -->';
+                return '<!-- wp:' . $match[1] . ' ' . $candidate . ' -->';
             },
             $content,
         );
@@ -203,7 +203,7 @@ final class PostCompositionNormalizer {
             return;
         }
 
-        $label = trim((string) ($match[3] ?? ''));
+        $label = trim($match[3] ?? '');
 
         if (
             '' === $label
@@ -253,8 +253,7 @@ final class PostCompositionNormalizer {
             $anchor_attributes .= ' rel="' . esc_attr($rel) . '"';
         }
 
-        $replacement =
-            (string) ($match[1] ?? '') . '<a' . $anchor_attributes . '>' . $label . '</a>' . (string) ($match[4] ?? '');
+        $replacement = ($match[1] ?? '') . '<a' . $anchor_attributes . '>' . $label . '</a>' . ($match[4] ?? '');
 
         // A Button is a leaf block. Rebuild its static slots together so both
         // WordPress's parser and lightweight test parsers serialize it once.

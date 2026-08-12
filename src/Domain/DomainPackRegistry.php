@@ -73,11 +73,11 @@ final class DomainPackRegistry {
         $template = get_template_directory();
         $stylesheet = get_stylesheet_directory();
 
-        if (is_string($template) && '' !== $template) {
+        if ('' !== $template) {
             $this->load_manifest($template, 'parent');
         }
 
-        if (is_string($stylesheet) && '' !== $stylesheet && $stylesheet !== $template) {
+        if ('' !== $stylesheet && $stylesheet !== $template) {
             $this->load_manifest($stylesheet, 'child');
         }
 
@@ -411,7 +411,7 @@ final class DomainPackRegistry {
         }
 
         if (function_exists('get_stylesheet')) {
-            $stylesheet = sanitize_key((string) get_stylesheet());
+            $stylesheet = sanitize_key(get_stylesheet());
 
             if ('' !== $stylesheet) {
                 $namespaces[] = $stylesheet;
@@ -419,7 +419,7 @@ final class DomainPackRegistry {
         }
 
         if (function_exists('get_template')) {
-            $template = sanitize_key((string) get_template());
+            $template = sanitize_key(get_template());
 
             if ('' !== $template) {
                 $namespaces[] = $template;
@@ -443,7 +443,7 @@ final class DomainPackRegistry {
             $pack_aliases = ArrayKey::as_map($pattern_config['aliases'] ?? null);
 
             foreach ($pack_aliases as $from => $to) {
-                if (!is_string($from) || !is_string($to)) {
+                if (!is_string($to)) {
                     continue;
                 }
 
@@ -661,9 +661,11 @@ final class DomainPackRegistry {
         $guidance = [];
 
         foreach ([...((array) ($parent['guidance'] ?? [])), ...((array) ($child['guidance'] ?? []))] as $item) {
-            if (is_array($item) && '' !== (string) ($item['id'] ?? '')) {
-                $guidance[(string) $item['id']] = $item;
+            if (!(is_array($item) && '' !== (string) ($item['id'] ?? ''))) {
+                continue;
             }
+
+            $guidance[(string) $item['id']] = $item;
         }
 
         $merged['guidance'] = array_values($guidance);

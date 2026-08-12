@@ -31,7 +31,7 @@ final class PatternMaterializer {
             : hash('sha256', $pattern_name . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX));
 
         foreach ($blocks as &$block) {
-            if (!is_array($block) || null === ($block['blockName'] ?? null)) {
+            if (null === ($block['blockName'] ?? null)) {
                 continue;
             }
 

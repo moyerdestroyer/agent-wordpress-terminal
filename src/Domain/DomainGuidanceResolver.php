@@ -58,7 +58,7 @@ final class DomainGuidanceResolver {
                         esc_attr((string) $pack['version']),
                         esc_attr((string) $guidance['id']),
                         esc_attr($scope),
-                        !empty($guidance['hard']) ? 'true' : 'false',
+                        'true',
                         esc_html($content),
                     ),
                 ];
@@ -75,7 +75,7 @@ final class DomainGuidanceResolver {
         $parts = [];
 
         foreach ($entries as $entry) {
-            $text = (string) $entry['text'];
+            $text = $entry['text'];
 
             if ($remaining <= 0) {
                 break;
@@ -216,8 +216,8 @@ final class DomainGuidanceResolver {
 
         if (array_key_exists($override_key, $overrides)) {
             $override = $overrides[$override_key];
-            $override_content = wp_strip_all_tags((string) ($override['content'] ?? ''));
-            $content = 'replace' === (string) ($override['mode'] ?? 'extend')
+            $override_content = wp_strip_all_tags($override['content']);
+            $content = 'replace' === $override['mode']
                 ? $override_content
                 : trim($content . "\n\nSite-specific extension:\n" . $override_content);
         }

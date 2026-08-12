@@ -103,17 +103,17 @@ final class RenderedVisualInspector {
     private function workspace(): array|\WP_Error {
         $uploads = wp_upload_dir();
 
-        if (!is_array($uploads) || true === ($uploads['error'] ?? false)) {
+        if ($uploads['error']) {
             return new \WP_Error('awpt_visual_upload_dir', __(
                 'Uploads directory is unavailable.',
                 'agent-wordpress-terminal',
             ));
         }
 
-        $path = trailingslashit((string) ($uploads['basedir'] ?? '')) . 'awpt-render-inspection';
-        $url = trailingslashit((string) ($uploads['baseurl'] ?? '')) . 'awpt-render-inspection';
+        $path = trailingslashit($uploads['basedir']) . 'awpt-render-inspection';
+        $url = trailingslashit($uploads['baseurl']) . 'awpt-render-inspection';
 
-        if ('' === $path || '' === $url || !wp_mkdir_p($path)) {
+        if (!wp_mkdir_p($path)) {
             return new \WP_Error('awpt_visual_workspace', __(
                 'Could not create the render workspace.',
                 'agent-wordpress-terminal',

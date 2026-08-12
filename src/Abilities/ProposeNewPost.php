@@ -1004,7 +1004,7 @@ final class ProposeNewPost implements AbilityInterface {
 
         $templates = $theme->get_page_templates(null, 'page');
 
-        return is_array($templates) ? $this->normalize_page_templates($templates) : [];
+        return $this->normalize_page_templates($templates);
     }
 
     /**

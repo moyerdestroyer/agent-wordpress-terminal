@@ -28,10 +28,6 @@ final class ProposalConstraintSet {
      */
     public function ingest(array $tool_calls): void {
         foreach ($tool_calls as $call) {
-            if (!is_array($call)) {
-                continue;
-            }
-
             if (!ToolRegistry::is_proposal_ability((string) ($call['tool'] ?? ''))) {
                 continue;
             }
@@ -173,7 +169,7 @@ final class ProposalConstraintSet {
         $skip = ['current_fingerprint', 'block_path', 'recommended_next_tools', 'constraints'];
 
         foreach ($facts as $key => $value) {
-            if (!is_string($key) || in_array($key, $skip, true)) {
+            if (in_array($key, $skip, true)) {
                 continue;
             }
 

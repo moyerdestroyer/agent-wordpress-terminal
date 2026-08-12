@@ -45,31 +45,25 @@ final class PatternStructureEvidence {
         }
 
         foreach ($this->session_calls($session_id) as $call) {
-            if ('success' !== (string) ($call['status'] ?? '')) {
+            if ('success' !== $call['status']) {
                 continue;
             }
 
-            $tool = (string) ($call['tool'] ?? '');
+            $tool = $call['tool'];
             $input = is_array($call['input'] ?? null) ? $call['input'] : [];
             $output = is_array($call['output'] ?? null) ? $call['output'] : [];
 
             if ('awpt/read-pattern' === $tool) {
-                $name = sanitize_text_field((string) (
-                    $input['name']
-                    ?? $input['pattern_name']
-                    ?? $output['name']
-                    ?? ''
-                ));
+                $name = sanitize_text_field(
+                    (string) ($input['name'] ?? $input['pattern_name'] ?? $output['name'] ?? ''),
+                );
 
                 if ($name === $pattern_name) {
                     return true;
                 }
             }
 
-            if (
-                'awpt/prepare-pattern-draft' === $tool
-                || 'awpt/prepare-pattern-change' === $tool
-            ) {
+            if ('awpt/prepare-pattern-draft' === $tool || 'awpt/prepare-pattern-change' === $tool) {
                 $mode = sanitize_key((string) ($output['mode'] ?? ''));
 
                 if (
@@ -91,9 +85,11 @@ final class PatternStructureEvidence {
                     $output['primary_pattern'] ?? null,
                     $nested['name'] ?? null,
                 ] as $primary) {
-                    if (is_string($primary) || is_scalar($primary)) {
-                        $candidates[] = sanitize_text_field((string) $primary);
+                    if (!(is_string($primary) || is_scalar($primary))) {
+                        continue;
                     }
+
+                    $candidates[] = sanitize_text_field((string) $primary);
                 }
 
                 foreach ([$output['pattern_names'] ?? null, $nested['pattern_names'] ?? null] as $list) {
@@ -102,9 +98,11 @@ final class PatternStructureEvidence {
                     }
 
                     foreach ($list as $name) {
-                        if (is_string($name) || is_scalar($name)) {
-                            $candidates[] = sanitize_text_field((string) $name);
+                        if (!(is_string($name) || is_scalar($name))) {
+                            continue;
                         }
+
+                        $candidates[] = sanitize_text_field((string) $name);
                     }
                 }
 
@@ -135,25 +133,24 @@ final class PatternStructureEvidence {
             return false;
         }
 
-        return $this->patterns->session_has_pattern_structure($session_id)
+        return (
+            $this->patterns->session_has_pattern_structure($session_id)
             || $this->session_has_pattern_draft($session_id)
-            || $this->session_has_custom_fallback($session_id);
+            || $this->session_has_custom_fallback($session_id)
+        );
     }
 
     public function session_has_pattern_draft(int $session_id): bool {
         foreach ($this->session_calls($session_id) as $call) {
-            if ('success' !== (string) ($call['status'] ?? '')) {
+            if ('success' !== $call['status']) {
                 continue;
             }
 
-            $tool = (string) ($call['tool'] ?? '');
+            $tool = $call['tool'];
             $output = is_array($call['output'] ?? null) ? $call['output'] : [];
             $mode = sanitize_key((string) ($output['mode'] ?? ''));
 
-            if (
-                'awpt/prepare-pattern-draft' === $tool
-                && 'pattern' === $mode
-            ) {
+            if ('awpt/prepare-pattern-draft' === $tool && 'pattern' === $mode) {
                 return true;
             }
 
@@ -175,17 +172,17 @@ final class PatternStructureEvidence {
     public function session_has_custom_fallback(int $session_id): bool {
         foreach ($this->session_calls($session_id) as $call) {
             if (
-                in_array(
-                    (string) ($call['tool'] ?? ''),
-                    ['awpt/prepare-pattern-draft', 'awpt/prepare-pattern-change'],
-                    true,
+                !(
+                    in_array($call['tool'], ['awpt/prepare-pattern-draft', 'awpt/prepare-pattern-change'], true)
+                    && 'success' === $call['status']
                 )
-                && 'success' === (string) ($call['status'] ?? '')
             ) {
-                $output = is_array($call['output'] ?? null) ? $call['output'] : [];
-                if ('custom_fallback' === sanitize_key((string) ($output['mode'] ?? ''))) {
-                    return true;
-                }
+                continue;
+            }
+
+            $output = is_array($call['output'] ?? null) ? $call['output'] : [];
+            if ('custom_fallback' === sanitize_key((string) ($output['mode'] ?? ''))) {
+                return true;
             }
         }
 
@@ -237,8 +234,14 @@ final class PatternStructureEvidence {
                 [
                     'status' => 400,
                     'recommended_next_tools' => [
-                        ['tool' => 'awpt/read-pattern', 'reason' => 'Load structure for a recommended pattern before adapting.'],
-                        ['tool' => 'awpt/propose-pattern-insert', 'reason' => 'Prefer inserting a recommended theme pattern when it fits.'],
+                        [
+                            'tool' => 'awpt/read-pattern',
+                            'reason' => 'Load structure for a recommended pattern before adapting.',
+                        ],
+                        [
+                            'tool' => 'awpt/propose-pattern-insert',
+                            'reason' => 'Prefer inserting a recommended theme pattern when it fits.',
+                        ],
                     ],
                 ],
             );
@@ -274,7 +277,10 @@ final class PatternStructureEvidence {
                 'pattern_name' => $pattern_name,
                 'recommended_next_tools' => [
                     ['tool' => 'awpt/read-pattern', 'input' => ['name' => $pattern_name]],
-                    ['tool' => 'awpt/prepare-pattern-draft', 'reason' => 'Or prepare an ordered pattern composition in one call.'],
+                    [
+                        'tool' => 'awpt/prepare-pattern-draft',
+                        'reason' => 'Or prepare an ordered pattern composition in one call.',
+                    ],
                 ],
             ],
         );

@@ -47,9 +47,11 @@ final class AbilityReplacementRegistry {
         $active = [];
 
         foreach ($this->configured() as $fallback => $replacement) {
-            if ($this->is_compatible($fallback, $replacement)) {
-                $active[$fallback] = $replacement;
+            if (!$this->is_compatible($fallback, $replacement)) {
+                continue;
             }
+
+            $active[$fallback] = $replacement;
         }
 
         return $active;
@@ -64,10 +66,12 @@ final class AbilityReplacementRegistry {
         $aliases = [$ability_name];
 
         foreach ($this->configured() as $fallback => $replacement) {
-            if ($ability_name === $fallback || $ability_name === $replacement) {
-                $aliases[] = $fallback;
-                $aliases[] = $replacement;
+            if (!($ability_name === $fallback || $ability_name === $replacement)) {
+                continue;
             }
+
+            $aliases[] = $fallback;
+            $aliases[] = $replacement;
         }
 
         return array_values(array_unique($aliases));
@@ -100,12 +104,10 @@ final class AbilityReplacementRegistry {
         $output_properties = $this->properties($output);
 
         return (
-            isset($properties['id'])
-            && isset($properties['fields'])
+            isset($properties['id'], $properties['fields'])
             && in_array('id', $field_enum, true)
             && in_array('content_raw', $field_enum, true)
-            && isset($output_properties['id'])
-            && isset($output_properties['content_raw'])
+            && isset($output_properties['id'], $output_properties['content_raw'])
         );
     }
 
@@ -122,9 +124,11 @@ final class AbilityReplacementRegistry {
             }
 
             foreach ($schema[$keyword] as $alternative) {
-                if (is_array($alternative)) {
-                    $properties += $this->properties($alternative);
+                if (!is_array($alternative)) {
+                    continue;
                 }
+
+                $properties += $this->properties($alternative);
             }
         }
 
@@ -144,9 +148,11 @@ final class AbilityReplacementRegistry {
         $result = [];
 
         foreach ($value as $key => $item) {
-            if (is_string($key)) {
-                $result[$key] = $item;
+            if (!is_string($key)) {
+                continue;
             }
+
+            $result[$key] = $item;
         }
 
         return $result;

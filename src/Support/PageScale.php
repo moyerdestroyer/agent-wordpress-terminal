@@ -75,7 +75,7 @@ final class PageScale {
         if ('' === $content && $focus_post_id > 0 && function_exists('get_post')) {
             $post = get_post($focus_post_id);
             if ($post instanceof \WP_Post) {
-                $content = (string) $post->post_content;
+                $content = $post->post_content;
             }
         }
 
@@ -96,9 +96,9 @@ final class PageScale {
      * @param array{scale: string, blocks: int, chars: int} $measure
      */
     public function compose_guidance(array $measure): string {
-        $scale = (string) ($measure['scale'] ?? self::UNKNOWN);
-        $blocks = (int) ($measure['blocks'] ?? 0);
-        $chars = (int) ($measure['chars'] ?? 0);
+        $scale = $measure['scale'];
+        $blocks = (int) $measure['blocks'];
+        $chars = (int) $measure['chars'];
 
         if (self::LARGE === $scale) {
             return sprintf(

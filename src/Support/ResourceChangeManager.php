@@ -425,7 +425,7 @@ final class ResourceChangeManager {
                 'parent' => (int) ($data['parent'] ?? 0),
             ]);
 
-            return is_wp_error($result) ? $result : ['term_id' => (int) ($result['term_id'] ?? 0)];
+            return is_wp_error($result) ? $result : ['term_id' => (int) $result['term_id']];
         }
 
         if ('delete' === $operation) {
@@ -485,7 +485,7 @@ final class ResourceChangeManager {
         if ('delete' === $operation) {
             $deleted = wp_delete_nav_menu((int) $id);
 
-            return is_wp_error($deleted) ? $deleted : ['menu_id' => (int) $id, 'deleted' => (bool) $deleted];
+            return is_wp_error($deleted) ? $deleted : ['menu_id' => (int) $id, 'deleted' => $deleted];
         }
 
         $current = wp_get_nav_menu_object((int) $id);
@@ -693,9 +693,11 @@ final class ResourceChangeManager {
             'author_url' => 'comment_author_url',
             'content' => 'comment_content',
         ] as $source => $target) {
-            if (array_key_exists($source, $data)) {
-                $update[$target] = $data[$source];
+            if (!array_key_exists($source, $data)) {
+                continue;
             }
+
+            $update[$target] = $data[$source];
         }
 
         $result = wp_update_comment(wp_slash($update), true);

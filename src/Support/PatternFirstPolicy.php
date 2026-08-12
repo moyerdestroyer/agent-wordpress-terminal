@@ -41,7 +41,7 @@ final class PatternFirstPolicy {
         foreach ($tool_calls as $call) {
             if (
                 'awpt/recommend-patterns' !== (string) ($call['tool'] ?? '')
-                || 'success' !== (string) ($call['status'] ?? '')
+                || 'success' !== (string) $call['status']
             ) {
                 continue;
             }
@@ -63,9 +63,7 @@ final class PatternFirstPolicy {
             return [];
         }
 
-        return $this->nonempty_recommendations_from_calls(
-            $this->session_tool_calls($session_id),
-        );
+        return $this->nonempty_recommendations_from_calls($this->session_tool_calls($session_id));
     }
 
     public function session_consulted_empty(int $session_id): bool {
@@ -77,10 +75,7 @@ final class PatternFirstPolicy {
         $any_nonempty = false;
 
         foreach ($this->session_tool_calls($session_id) as $call) {
-            if (
-                'awpt/recommend-patterns' !== (string) ($call['tool'] ?? '')
-                || 'success' !== (string) ($call['status'] ?? '')
-            ) {
+            if ('awpt/recommend-patterns' !== $call['tool'] || 'success' !== $call['status']) {
                 continue;
             }
 
@@ -101,10 +96,7 @@ final class PatternFirstPolicy {
         }
 
         foreach ($this->session_tool_calls($session_id) as $call) {
-            if (
-                'awpt/read-pattern' === (string) ($call['tool'] ?? '')
-                && 'success' === (string) ($call['status'] ?? '')
-            ) {
+            if ('awpt/read-pattern' === $call['tool'] && 'success' === $call['status']) {
                 return true;
             }
         }
@@ -142,8 +134,6 @@ final class PatternFirstPolicy {
             return false;
         }
 
-        return $this->is_presentation_edit_message(
-            new MessageRepository()->latest_user_message($session_id),
-        );
+        return $this->is_presentation_edit_message(new MessageRepository()->latest_user_message($session_id));
     }
 }

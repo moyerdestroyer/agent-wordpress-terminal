@@ -86,8 +86,8 @@ final class ReadBlockTree implements AbilityInterface {
         $tree = BlockTree::from_content($post->post_content);
         $normalized = $tree->normalized();
         $top_level = PageSectionModel::from_tree($tree, [
-            'title' => (string) ($post->post_title ?? ''),
-            'post_type' => (string) ($post->post_type ?? ''),
+            'title' => $post->post_title,
+            'post_type' => $post->post_type,
         ]);
 
         return [

@@ -252,8 +252,8 @@ final class QueueImproveScorecard {
 
         return [
             'scorecard_version' => self::VERSION,
-            'label' => (string) ($meta['label'] ?? ''),
-            'note' => (string) ($meta['note'] ?? ''),
+            'label' => $meta['label'] ?? '',
+            'note' => $meta['note'] ?? '',
             'generated_at' => gmdate('c'),
             'n' => $n,
             'n_structural_eligible' => $sn,
@@ -300,25 +300,23 @@ final class QueueImproveScorecard {
                 ],
             ],
             'wall_s_mean' => $wall_n > 0 ? round($wall_sum / $wall_n, 1) : null,
-            'runs' => array_values(array_map(static function (array $row): array {
-                return [
-                    'post_id' => (int) ($row['post_id'] ?? 0),
-                    'run_id' => (string) ($row['run_id'] ?? ''),
-                    'scenario_class' => (string) ($row['scenario_class'] ?? ''),
-                    'eligible_structural' => (bool) ($row['eligible_structural'] ?? false),
-                    'path_used' => (string) ($row['path_used'] ?? ''),
-                    'server_materialized' => (bool) ($row['server_materialized'] ?? false),
-                    'prepare_change_success' => (int) ($row['prepare_change_success'] ?? 0),
-                    'propose_replace_success' => (int) ($row['propose_replace_success'] ?? 0),
-                    'propose_insert_success' => (int) ($row['propose_insert_success'] ?? 0),
-                    'funnel_stage' => (string) ($row['funnel_stage'] ?? ''),
-                    'correction_count' => (int) ($row['correction_count'] ?? 0),
-                    'freehand_provenance' => (bool) ($row['freehand_provenance'] ?? false),
-                    'wall_s' => $row['wall_s'] ?? null,
-                    'first_proposal_valid' => $row['first_proposal_valid'] ?? null,
-                    'turn_outcome_status' => (string) ($row['turn_outcome_status'] ?? ''),
-                ];
-            }, array_values(array_filter($rows, 'is_array')))),
+            'runs' => array_values(array_map(static fn(array $row): array => [
+                'post_id' => (int) ($row['post_id'] ?? 0),
+                'run_id' => (string) ($row['run_id'] ?? ''),
+                'scenario_class' => (string) ($row['scenario_class'] ?? ''),
+                'eligible_structural' => (bool) ($row['eligible_structural'] ?? false),
+                'path_used' => (string) ($row['path_used'] ?? ''),
+                'server_materialized' => (bool) ($row['server_materialized'] ?? false),
+                'prepare_change_success' => (int) ($row['prepare_change_success'] ?? 0),
+                'propose_replace_success' => (int) ($row['propose_replace_success'] ?? 0),
+                'propose_insert_success' => (int) ($row['propose_insert_success'] ?? 0),
+                'funnel_stage' => (string) ($row['funnel_stage'] ?? ''),
+                'correction_count' => (int) ($row['correction_count'] ?? 0),
+                'freehand_provenance' => (bool) ($row['freehand_provenance'] ?? false),
+                'wall_s' => $row['wall_s'] ?? null,
+                'first_proposal_valid' => $row['first_proposal_valid'] ?? null,
+                'turn_outcome_status' => (string) ($row['turn_outcome_status'] ?? ''),
+            ], array_values(array_filter($rows, 'is_array')))),
             'policy' => 'Rates are report-only. Do not invent fixed targets (e.g. 70%) without denominators and a clean post-M3 cohort.',
         ];
     }
@@ -334,7 +332,7 @@ final class QueueImproveScorecard {
         $rows = [];
 
         foreach ($paths as $path) {
-            $path = (string) $path;
+            $path = $path;
 
             if (!is_readable($path)) {
                 continue;
@@ -373,7 +371,7 @@ final class QueueImproveScorecard {
         $files = [];
 
         foreach ($inputs as $input) {
-            $input = (string) $input;
+            $input = $input;
 
             if (is_dir($input)) {
                 $globbed = glob(rtrim($input, '/') . '/awpt-queue-*.json') ?: [];
@@ -448,12 +446,16 @@ final class QueueImproveScorecard {
         $structure_reads = 0;
         foreach ($tools as $line) {
             if (
-                str_starts_with($line, 'awpt/read-block-tree:')
-                || str_starts_with($line, 'awpt/analyze-page:')
-                || str_starts_with($line, 'awpt/prepare-pattern-change:')
+                !(
+                    str_starts_with($line, 'awpt/read-block-tree:')
+                    || str_starts_with($line, 'awpt/analyze-page:')
+                    || str_starts_with($line, 'awpt/prepare-pattern-change:')
+                )
             ) {
-                ++$structure_reads;
+                continue;
             }
+
+            ++$structure_reads;
         }
 
         if ($structure_reads > 0) {
@@ -516,9 +518,11 @@ final class QueueImproveScorecard {
         $n = 0;
 
         foreach ($tools as $line) {
-            if (str_starts_with((string) $line, $prefix)) {
-                ++$n;
+            if (!str_starts_with($line, $prefix)) {
+                continue;
             }
+
+            ++$n;
         }
 
         return $n;

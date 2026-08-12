@@ -65,10 +65,6 @@ final class PageSectionModel {
         $header_assigned = false;
 
         foreach ($normalized as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
             $path = (string) ($block['path'] ?? '');
 
             // Top-level only (no dots).
@@ -137,10 +133,6 @@ final class PageSectionModel {
         $path = sanitize_text_field($path);
 
         foreach ($sections as $section) {
-            if (!is_array($section)) {
-                continue;
-            }
-
             if ((string) ($section['path'] ?? '') === $path) {
                 return $section;
             }
@@ -176,10 +168,6 @@ final class PageSectionModel {
         $scored = [];
 
         foreach ($sections as $section) {
-            if (!is_array($section)) {
-                continue;
-            }
-
             $role = (string) ($section['role'] ?? self::ROLE_UNKNOWN);
             $path = (string) ($section['path'] ?? '');
             $heading = (string) ($section['heading'] ?? '');
@@ -191,9 +179,11 @@ final class PageSectionModel {
                 }
 
                 foreach ($keywords as $keyword) {
-                    if (str_contains($intent_l, $keyword)) {
-                        $score += 10;
+                    if (!str_contains($intent_l, $keyword)) {
+                        continue;
                     }
+
+                    $score += 10;
                 }
             }
 
@@ -222,7 +212,7 @@ final class PageSectionModel {
 
         usort(
             $scored,
-            static fn (array $a, array $b): int => ($b['score'] <=> $a['score']) ?: strcmp($a['path'], $b['path']),
+            static fn(array $a, array $b): int => $b['score'] <=> $a['score'] ?: strcmp($a['path'], $b['path']),
         );
 
         return $scored;
@@ -234,7 +224,11 @@ final class PageSectionModel {
      * @param array<string, mixed>|null $target_section
      * @return array{operation: string, reason: string}
      */
-    public static function recommend_operation(string $intent, ?array $target_section = null, string $mode = ''): array {
+    public static function recommend_operation(
+        string $intent,
+        ?array $target_section = null,
+        string $mode = '',
+    ): array {
         $intent_l = mb_strtolower(trim($intent), 'UTF-8');
         $mode = sanitize_key($mode);
 
@@ -245,7 +239,10 @@ final class PageSectionModel {
             ];
         }
 
-        if (preg_match('/\b(whole\s*page|full\s*page|redesign\s+entire|from\s+scratch|restructure\s+page)\b/', $intent_l)) {
+        if (preg_match(
+            '/\b(whole\s*page|full\s*page|redesign\s+entire|from\s+scratch|restructure\s+page)\b/',
+            $intent_l,
+        )) {
             return [
                 'operation' => 'multi_section_or_redesign',
                 'reason' => 'Whole-page restructure: prefer multi section replace/insert (M4 redesign only if hops are excessive).',
@@ -306,12 +303,17 @@ final class PageSectionModel {
             return self::ROLE_QUERY;
         }
 
-        $looks_header = str_contains($name_blob, 'post-title')
+        $looks_header =
+            str_contains($name_blob, 'post-title')
             || str_contains($name_blob, 'site-title')
             || str_contains($name_blob, 'content-header')
             || str_contains($name_blob, 'page-header');
 
-        if (!$header_assigned && (0 === $index) && ($looks_header || '' !== $heading && mb_strlen($heading, 'UTF-8') < 80)) {
+        if (
+            !$header_assigned
+            && 0 === $index
+            && ($looks_header || '' !== $heading && mb_strlen($heading, 'UTF-8') < 80)
+        ) {
             // First section with a short heading often is the page header/hero band.
             if ($looks_header) {
                 return self::ROLE_HEADER;
@@ -326,7 +328,7 @@ final class PageSectionModel {
             str_contains($name_blob, 'core/cover')
             || str_contains($plain_l, 'hero')
             || str_contains($heading_l, 'hero')
-            || (str_contains($name_blob, 'core/media-text') && 0 === $index)
+            || str_contains($name_blob, 'core/media-text') && 0 === $index
         ) {
             return self::ROLE_HERO;
         }
@@ -336,7 +338,8 @@ final class PageSectionModel {
             || str_contains($heading_l, 'faq')
             || str_contains($plain_l, 'frequently asked')
             || str_contains($name_blob, 'core/details')
-            || (str_contains($name_blob, 'core/list') && (str_contains($plain_l, 'question') || substr_count($plain_l, '?') >= 2))
+            || str_contains($name_blob, 'core/list')
+            && (str_contains($plain_l, 'question') || substr_count($plain_l, '?') >= 2)
         ) {
             return self::ROLE_FAQ;
         }
@@ -346,7 +349,7 @@ final class PageSectionModel {
             || str_contains($heading_l, 'how to')
             || str_contains($heading_l, 'steps')
             || str_contains($plain_l, 'how it works')
-            || (str_contains($name_blob, 'core/list') && preg_match('/\b(1\.|2\.|3\.)\b/', $plain_l))
+            || str_contains($name_blob, 'core/list') && preg_match('/\b(1\.|2\.|3\.)\b/', $plain_l)
         ) {
             return self::ROLE_STEPS;
         }
@@ -359,7 +362,7 @@ final class PageSectionModel {
             // Buttons alone can be CTA; prefer CTA when CTA language or buttons dominate short section.
             if (
                 preg_match('/\b(contact|apply|sign up|get started|book now)\b/', $plain_l)
-                || (str_contains($name_blob, 'core/button') && mb_strlen($plain, 'UTF-8') < 200)
+                || str_contains($name_blob, 'core/button') && mb_strlen($plain, 'UTF-8') < 200
             ) {
                 return self::ROLE_CTA;
             }
@@ -367,11 +370,13 @@ final class PageSectionModel {
 
         $media_names = array_filter(
             $names,
-            static fn (string $n): bool => str_contains($n, 'image')
+            static fn(string $n): bool => (
+                str_contains($n, 'image')
                 || str_contains($n, 'gallery')
                 || str_contains($n, 'media-text')
                 || str_contains($n, 'video')
-                || str_contains($n, 'embed'),
+                || str_contains($n, 'embed')
+            ),
         );
 
         if (
@@ -420,7 +425,7 @@ final class PageSectionModel {
      */
     private static function has_dynamic_names(array $names): bool {
         foreach ($names as $name) {
-            $name = mb_strtolower((string) $name, 'UTF-8');
+            $name = mb_strtolower($name, 'UTF-8');
 
             if (in_array($name, self::DYNAMIC_BLOCK_NAMES, true)) {
                 return true;
@@ -446,7 +451,7 @@ final class PageSectionModel {
         if (function_exists('serialize_block')) {
             $serialized = new BlockTreePathHelpers()->serialize([$block]);
 
-            if (is_string($serialized) && '' !== $serialized) {
+            if ('' !== $serialized) {
                 return $serialized;
             }
         }
@@ -475,7 +480,7 @@ final class PageSectionModel {
         $lines = preg_split('/\R+/', $plain_fallback) ?: [];
 
         foreach ($lines as $line) {
-            $line = trim((string) $line);
+            $line = trim($line);
 
             if ('' !== $line) {
                 return mb_substr($line, 0, 120, 'UTF-8');
@@ -502,8 +507,10 @@ final class PageSectionModel {
 
         $html = (string) ($block['innerHTML'] ?? '');
 
+        $m = [];
+
         if (preg_match('/<h[1-6][^>]*>(.*?)<\/h[1-6]>/is', $html, $m)) {
-            $text = trim(wp_strip_all_tags((string) $m[1]));
+            $text = trim(wp_strip_all_tags($m[1]));
 
             if ('' !== $text) {
                 return $text;
@@ -534,7 +541,7 @@ final class PageSectionModel {
         $links = [];
 
         foreach (array_keys($matches[0] ?? []) as $index) {
-            $url = html_entity_decode((string) (($matches[1][$index] ?? '') ?: ($matches[2][$index] ?? '')));
+            $url = html_entity_decode($matches[1][$index] ?? '' ?: $matches[2][$index] ?? '');
 
             if ('' !== $url) {
                 $links[] = $url;

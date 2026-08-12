@@ -194,7 +194,7 @@ final class ProposalRequestContext {
             return null;
         }
 
-        $raw = strtolower((string) ($matches[1] ?? ''));
+        $raw = strtolower($matches[1] ?? '');
         $words = [
             'one' => 1,
             'two' => 2,

@@ -58,19 +58,22 @@ final class BlockTreeMutator {
                     'status' => 400,
                     'allowed_positions' => $allowed,
                     'received_position' => 'replace',
-                    'recommended_next_tools' => [[
-                        'tool' => 'awpt/prepare-pattern-change',
-                        'reason' => __(
-                            'Prepare a section replacement with a verified target path and fingerprint, then stage with propose-pattern-replace.',
-                            'agent-wordpress-terminal',
-                        ),
-                    ], [
-                        'tool' => 'awpt/propose-pattern-replace',
-                        'reason' => __(
-                            'Stage a server-materialized section replacement without freehand markup.',
-                            'agent-wordpress-terminal',
-                        ),
-                    ]],
+                    'recommended_next_tools' => [
+                        [
+                            'tool' => 'awpt/prepare-pattern-change',
+                            'reason' => __(
+                                'Prepare a section replacement with a verified target path and fingerprint, then stage with propose-pattern-replace.',
+                                'agent-wordpress-terminal',
+                            ),
+                        ],
+                        [
+                            'tool' => 'awpt/propose-pattern-replace',
+                            'reason' => __(
+                                'Stage a server-materialized section replacement without freehand markup.',
+                                'agent-wordpress-terminal',
+                            ),
+                        ],
+                    ],
                     'recovery' => __(
                         'Do not retry propose-pattern-insert with position replace. Call prepare-pattern-change (mode=replace) then propose-pattern-replace.',
                         'agent-wordpress-terminal',
@@ -82,10 +85,7 @@ final class BlockTreeMutator {
         if (!in_array($position, $allowed, true)) {
             return new \WP_Error(
                 'awpt_invalid_block_position',
-                __(
-                    'Insert position must be before, after, or append.',
-                    'agent-wordpress-terminal',
-                ),
+                __('Insert position must be before, after, or append.', 'agent-wordpress-terminal'),
                 [
                     'status' => 400,
                     'allowed_positions' => $allowed,
@@ -261,7 +261,7 @@ final class BlockTreeMutator {
         $normalized = [];
 
         foreach ($new_blocks as $raw) {
-            if (!is_array($raw) || !BlockTree::has_block_name($raw)) {
+            if (!BlockTree::has_block_name($raw)) {
                 return $this->paths->error('awpt_invalid_block', __(
                     'Replacement blocks must include a blockName.',
                     'agent-wordpress-terminal',
@@ -493,7 +493,7 @@ final class BlockTreeMutator {
     private function first_path_segment(string $path): int {
         $segments = explode('.', $path, 2);
 
-        return max(0, (int) ($segments[0] ?? 0));
+        return max(0, (int) $segments[0]);
     }
 
     /**
@@ -516,9 +516,11 @@ final class BlockTreeMutator {
         $null_positions = [];
 
         foreach ($inner_content as $index => $part) {
-            if (null === $part) {
-                $null_positions[] = (int) $index;
+            if (null !== $part) {
+                continue;
             }
+
+            $null_positions[] = (int) $index;
         }
 
         if (array_key_exists($child_index, $null_positions)) {
@@ -642,13 +644,8 @@ final class BlockTreeMutator {
                 $inner = $this->paths->inner_blocks($block);
                 $prefix = '' === $parent_prefix ? (string) $target : $parent_prefix . '.' . $target;
                 $before_count = count($inner);
-                $leaf_index = $segments[0] ?? 0;
-                $removed = $this->replace_at(
-                    $inner,
-                    $segments,
-                    $replacement,
-                    $prefix,
-                );
+                $leaf_index = $segments[0];
+                $removed = $this->replace_at($inner, $segments, $replacement, $prefix);
                 $block['innerBlocks'] = $inner;
 
                 if (!is_wp_error($removed) && count($inner) !== $before_count) {

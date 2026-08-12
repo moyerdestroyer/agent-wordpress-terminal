@@ -111,9 +111,7 @@ final class BlockTreeView {
                 'fingerprint' => (string) ($block['fingerprint'] ?? ''),
             ];
 
-            $summary = is_array($block['attributes_summary'] ?? null)
-                ? $block['attributes_summary']
-                : [];
+            $summary = is_array($block['attributes_summary'] ?? null) ? $block['attributes_summary'] : [];
             $attrs = is_array($block['attributes'] ?? null) ? $block['attributes'] : [];
 
             if ($prefer_summary_attrs && [] !== $summary) {

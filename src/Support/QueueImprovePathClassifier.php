@@ -44,11 +44,7 @@ final class QueueImprovePathClassifier {
      *   classifier_version: string
      * }
      */
-    public function classify(
-        array $actions,
-        array $tool_summary = [],
-        array $recommended_patterns = [],
-    ): array {
+    public function classify(array $actions, array $tool_summary = [], array $recommended_patterns = []): array {
         $ops = [];
         $has_pattern_name = false;
         $has_unfit = false;
@@ -98,10 +94,7 @@ final class QueueImprovePathClassifier {
             $path = 'adapted_freehand';
         } elseif ($has_unfit) {
             $path = 'surgical_with_unfit';
-        } elseif (
-            [] === $recommended_patterns
-            && in_array('awpt/recommend-patterns:success', $tool_summary, true)
-        ) {
+        } elseif ([] === $recommended_patterns && in_array('awpt/recommend-patterns:success', $tool_summary, true)) {
             $path = 'surgical_empty_recs';
         } elseif ([] !== $ops) {
             $path = 'surgical_or_other';
@@ -158,7 +151,7 @@ final class QueueImprovePathClassifier {
     /** @param list<string> $tool_summary */
     private function had_successful_structure_read(array $tool_summary): bool {
         foreach ($tool_summary as $entry) {
-            $line = (string) $entry;
+            $line = $entry;
 
             if (
                 str_starts_with($line, 'awpt/read-pattern:success')

@@ -62,12 +62,10 @@ final class AgentWorkContextService {
                 'correction_limit' => 1,
             ],
             'design_authority' => [
-                'theme_name' => (string) ($design['theme_name'] ?? ''),
-                'stylesheet' => (string) ($design['stylesheet'] ?? ''),
-                'template' => (string) ($design['template'] ?? ''),
-                'preferred_pattern_namespaces' => ArrayKey::list_of_strings(
-                    $design['preferred_pattern_namespaces'] ?? null,
-                ),
+                'theme_name' => $design['theme_name'],
+                'stylesheet' => $design['stylesheet'],
+                'template' => $design['template'],
+                'preferred_pattern_namespaces' => ArrayKey::list_of_strings($design['preferred_pattern_namespaces']),
             ],
             'domain_packs' => $this->packs->status(),
             'guidance' => $guidance,

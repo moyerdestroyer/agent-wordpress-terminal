@@ -46,7 +46,7 @@ final class DomainValidationService {
      */
     public function evaluate(string $content, array $context = [], bool $apply_safe_fixes = false): array {
         $fixed = $apply_safe_fixes ? new SafeCompositionFixer()->fix($content) : ['content' => $content, 'fixes' => []];
-        $validated_content = (string) $fixed['content'];
+        $validated_content = $fixed['content'];
         $findings = new BaselineCompositionValidator()->validate($validated_content);
         array_push($findings, ...new DeclarativeRuleEngine(
             new DomainRuleRepository($this->registry),

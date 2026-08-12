@@ -67,11 +67,17 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                                 'attrs' => [
                                     'type' => 'object',
                                     'additionalProperties' => true,
-                                    'description' => __('Required for update_attrs and update_block.', 'agent-wordpress-terminal'),
+                                    'description' => __(
+                                        'Required for update_attrs and update_block.',
+                                        'agent-wordpress-terminal',
+                                    ),
                                 ],
                                 'content' => [
                                     'type' => 'string',
-                                    'description' => __('Required for replace_text and update_block.', 'agent-wordpress-terminal'),
+                                    'description' => __(
+                                        'Required for replace_text and update_block.',
+                                        'agent-wordpress-terminal',
+                                    ),
                                 ],
                                 'position' => ['type' => 'string', 'enum' => ['before', 'after']],
                                 'block_name' => [
@@ -163,11 +169,7 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
         ];
         $payload = PatternUnfitInput::persist_on_payload($payload, $input);
 
-        $payload = new CompositionProposalGuard()->prepare(
-            $payload,
-            'edit',
-            $session_id,
-        );
+        $payload = new CompositionProposalGuard()->prepare($payload, 'edit', $session_id);
 
         if (is_wp_error($payload)) {
             return $payload;

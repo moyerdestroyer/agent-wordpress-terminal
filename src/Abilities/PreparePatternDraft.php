@@ -194,9 +194,9 @@ final class PreparePatternDraft implements AbilityInterface {
             'pattern' => [
                 'name' => $pattern_name,
                 'pattern_names' => $pattern_names,
-                'title' => (string) ($primary['title'] ?? ''),
-                'owner' => (string) ($primary['owner'] ?? ''),
-                'composition_scope' => (string) ($primary['composition_scope'] ?? ''),
+                'title' => $primary['title'] ?? '',
+                'owner' => $primary['owner'] ?? '',
+                'composition_scope' => $primary['composition_scope'] ?? '',
                 'content_hash' => hash('sha256', $expanded_content),
                 'components' => $components,
                 'editable_slots' => new PatternEditableSlots()->from_content($expanded_content),
@@ -297,9 +297,11 @@ final class PreparePatternDraft implements AbilityInterface {
         ];
 
         foreach ($facets as $pattern => $query) {
-            if (preg_match($pattern, $normalized)) {
-                $requirements[] = $query;
+            if (!preg_match($pattern, $normalized)) {
+                continue;
             }
+
+            $requirements[] = $query;
         }
 
         // When no common signal matched, preserve extensibility by ranking the

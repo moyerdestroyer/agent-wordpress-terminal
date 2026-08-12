@@ -57,24 +57,24 @@ final class SafeCompositionFixer {
             static function (array $match) use (&$stack): string {
                 $closing = '/' === ($match[1] ?? '');
                 $self_closing = '/' === ($match[3] ?? '');
-                $name = (string) ($match[2] ?? '');
+                $name = $match[2] ?? '';
 
                 if (!$closing && !$self_closing) {
                     $stack[] = $name;
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 if (!$closing || [] === $stack) {
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
-                $expected = (string) array_pop($stack);
+                $expected = array_pop($stack);
 
                 if ($expected === $name) {
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
-                return str_replace('/wp:' . $name, '/wp:' . $expected, (string) $match[0]);
+                return str_replace('/wp:' . $name, '/wp:' . $expected, $match[0]);
             },
             $content,
         );
@@ -86,10 +86,10 @@ final class SafeCompositionFixer {
         $normalized = preg_replace_callback(
             '/\bclass=(["\'])(.*?)\1/is',
             static function (array $match): string {
-                $tokens = preg_split('/\s+/', trim((string) ($match[2] ?? '')));
+                $tokens = preg_split('/\s+/', trim($match[2] ?? ''));
                 $tokens = false === $tokens ? [] : array_values(array_unique(array_filter($tokens)));
 
-                return 'class=' . (string) $match[1] . implode(' ', $tokens) . (string) $match[1];
+                return 'class=' . $match[1] . implode(' ', $tokens) . $match[1];
             },
             $content,
         );
@@ -146,9 +146,11 @@ final class SafeCompositionFixer {
                 $attributes[] = $attrs;
 
                 foreach (['id', 'mediaId'] as $key) {
-                    if ((int) ($attrs[$key] ?? 0) > 0) {
-                        $media[] = (int) $attrs[$key];
+                    if ((int) ($attrs[$key] ?? 0) <= 0) {
+                        continue;
                     }
+
+                    $media[] = (int) $attrs[$key];
                 }
 
                 $walk(is_array($block['innerBlocks'] ?? null) ? $block['innerBlocks'] : []);
@@ -156,10 +158,11 @@ final class SafeCompositionFixer {
         };
         $walk($blocks);
         $links = [];
+        $matches = [];
         preg_match_all('/\bhref=(["\'])(.*?)\1/i', $content, $matches);
 
         foreach ($matches[2] ?? [] as $link) {
-            $links[] = html_entity_decode((string) $link);
+            $links[] = html_entity_decode($link);
         }
 
         sort($links);

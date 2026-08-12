@@ -107,13 +107,10 @@ final class RecommendPatterns implements AbilityInterface {
             $post = get_post($post_id);
 
             if ($post instanceof \WP_Post) {
-                $section = PageSectionModel::find_by_path(
-                    PageSectionModel::from_content((string) $post->post_content, [
-                        'title' => (string) ($post->post_title ?? ''),
-                        'post_type' => (string) ($post->post_type ?? ''),
-                    ]),
-                    $target_path,
-                );
+                $section = PageSectionModel::find_by_path(PageSectionModel::from_content($post->post_content, [
+                    'title' => $post->post_title,
+                    'post_type' => $post->post_type,
+                ]), $target_path);
 
                 if (is_array($section)) {
                     $target_role = sanitize_key((string) ($section['role'] ?? ''));
@@ -124,7 +121,7 @@ final class RecommendPatterns implements AbilityInterface {
 
         $prefer_section_scope = array_key_exists('prefer_section_scope', $input)
             ? (bool) $input['prefer_section_scope']
-            : ('' !== $target_role);
+            : '' !== $target_role;
 
         $ranked = [];
 
@@ -151,10 +148,12 @@ final class RecommendPatterns implements AbilityInterface {
                 $term_matched = false;
 
                 foreach ($weighted_fields as [$value, $weight]) {
-                    if (str_contains(mb_strtolower($value), $term)) {
-                        $relevance += $weight;
-                        $term_matched = true;
+                    if (!str_contains(mb_strtolower($value), $term)) {
+                        continue;
                     }
+
+                    $relevance += $weight;
+                    $term_matched = true;
                 }
 
                 if ($term_matched) {
@@ -166,16 +165,12 @@ final class RecommendPatterns implements AbilityInterface {
             $score += 'active_theme' === (string) ($pattern['owner'] ?? '') ? 40 : 0;
             $score += [] !== $domain ? 30 : 0;
 
-            $affinity = $this->section_role_affinity(
-                $target_role,
-                $prefer_section_scope,
-                [
-                    'role' => (string) ($domain['role'] ?? ''),
-                    'composition_scope' => (string) ($pattern['composition_scope'] ?? ''),
-                    'name' => (string) ($pattern['name'] ?? ''),
-                    'title' => (string) ($pattern['title'] ?? ''),
-                ],
-            );
+            $affinity = $this->section_role_affinity($target_role, $prefer_section_scope, [
+                'role' => (string) ($domain['role'] ?? ''),
+                'composition_scope' => (string) ($pattern['composition_scope'] ?? ''),
+                'name' => (string) ($pattern['name'] ?? ''),
+                'title' => (string) ($pattern['title'] ?? ''),
+            ]);
             $score += $affinity['score'];
 
             $rationale_parts = [];
@@ -274,17 +269,10 @@ final class RecommendPatterns implements AbilityInterface {
      * @param array{role: string, composition_scope: string, name: string, title: string} $pattern
      * @return array{score: int, rationale: string}
      */
-    private function section_role_affinity(
-        string $section_role,
-        bool $prefer_section_scope,
-        array $pattern,
-    ): array {
+    private function section_role_affinity(string $section_role, bool $prefer_section_scope, array $pattern): array {
         $score = 0;
         $notes = [];
-        $blob = mb_strtolower(
-            trim(implode(' ', $pattern)),
-            'UTF-8',
-        );
+        $blob = mb_strtolower(trim(implode(' ', $pattern)), 'UTF-8');
         $pattern_role_l = mb_strtolower($pattern['role'], 'UTF-8');
         $scope_l = mb_strtolower($pattern['composition_scope'], 'UTF-8');
 
@@ -293,14 +281,12 @@ final class RecommendPatterns implements AbilityInterface {
             $matched_alias = '';
 
             foreach ($aliases as $alias) {
-                if (
-                    $pattern_role_l === $alias
-                    || $scope_l === $alias
-                    || str_contains($blob, $alias)
-                ) {
-                    $matched_alias = $alias;
-                    break;
+                if (!($pattern_role_l === $alias || $scope_l === $alias || str_contains($blob, $alias))) {
+                    continue;
                 }
+
+                $matched_alias = $alias;
+                break;
             }
 
             if ('' !== $matched_alias) {
@@ -321,8 +307,7 @@ final class RecommendPatterns implements AbilityInterface {
             }
 
             if (
-                in_array($scope_l, ['layout', 'page'], true)
-                || in_array($pattern_role_l, ['page-layout', 'page'], true)
+                in_array($scope_l, ['layout', 'page'], true) || in_array($pattern_role_l, ['page-layout', 'page'], true)
             ) {
                 $score -= 22;
                 $notes[] = __('Soft-demoted full-page layout for section change.', 'agent-wordpress-terminal');

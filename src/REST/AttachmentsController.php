@@ -46,8 +46,8 @@ final class AttachmentsController extends RestController {
             );
         }
         /** @var array{error?: int, name?: string, size?: int, tmp_name?: string, type?: string} $file */
-        $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
-        $declared_mime = strtolower((string) ($file['type'] ?? ''));
+        $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        $declared_mime = strtolower($file['type'] ?? '');
         $supported = str_starts_with($declared_mime, 'image/') || in_array($extension, self::DOCUMENT_EXTENSIONS, true);
 
         if (!$supported) {
@@ -78,7 +78,7 @@ final class AttachmentsController extends RestController {
             'id' => $attachment_id,
             'url' => wp_get_attachment_url($attachment_id),
             'mime_type' => get_post_mime_type($attachment_id),
-            'filename' => is_string($path) ? basename($path) : sanitize_file_name((string) ($file['name'] ?? '')),
+            'filename' => is_string($path) ? basename($path) : sanitize_file_name($file['name'] ?? ''),
             'kind' => $is_image ? 'image' : 'document',
         ], 201);
     }

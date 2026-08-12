@@ -35,11 +35,7 @@ final class PatternNameResolver {
      * @param list<string>|null         $namespaces Explicit pack namespaces; null loads active packs.
      * @param array<string, string>|null $aliases    Explicit alias map; null loads active packs.
      */
-    public function __construct(
-        ?PatternCatalog $catalog = null,
-        ?array $namespaces = null,
-        ?array $aliases = null,
-    ) {
+    public function __construct(?PatternCatalog $catalog = null, ?array $namespaces = null, ?array $aliases = null) {
         $this->catalog = $catalog ?? new PatternCatalog();
         $this->namespaces = $namespaces;
         $this->aliases = $aliases;
@@ -106,11 +102,7 @@ final class PatternNameResolver {
             foreach ($this->namespace_list() as $namespace) {
                 $candidates[] = $namespace . '/' . $normalized;
                 $candidates[] = $namespace . '/header-' . preg_replace('/^header-/', '', $normalized);
-                $candidates[] = $namespace . '/layout-page-' . preg_replace(
-                    '/^(layout-page-|page-)/',
-                    '',
-                    $normalized,
-                );
+                $candidates[] = $namespace . '/layout-page-' . preg_replace('/^(layout-page-|page-)/', '', $normalized);
                 $candidates[] = $namespace . '/section-' . preg_replace('/^section-/', '', $normalized);
 
                 if (in_array($normalized, ['page-header', 'header-page'], true)) {
@@ -129,6 +121,8 @@ final class PatternNameResolver {
         }
 
         // page-header ↔ header-page style swap inside any namespace.
+        $m = [];
+
         if (preg_match('#^([^/]+)/(page-header|header-page)$#', $normalized, $m)) {
             $candidates[] = $m[1] . '/header-page';
             $candidates[] = $m[1] . '/page-header';

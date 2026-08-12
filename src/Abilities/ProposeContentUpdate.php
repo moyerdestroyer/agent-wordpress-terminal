@@ -14,18 +14,18 @@ use AWPT\Agent\AbilityReplacementRegistry;
 use AWPT\Agent\AgentFeedback;
 use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
-use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Domain\CompositionGate;
+use AWPT\Domain\CompositionProposalGuard;
 use AWPT\Domain\ExistingContentPreservationValidator;
 use AWPT\Domain\PatternMaterializer;
 use AWPT\Domain\PatternStructureEvidence;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\NewPostStagingDraft;
 use AWPT\Support\PatternCatalog;
+use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentSanitizer;
 use AWPT\Support\PostContentStagingPipeline;
-use AWPT\Support\PatternUnfitInput;
 use AWPT\Support\StagedPostPreview;
 
 if (!defined('ABSPATH')) {
@@ -303,7 +303,7 @@ final class ProposeContentUpdate implements AbilityInterface {
 
             $domain_validation = new CompositionGate();
             $domain_result = $domain_validation->evaluate(
-                (string) $payload['post_content'],
+                $payload['post_content'],
                 [
                     'operation' => ActionOperations::CONTENT_UPDATE,
                     'work_type' => 'edit',
@@ -326,22 +326,18 @@ final class ProposeContentUpdate implements AbilityInterface {
                 ],
                 true,
             );
-            $blocking_findings = CompositionProposalGuard::new_findings(
-                $domain_findings,
-                $baseline_result['findings'],
-            );
-            $inherited_findings = array_values(array_filter(
-                $domain_findings,
-                static function (array $finding) use ($blocking_findings): bool {
-                    foreach ($blocking_findings as $blocking) {
-                        if ($finding === $blocking) {
-                            return false;
-                        }
+            $blocking_findings = CompositionProposalGuard::new_findings($domain_findings, $baseline_result['findings']);
+            $inherited_findings = array_values(array_filter($domain_findings, static function (array $finding) use (
+                $blocking_findings,
+            ): bool {
+                foreach ($blocking_findings as $blocking) {
+                    if ($finding === $blocking) {
+                        return false;
                     }
+                }
 
-                    return true;
-                },
-            ));
+                return true;
+            }));
             $domain_error = $domain_validation->blocking_error($blocking_findings);
 
             if (null !== $domain_error) {
@@ -372,7 +368,7 @@ final class ProposeContentUpdate implements AbilityInterface {
                 $payload['safe_fixes'] = $domain_result['fixes'];
             }
 
-            $media_integrity = new PostContentMediaIntegrity()->prepare((string) $payload['post_content']);
+            $media_integrity = new PostContentMediaIntegrity()->prepare($payload['post_content']);
 
             if (is_wp_error($media_integrity)) {
                 return $media_integrity;

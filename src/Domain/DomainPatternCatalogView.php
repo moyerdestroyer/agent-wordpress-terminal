@@ -51,10 +51,7 @@ final class DomainPatternCatalogView {
             ];
         }
 
-        usort($items, static fn(array $left, array $right): int => strnatcasecmp(
-            (string) ($left['title'] ?? ''),
-            (string) ($right['title'] ?? ''),
-        ));
+        usort($items, static fn(array $left, array $right): int => strnatcasecmp($left['title'], $right['title']));
 
         return $items;
     }

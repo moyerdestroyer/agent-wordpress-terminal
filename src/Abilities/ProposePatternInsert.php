@@ -316,7 +316,7 @@ final class ProposePatternInsert implements AbilityInterface {
         $preservation_error = new ExistingContentPreservationValidator()->validate_for_session(
             $session_id,
             $post->post_content,
-            (string) $payload['post_content'],
+            $payload['post_content'],
         );
 
         if ($preservation_error instanceof \WP_Error) {

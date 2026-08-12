@@ -59,7 +59,12 @@ final class BlockBatchUpdater {
 
         if ($counts['update_block'] > 0) {
             $parts[] = sprintf(
-                _n('%d combined block update', '%d combined block updates', $counts['update_block'], 'agent-wordpress-terminal'),
+                _n(
+                    '%d combined block update',
+                    '%d combined block updates',
+                    $counts['update_block'],
+                    'agent-wordpress-terminal',
+                ),
                 $counts['update_block'],
             );
         }
@@ -267,9 +272,9 @@ final class BlockBatchUpdater {
 
             $attrs = is_array($change['attrs'] ?? null) ? $change['attrs'] : [];
             $result = BlockTree::from_content($working)->update_attrs(
-                (string) $change['block_path'],
+                $change['block_path'],
                 $attrs,
-                (string) $change['expected_fingerprint'],
+                $change['expected_fingerprint'],
             );
 
             if (is_wp_error($result)) {
@@ -285,7 +290,7 @@ final class BlockBatchUpdater {
             }
 
             $result = new PatternTextUpdater()->apply($working, [[
-                'block_path' => (string) $change['block_path'],
+                'block_path' => $change['block_path'],
                 'content' => (string) $change['content'],
             ]]);
 
@@ -302,21 +307,19 @@ final class BlockBatchUpdater {
             true,
         )));
         usort($structural, static function (array $left, array $right): int {
-            $path_order = self::compare_paths((string) $right['block_path'], (string) $left['block_path']);
+            $path_order = self::compare_paths($right['block_path'], $left['block_path']);
 
-            return 0 !== $path_order
-                ? $path_order
-                : (int) ($right['change_index'] ?? 0) <=> (int) ($left['change_index'] ?? 0);
+            return 0 !== $path_order ? $path_order : (int) $right['change_index'] <=> (int) $left['change_index'];
         });
 
         foreach ($structural as $change) {
             $tree = BlockTree::from_content($working);
             $result = 'remove' === $change['kind']
-                ? $tree->remove_block((string) $change['block_path'])
+                ? $tree->remove_block($change['block_path'])
                 : $tree->insert_block(
-                    (string) $change['block_path'],
+                    $change['block_path'],
                     is_array($change['block'] ?? null) ? $change['block'] : [],
-                    (string) ($change['position'] ?? BlockTree::POSITION_BEFORE),
+                    $change['position'] ?? BlockTree::POSITION_BEFORE,
                 );
 
             if (is_wp_error($result)) {

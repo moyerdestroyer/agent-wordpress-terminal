@@ -183,7 +183,7 @@ final class ProviderRuntime {
         $started_at = microtime(true);
         $turn_id = (string) ($turn_context['turn_id'] ?? '');
         $uses_phases = $profile->uses_explore_compose_phases();
-        $has_open_new_post = (bool) ($budget_context['has_open_new_post_proposal'] ?? false);
+        $has_open_new_post = $budget_context['has_open_new_post_proposal'] ?? false;
         // Creation language can also match the broad edit classifier (for
         // example, "make a news page with images"). A confirmed new-content
         // turn takes precedence unless an open staged draft makes it a revision.
@@ -515,9 +515,11 @@ final class ProviderRuntime {
                 $activated = is_array($output['activated'] ?? null) ? $output['activated'] : [];
 
                 foreach (array_filter($activated, 'is_string') as $ability_name) {
-                    if ($tool_registry->can_auto_execute($ability_name)) {
-                        $activated_tool_names[] = $ability_name;
+                    if (!$tool_registry->can_auto_execute($ability_name)) {
+                        continue;
                     }
+
+                    $activated_tool_names[] = $ability_name;
                 }
 
                 $activated_tool_names = array_values(array_unique($activated_tool_names));
@@ -695,35 +697,25 @@ final class ProviderRuntime {
                 $compose_only = 'awpt_pattern_not_read' !== $latest_failure_code;
                 $turn_phase = $compose_only ? 'compose' : 'explore';
                 $pattern_read_recovery = 'awpt_pattern_not_read' === $latest_failure_code;
-                $guidance = $proposal_constraints->recovery_guidance(
-                    $proposal_failures,
-                    self::MAX_PROPOSAL_FAILURES,
-                );
+                $guidance = $proposal_constraints->recovery_guidance($proposal_failures, self::MAX_PROPOSAL_FAILURES);
 
                 if ($compose_only) {
                     // Re-compact to verified evidence + open constraints so the
                     // failed giant proposal payload does not monopolize the wall.
-                    $coverage = is_array($last_discovery['coverage'] ?? null)
-                        ? $last_discovery['coverage']
-                        : [];
+                    $coverage = is_array($last_discovery['coverage'] ?? null) ? $last_discovery['coverage'] : [];
                     $reason = (string) ($last_discovery['reason'] ?? 'Correct the proposal from verified evidence.');
                     $focus_post_id = $this->focus_post_id_for_pack($session_id, $tool_calls, $turn_context);
                     $builder = new EvidencePackBuilder();
                     $pack = $builder->pack($tool_calls, $coverage, $reason, [
                         'focus_post_id' => $focus_post_id,
                     ]);
-                    $messages = $builder->provider_messages(
-                        $messages,
-                        $tool_calls,
-                        $user_message,
-                        [
-                            'coverage' => $coverage,
-                            'reason' => $reason,
-                            'mode' => 'compose',
-                            'recovery_guidance' => $guidance,
-                            'focus_post_id' => $focus_post_id,
-                        ],
-                    );
+                    $messages = $builder->provider_messages($messages, $tool_calls, $user_message, [
+                        'coverage' => $coverage,
+                        'reason' => $reason,
+                        'mode' => 'compose',
+                        'recovery_guidance' => $guidance,
+                        'focus_post_id' => $focus_post_id,
+                    ]);
                     $compose_abilities = $this->compose_abilities_for(
                         $tool_calls,
                         $turn_profile,
@@ -790,12 +782,7 @@ final class ProviderRuntime {
                 $pack = $builder->pack($tool_calls, $coverage, $reason, [
                     'focus_post_id' => $focus_post_id,
                 ]);
-                $messages = $builder->provider_messages(
-                    $messages,
-                    $tool_calls,
-                    $user_message,
-                    $compose_options,
-                );
+                $messages = $builder->provider_messages($messages, $tool_calls, $user_message, $compose_options);
                 $compose_abilities = $this->compose_abilities_for(
                     $tool_calls,
                     $turn_profile,
@@ -804,7 +791,7 @@ final class ProviderRuntime {
                     true === ($options['presentation_edit'] ?? false),
                 );
                 // Large redesigns: surface batch tools before full content rewrite.
-                if (new PageScale()->is_large((string) ($page_scale['scale'] ?? ''))) {
+                if (new PageScale()->is_large($page_scale['scale'])) {
                     $compose_abilities = $this->prefer_batch_tools_for_large_page($compose_abilities);
                 }
                 $turn_context['pattern_preparation'] = $this->latest_pattern_preparation($tool_calls);
@@ -877,8 +864,8 @@ final class ProviderRuntime {
                 'evidence_pack_chars' => $compose_compacted
                     ? new EvidencePackBuilder()->encoded_size(
                         $tool_calls,
-                        is_array($last_discovery['coverage'] ?? null) ? $last_discovery['coverage'] : [],
-                        (string) ($last_discovery['reason'] ?? ''),
+                        is_array($last_discovery['coverage']) ? $last_discovery['coverage'] : [],
+                        $last_discovery['reason'],
                     )
                     : 0,
                 'activated_tool_names' => $activated_tool_names,
@@ -907,7 +894,7 @@ final class ProviderRuntime {
                     'turn_phase' => $turn_phase,
                     'explore_hops' => $explore_hops,
                     'compose_compacted' => $compose_compacted,
-                    'parallel_batch_size' => (int) ($execution['parallel_batch_size'] ?? 0),
+                    'parallel_batch_size' => (int) $execution['parallel_batch_size'],
                 ],
             ]);
             $follow_up = $this->follow_up_round($provider, $tool_registry, $state);
@@ -915,9 +902,7 @@ final class ProviderRuntime {
 
             $content = $follow_up['content'];
             $result = $follow_up['result'];
-            $offered_tool_names = is_array($follow_up['offered_tool_names'] ?? null)
-                ? array_values(array_filter($follow_up['offered_tool_names'], 'is_string'))
-                : [];
+            $offered_tool_names = array_values(array_filter($follow_up['offered_tool_names'], 'is_string'));
             if (is_array($follow_up['failure_tool_call'] ?? null)) {
                 $tool_calls[] = $follow_up['failure_tool_call'];
             }
@@ -968,9 +953,7 @@ final class ProviderRuntime {
                 ++$provider_completions;
                 $content = $follow_up['content'];
                 $result = $follow_up['result'];
-                $offered_tool_names = is_array($follow_up['offered_tool_names'] ?? null)
-                    ? array_values(array_filter($follow_up['offered_tool_names'], 'is_string'))
-                    : [];
+                $offered_tool_names = array_values(array_filter($follow_up['offered_tool_names'], 'is_string'));
                 if (is_array($follow_up['failure_tool_call'] ?? null)) {
                     $tool_calls[] = $follow_up['failure_tool_call'];
                 }
@@ -990,19 +973,15 @@ final class ProviderRuntime {
             && $this->has_successful_evaluate_evidence($tool_calls)
             && !$this->looks_like_execution_plan($content)
         ) {
-            $finalized = $this->force_improve_evaluate_plan(
-                $provider,
-                $session_id,
-                [
-                    'messages' => $messages,
-                    'tool_calls' => $tool_calls,
-                    'result' => $result,
-                    'content' => $content,
-                    'turn_started_at' => $turn_started_at,
-                    'turn_wall_seconds' => (int) ($options['turn_wall_seconds'] ?? self::IMPROVE_EVALUATE_WALL_SECONDS),
-                    'turn_id' => (string) ($turn_context['turn_id'] ?? ''),
-                ],
-            );
+            $finalized = $this->force_improve_evaluate_plan($provider, $session_id, [
+                'messages' => $messages,
+                'tool_calls' => $tool_calls,
+                'result' => $result,
+                'content' => $content,
+                'turn_started_at' => $turn_started_at,
+                'turn_wall_seconds' => (int) ($options['turn_wall_seconds'] ?? self::IMPROVE_EVALUATE_WALL_SECONDS),
+                'turn_id' => (string) ($turn_context['turn_id'] ?? ''),
+            ]);
             $content = $finalized['content'];
             $result = $finalized['result'];
             $messages = $finalized['messages'];
@@ -1012,10 +991,12 @@ final class ProviderRuntime {
             $proposal_tool = 'awpt/propose-content-update';
 
             foreach ($offered_tool_names ?? [] as $offered_tool_name) {
-                if (ToolRegistry::is_proposal_ability($offered_tool_name)) {
-                    $proposal_tool = $offered_tool_name;
-                    break;
+                if (!ToolRegistry::is_proposal_ability($offered_tool_name)) {
+                    continue;
                 }
+
+                $proposal_tool = $offered_tool_name;
+                break;
             }
 
             $content = __(
@@ -1162,7 +1143,7 @@ final class ProviderRuntime {
                 $raw_custom_composition
                     ? self::RAW_COMPOSITION_MAX_COMPLETION_TOKENS
                     : (
-                        $turn_profile?->content_edit_turn ?? false
+                        $turn_profile->content_edit_turn ?? false
                             ? self::EXISTING_CONTENT_COMPOSITION_MAX_COMPLETION_TOKENS
                             : self::COMPOSITION_MAX_COMPLETION_TOKENS
                     )
@@ -1222,9 +1203,7 @@ final class ProviderRuntime {
         $offered_tool_names = $tool_registry->names_from_declarations($provider_tools);
         $request_timeout = $compose_only
             ? min(
-                $raw_custom_composition
-                    ? self::RAW_COMPOSE_REQUEST_SECONDS
-                    : self::EXISTING_COMPOSE_REQUEST_SECONDS,
+                $raw_custom_composition ? self::RAW_COMPOSE_REQUEST_SECONDS : self::EXISTING_COMPOSE_REQUEST_SECONDS,
                 max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining),
             )
             : min(120, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining));
@@ -1274,9 +1253,8 @@ final class ProviderRuntime {
             'max_completion_tokens' => $completion_budget,
             'tool_choice' => $tool_choice,
             'timeout' => $request_timeout,
-            'reasoning_effort' => $raw_custom_composition || ($turn_profile?->content_edit_turn ?? false) ? 'low' : '',
+            'reasoning_effort' => $raw_custom_composition || ($turn_profile->content_edit_turn ?? false) ? 'low' : '',
         ]);
-        $retried_finalization = false;
         $this->record_provider_call($session_id, [
             'provider' => $provider->get_name(),
             'tool_round' => count($tool_calls),
@@ -1296,7 +1274,6 @@ final class ProviderRuntime {
             $retry_remaining = $turn_wall_seconds - (int) ceil($retry_started_at - $turn_started_at);
 
             if ($retry_remaining >= self::MIN_USEFUL_REQUEST_SECONDS) {
-                $retried_finalization = true;
                 new ChatProgress()->update($session_id, $turn_id, [
                     'phase' => 'retrying',
                     'label' => __('Retrying proposal finalization', 'agent-wordpress-terminal'),
@@ -1334,7 +1311,7 @@ final class ProviderRuntime {
                                 : self::EXISTING_COMPOSE_RETRY_SECONDS,
                             max(self::MIN_USEFUL_REQUEST_SECONDS, $retry_remaining),
                         ),
-                        'reasoning_effort' => $raw_custom_composition || ($turn_profile?->content_edit_turn ?? false)
+                        'reasoning_effort' => $raw_custom_composition || ($turn_profile->content_edit_turn ?? false)
                             ? 'low'
                             : '',
                     ],
@@ -1351,15 +1328,9 @@ final class ProviderRuntime {
         }
 
         if (!is_array($follow_up)) {
-            $failure = is_wp_error($follow_up)
-                ? $this->result_formatter->format_incomplete_turn($tool_calls, $follow_up->get_error_message())
-                : $content;
-            $failure_message = is_wp_error($follow_up)
-                ? $follow_up->get_error_message()
-                : __('The provider could not finalize the requested proposal.', 'agent-wordpress-terminal');
-            $failure_code = is_wp_error($follow_up)
-                ? sanitize_key((string) $follow_up->get_error_code())
-                : 'awpt_provider_finalization_failed';
+            $failure = $this->result_formatter->format_incomplete_turn($tool_calls, $follow_up->get_error_message());
+            $failure_message = $follow_up->get_error_message();
+            $failure_code = sanitize_key((string) $follow_up->get_error_code());
 
             // Do not pretend a transport timeout was a propose-content-update ability failure.
             return [
@@ -1430,7 +1401,7 @@ final class ProviderRuntime {
         $fallback_tools = [] !== $tools ? $tools : $this->tool_registry->get_chat_completion_tools();
         $fallback_result = $fallback->complete($messages, $fallback_tools, [
             'session_id' => (int) ($context['session_id'] ?? 0),
-            'turn_id' => (string) ($context['turn_id'] ?? ''),
+            'turn_id' => $context['turn_id'] ?? '',
             'tool_round' => 0,
             'log_phase' => 'failover',
         ]);
@@ -1642,18 +1613,14 @@ final class ProviderRuntime {
      *   messages: array<int, array<string, mixed>>
      * }
      */
-    private function force_improve_evaluate_plan(
-        ProviderInterface $provider,
-        int $session_id,
-        array $context,
-    ): array {
+    private function force_improve_evaluate_plan(ProviderInterface $provider, int $session_id, array $context): array {
         $messages = $context['messages'];
         $tool_calls = $context['tool_calls'];
         $result = $context['result'];
         $content = $context['content'];
         $turn_started_at = $this->float_value($context['turn_started_at'] ?? null, microtime(true));
         $turn_wall_seconds = (int) ($context['turn_wall_seconds'] ?? self::IMPROVE_EVALUATE_WALL_SECONDS);
-        $turn_id = (string) ($context['turn_id'] ?? '');
+        $turn_id = $context['turn_id'] ?? '';
         $remaining = $turn_wall_seconds - (int) ceil(microtime(true) - $turn_started_at);
 
         if ($remaining < self::MIN_USEFUL_REQUEST_SECONDS) {
@@ -1691,15 +1658,19 @@ final class ProviderRuntime {
         ]);
 
         $started_at = microtime(true);
-        $follow_up = $provider->complete($messages, [], [
-            'session_id' => $session_id,
-            'turn_id' => $turn_id,
-            'tool_round' => count($tool_calls),
-            'log_phase' => 'improve_evaluate_finalize',
-            'max_completion_tokens' => 2_400,
-            'tool_choice' => 'none',
-            'timeout' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining)),
-        ]);
+        $follow_up = $provider->complete(
+            $messages,
+            [],
+            [
+                'session_id' => $session_id,
+                'turn_id' => $turn_id,
+                'tool_round' => count($tool_calls),
+                'log_phase' => 'improve_evaluate_finalize',
+                'max_completion_tokens' => 2_400,
+                'tool_choice' => 'none',
+                'timeout' => min(90, max(self::MIN_USEFUL_REQUEST_SECONDS, $remaining)),
+            ],
+        );
         $this->record_provider_call($session_id, [
             'provider' => $provider->get_name(),
             'tool_round' => count($tool_calls),
@@ -2005,7 +1976,7 @@ final class ProviderRuntime {
         return $this->narrow_edit_compose_abilities(
             $profile?->compose_allowlist() ?? ['awpt/propose-new-post'],
             $pack,
-            $presentation_edit || ($profile?->presentation_edit ?? false),
+            $presentation_edit || ($profile->presentation_edit ?? false),
         );
     }
 
@@ -2027,14 +1998,18 @@ final class ProviderRuntime {
         ];
         $ordered = [];
         foreach ($preferred as $name) {
-            if (in_array($name, $abilities, true)) {
-                $ordered[] = $name;
+            if (!in_array($name, $abilities, true)) {
+                continue;
             }
+
+            $ordered[] = $name;
         }
         foreach ($abilities as $name) {
-            if (!in_array($name, $ordered, true)) {
-                $ordered[] = $name;
+            if (in_array($name, $ordered, true)) {
+                continue;
             }
+
+            $ordered[] = $name;
         }
 
         return $ordered;

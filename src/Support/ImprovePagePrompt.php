@@ -139,8 +139,8 @@ final class ImprovePagePrompt {
 
         $split = preg_split('/\s+/', $trimmed, 2);
         $parts = is_array($split) ? $split : [$trimmed];
-        $command = strtolower((string) (array_shift($parts) ?? ''));
-        $rest = trim((string) (array_shift($parts) ?? ''));
+        $command = strtolower(array_shift($parts) ?? '');
+        $rest = trim(array_shift($parts) ?? '');
 
         return match ($command) {
             '/plan', '/evaluate' => [

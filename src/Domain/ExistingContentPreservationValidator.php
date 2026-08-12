@@ -237,7 +237,7 @@ final class ExistingContentPreservationValidator {
         $links = [];
 
         foreach (array_keys($matches[0] ?? []) as $index) {
-            $url = html_entity_decode((string) ($matches[1][$index] ?? '' ?: $matches[2][$index] ?? ''));
+            $url = html_entity_decode($matches[1][$index] ?? '' ?: $matches[2][$index] ?? '');
 
             if ('' !== $url) {
                 $links[] = $url;

@@ -170,12 +170,12 @@ final class MediaLibraryVisualEvidence {
         }
 
         $extracted = new DocumentTextExtractor()->extract($path, $mime, basename($path));
-        $text = trim((string) ($extracted['text'] ?? ''));
+        $text = trim($extracted['text']);
 
         if ('' === $text) {
             return [
                 'type' => 'text',
-                'text' => $label . ' Extraction status: ' . (string) ($extracted['warning'] ?? 'no readable text'),
+                'text' => $label . ' Extraction status: ' . $extracted['warning'],
             ];
         }
 
@@ -187,8 +187,8 @@ final class MediaLibraryVisualEvidence {
             'text' => sprintf(
                 "%s\nExtraction method: %s%s\n<document-evidence attachment-id=\"%d\">\n%s\n</document-evidence>%s",
                 $label,
-                (string) ($extracted['method'] ?? 'unknown'),
-                '' !== (string) ($extracted['warning'] ?? '') ? '; ' . (string) $extracted['warning'] : '',
+                $extracted['method'],
+                '' !== $extracted['warning'] ? '; ' . $extracted['warning'] : '',
                 $id,
                 $excerpt,
                 $truncated

@@ -47,13 +47,15 @@ final class DomainPackHealth {
         $has_all = in_array('all', $guidance_scopes, true);
 
         foreach ($recommended_scopes as $scope) {
-            if (!$has_all && !in_array($scope, $guidance_scopes, true)) {
-                $issues[] = $this->issue(
-                    'recommendation',
-                    'missing-guidance-scope',
-                    sprintf(__('No guidance module explicitly covers %s work.', 'agent-wordpress-terminal'), $scope),
-                );
+            if (!(!$has_all && !in_array($scope, $guidance_scopes, true))) {
+                continue;
             }
+
+            $issues[] = $this->issue(
+                'recommendation',
+                'missing-guidance-scope',
+                sprintf(__('No guidance module explicitly covers %s work.', 'agent-wordpress-terminal'), $scope),
+            );
         }
 
         $catalog = $this->catalog($pack);
@@ -107,9 +109,11 @@ final class DomainPackHealth {
             }
 
             foreach (array_unique($references) as $reference) {
-                if (!array_key_exists($reference, $catalog) && !in_array($reference, $registered, true)) {
-                    $broken_references[] = $name . ' → ' . $reference;
+                if (!(!array_key_exists($reference, $catalog) && !in_array($reference, $registered, true))) {
+                    continue;
                 }
+
+                $broken_references[] = $name . ' → ' . $reference;
             }
 
             if (
@@ -260,9 +264,11 @@ final class DomainPackHealth {
         $catalog = [];
 
         foreach (ArrayKey::as_map(ArrayKey::as_map($decoded)['patterns'] ?? null) as $name => $metadata) {
-            if (is_array($metadata)) {
-                $catalog[(string) $name] = ArrayKey::string_map($metadata);
+            if (!is_array($metadata)) {
+                continue;
             }
+
+            $catalog[$name] = ArrayKey::string_map($metadata);
         }
 
         return $catalog;

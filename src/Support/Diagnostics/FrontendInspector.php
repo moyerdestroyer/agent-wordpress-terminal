@@ -77,12 +77,12 @@ final class FrontendInspector {
         $main = [];
 
         if (preg_match('~<main\b[^>]*>(.*?)</main>~is', $html, $main)) {
-            $scope = (string) ($main[1] ?? '');
+            $scope = $main[1] ?? '';
         } else {
             $body = [];
 
             if (preg_match('~<body\b[^>]*>(.*?)</body>~is', $html, $body)) {
-                $scope = (string) ($body[1] ?? '');
+                $scope = $body[1] ?? '';
             }
         }
 
@@ -91,7 +91,7 @@ final class FrontendInspector {
 
         if (preg_match_all('~<h([1-6])\b[^>]*>(.*?)</h\1>~is', $scope, $matches, PREG_SET_ORDER)) {
             foreach (array_slice($matches, 0, 64) as $match) {
-                $text = trim(html_entity_decode(wp_strip_all_tags((string) ($match[2] ?? '')), ENT_QUOTES | ENT_HTML5));
+                $text = trim(html_entity_decode(wp_strip_all_tags($match[2] ?? ''), ENT_QUOTES | ENT_HTML5));
 
                 if ('' === $text) {
                     continue;
@@ -206,12 +206,13 @@ final class FrontendInspector {
             $sticky_top = ($sticky_top ?? '') . ' | inline-css: ' . mb_substr($css[0], 0, 200);
         }
 
-        $interesting = array_values(array_filter($classes, static function (string $class): bool {
-            return (bool) preg_match(
+        $interesting = array_values(array_filter(
+            $classes,
+            static fn(string $class): bool => (bool) preg_match(
                 '/(layout|docs|toc|sticky|sidebar|sidenav|header|footer|nav|hero|columns)/i',
                 $class,
-            );
-        }));
+            ),
+        ));
 
         return [
             'interesting_classes' => array_slice($interesting, 0, 24),

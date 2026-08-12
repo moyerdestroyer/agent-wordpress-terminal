@@ -38,11 +38,11 @@ final class PostContentSanitizer {
         $matches = [];
 
         if (preg_match('/\A<!\[CDATA\[\s*(.*?)\s*\]\]>\z/s', $trimmed, $matches)) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1] ?? '');
         }
 
         if (preg_match('/\A```(?:html|wordpress|gutenberg)?\s*\R(.*?)\R```\z/is', $trimmed, $matches)) {
-            return trim((string) ($matches[1] ?? ''));
+            return trim($matches[1] ?? '');
         }
 
         return $content;

@@ -87,11 +87,11 @@ final class AiLogger {
      * } $context
      */
     public static function log_provider_complete(array $context): void {
-        $messages = is_array($context['messages'] ?? null) ? $context['messages'] : [];
+        $messages = $context['messages'];
         $tools = is_array($context['tools'] ?? null) ? $context['tools'] : [];
         $options = is_array($context['options'] ?? null) ? $context['options'] : [];
-        $result = $context['result'] ?? null;
-        $started_at = is_float($context['started_at'] ?? null) ? $context['started_at'] : microtime(true);
+        $result = $context['result'];
+        $started_at = $context['started_at'];
         $meta = is_array($context['meta'] ?? null) ? $context['meta'] : [];
         $error = is_wp_error($result) ? $result : null;
         $success = is_array($result) ? $result : [];
@@ -102,7 +102,7 @@ final class AiLogger {
             'session_id' => (int) ($options['session_id'] ?? 0),
             'turn_id' => (string) ($options['turn_id'] ?? ''),
             'tool_round' => (int) ($options['tool_round'] ?? 0),
-            'provider' => (string) ($context['provider'] ?? ''),
+            'provider' => $context['provider'],
             'model' => (string) ($success['model'] ?? $meta['model'] ?? ''),
             'outcome' => null !== $error ? 'error' : 'success',
             'error_code' => null !== $error ? $error->get_error_code() : '',
@@ -142,14 +142,14 @@ final class AiLogger {
      * } $context
      */
     public static function log_tool_execute(array $context): void {
-        $status = (string) ($context['status'] ?? '');
+        $status = $context['status'];
         $meta = is_array($context['meta'] ?? null) ? $context['meta'] : [];
-        $started_at = is_float($context['started_at'] ?? null) ? $context['started_at'] : microtime(true);
-        $input = is_array($context['input'] ?? null) ? $context['input'] : [];
+        $started_at = $context['started_at'];
+        $input = $context['input'];
 
         self::log(self::EVENT_TOOL_EXECUTE, [
-            'session_id' => (int) ($context['session_id'] ?? 0),
-            'turn_id' => (string) ($context['turn_id'] ?? ''),
+            'session_id' => (int) $context['session_id'],
+            'turn_id' => $context['turn_id'] ?? '',
             'tool_round' => (int) ($meta['tool_round'] ?? 0),
             'provider' => '',
             'model' => '',
@@ -157,7 +157,7 @@ final class AiLogger {
             'error_code' => 'success' === $status ? '' : sanitize_key($status),
             'duration_ms' => (int) round((microtime(true) - $started_at) * 1000),
             'request' => [
-                'tool_name' => (string) ($context['tool_name'] ?? ''),
+                'tool_name' => $context['tool_name'],
                 'input' => $input,
             ],
             'response' => [
@@ -182,25 +182,21 @@ final class AiLogger {
     public static function log_embedding(array $context): void {
         $texts = [];
 
-        if (is_array($context['texts'] ?? null)) {
-            foreach ($context['texts'] as $text) {
-                if (is_string($text)) {
-                    $texts[] = $text;
-                }
-            }
+        foreach ($context['texts'] as $text) {
+            $texts[] = $text;
         }
 
         $meta = is_array($context['meta'] ?? null) ? $context['meta'] : [];
-        $started_at = is_float($context['started_at'] ?? null) ? $context['started_at'] : microtime(true);
+        $started_at = $context['started_at'];
 
         self::log(self::EVENT_EMBEDDING, [
             'session_id' => 0,
             'turn_id' => '',
             'tool_round' => 0,
-            'provider' => (string) ($context['provider'] ?? ''),
-            'model' => (string) ($context['model'] ?? ''),
-            'outcome' => sanitize_key((string) ($context['outcome'] ?? 'success')),
-            'error_code' => (string) ($context['error_code'] ?? ''),
+            'provider' => $context['provider'],
+            'model' => $context['model'],
+            'outcome' => sanitize_key($context['outcome']),
+            'error_code' => $context['error_code'] ?? '',
             'duration_ms' => (int) round((microtime(true) - $started_at) * 1000),
             'request' => [
                 'input_count' => count($texts),
@@ -247,11 +243,9 @@ final class AiLogger {
                 is_array($item)
                 && (
                     'image_url' === ($item['type'] ?? null)
-                    || (
-                        isset($item['url'])
-                        && is_string($item['url'])
-                        && self::looks_like_data_url($item['url'])
-                    )
+                    || isset($item['url'])
+                    && is_string($item['url'])
+                    && self::looks_like_data_url($item['url'])
                 )
             ) {
                 $out[$key] = self::sanitize_image_part($item);
@@ -277,7 +271,7 @@ final class AiLogger {
             $url = (string) ($part['image_url']['url'] ?? '');
             $part['image_url']['url'] = self::redact_data_url($url);
         } elseif (is_string($part['image_url'] ?? null)) {
-            $url = (string) $part['image_url'];
+            $url = $part['image_url'];
             $part['image_url'] = self::redact_data_url($url);
         } elseif (isset($part['url'])) {
             $url = (string) $part['url'];
@@ -360,7 +354,7 @@ final class AiLogger {
                 if (!wp_mkdir_p($dir)) {
                     return;
                 }
-            } elseif (!mkdir($dir, 0755, true) && !is_dir($dir)) {
+            } elseif (!mkdir($dir, 0o755, true) && !is_dir($dir)) {
                 return;
             }
         }
@@ -392,7 +386,6 @@ final class AiLogger {
             }
         }
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
         file_put_contents($path, $encoded . "\n", FILE_APPEND | LOCK_EX);
     }
 
@@ -400,17 +393,13 @@ final class AiLogger {
         if (function_exists('wp_upload_dir')) {
             $uploads = wp_upload_dir();
 
-            if (
-                is_array($uploads)
-                && (!isset($uploads['error']) || false === $uploads['error'] || '' === $uploads['error'])
-                && is_string($uploads['basedir'] ?? null)
-            ) {
-                return trailingslashit((string) $uploads['basedir']) . 'awpt-logs';
+            if ((false === $uploads['error'] || '' === $uploads['error']) && is_string($uploads['basedir'])) {
+                return trailingslashit($uploads['basedir']) . 'awpt-logs';
             }
         }
 
         if (defined('WP_CONTENT_DIR')) {
-            return trailingslashit((string) WP_CONTENT_DIR) . 'uploads/awpt-logs';
+            return trailingslashit(WP_CONTENT_DIR) . 'uploads/awpt-logs';
         }
 
         return '';
@@ -443,14 +432,13 @@ final class AiLogger {
         }
 
         foreach ($files as $file) {
-            if (!is_string($file) || !is_file($file)) {
+            if (!is_file($file)) {
                 continue;
             }
 
             $mtime = filemtime($file);
 
             if (false !== $mtime && $mtime < $cutoff) {
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
                 unlink($file);
             }
         }

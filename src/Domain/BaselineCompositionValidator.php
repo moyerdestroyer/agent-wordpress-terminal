@@ -143,7 +143,7 @@ final class BaselineCompositionValidator {
 
         $registry = \WP_Block_Type_Registry::get_instance();
 
-        return !method_exists($registry, 'is_registered') || $registry->is_registered($name);
+        return $registry->is_registered($name);
     }
 
     /**
@@ -169,9 +169,11 @@ final class BaselineCompositionValidator {
                 $expected_types[] = $raw_expected;
             } elseif (is_array($raw_expected)) {
                 foreach ($raw_expected as $candidate) {
-                    if (is_string($candidate) && '' !== $candidate) {
-                        $expected_types[] = $candidate;
+                    if (!(is_string($candidate) && '' !== $candidate)) {
+                        continue;
                     }
+
+                    $expected_types[] = $candidate;
                 }
             }
 
@@ -189,10 +191,10 @@ final class BaselineCompositionValidator {
                 'code' => 'invalid-attribute-type',
                 'message' => sprintf(
                     __('Attribute %1$s on %2$s has the wrong value type.', 'agent-wordpress-terminal'),
-                    (string) $key,
+                    $key,
                     $name,
                 ),
-                'path' => $path . '.attrs.' . sanitize_key((string) $key),
+                'path' => $path . '.attrs.' . sanitize_key($key),
                 'suggestion' => sprintf(__('Use the registered %s value type.', 'agent-wordpress-terminal'), $expected),
             ], ['expected' => $expected, 'actual' => get_debug_type($value)]);
         }

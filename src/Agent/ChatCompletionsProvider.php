@@ -212,7 +212,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                     'http_status' => $status,
                     'timeout' => $timeout,
                     'image_fallback' => $used_image_fallback,
-                    'raw_body_preview' => is_string($body) ? mb_substr($body, 0, 4_000) : '',
+                    'raw_body_preview' => mb_substr($body, 0, 4_000),
                 ],
             ]);
 

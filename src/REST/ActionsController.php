@@ -158,11 +158,7 @@ final class ActionsController extends RestController {
             $payload['domain_rollback_result'] = $result;
             $this->actions->update_payload($action_id, $payload);
             $this->actions->update_status($action_id, 'rolled_back');
-            new ImproveWorkflowRepository()->sync_action(
-                (int) ($action['session_id'] ?? 0),
-                $action_id,
-                'rolled_back',
-            );
+            new ImproveWorkflowRepository()->sync_action((int) ($action['session_id'] ?? 0), $action_id, 'rolled_back');
 
             return new \WP_REST_Response($this->actions->format_action($action_id), status: 200);
         }

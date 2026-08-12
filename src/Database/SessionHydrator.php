@@ -51,8 +51,6 @@ final class SessionHydrator {
         return $hydrated;
     }
 
-    /**
-     */
     private function tool_output_summary(string $tool, mixed $output): string {
         if (null === $output || [] === $output || '' === $output) {
             return '';

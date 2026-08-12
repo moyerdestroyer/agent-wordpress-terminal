@@ -132,7 +132,7 @@ final class PatternMediaPlacer {
 
         foreach ($normalized as $placement) {
             if ('featured_cover' === $placement['placement']) {
-                $result = $this->bind_featured_cover($content, (string) $placement['block_path']);
+                $result = $this->bind_featured_cover($content, $placement['block_path']);
 
                 if (is_wp_error($result)) {
                     return $result;
@@ -142,16 +142,16 @@ final class PatternMediaPlacer {
                 continue;
             }
 
-            $block = $this->image_block((int) $placement['attachment_id'], (string) $placement['alt']);
+            $block = $this->image_block((int) $placement['attachment_id'], $placement['alt']);
 
             if (is_wp_error($block)) {
                 return $block;
             }
 
             $result = BlockTree::from_content($content)->insert_block(
-                (string) $placement['block_path'],
+                $placement['block_path'],
                 $block,
-                (string) $placement['position'],
+                $placement['position'],
             );
 
             if (is_wp_error($result)) {
@@ -227,24 +227,20 @@ final class PatternMediaPlacer {
     private function normalize_featured_cover_html(array &$block): void {
         $normalize = static function (string $html): string {
             $html = (string) preg_replace('/<img\b[^>]*\bwp-block-cover__image-background\b[^>]*>\s*/i', '', $html);
-            $html = (string) preg_replace_callback(
+            return (string) preg_replace_callback(
                 '/class=("|\')(.*?)\1/i',
                 static function (array $match): string {
-                    $classes = preg_split('/\s+/', trim((string) ($match[2] ?? '')));
+                    $classes = preg_split('/\s+/', trim($match[2] ?? ''));
                     $classes = array_values(array_filter(
                         is_array($classes) ? $classes : [],
                         static fn(string $class): bool => 'is-light' !== $class,
                     ));
 
-                    return (
-                        'class=' . (string) ($match[1] ?? '"') . implode(' ', $classes) . (string) ($match[1] ?? '"')
-                    );
+                    return 'class=' . ($match[1] ?? '"') . implode(' ', $classes) . ($match[1] ?? '"');
                 },
                 $html,
                 1,
             );
-
-            return $html;
         };
 
         $block['innerHTML'] = $normalize((string) ($block['innerHTML'] ?? ''));
@@ -261,9 +257,11 @@ final class PatternMediaPlacer {
         }
 
         foreach ($block['innerContent'] as &$part) {
-            if (is_string($part)) {
-                $part = $normalize($part);
+            if (!is_string($part)) {
+                continue;
             }
+
+            $part = $normalize($part);
         }
 
         unset($part);

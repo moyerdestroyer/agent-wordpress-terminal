@@ -45,10 +45,10 @@ final class ProposalFailureNormalizer {
                 $error_message,
             )],
             'awpt_pattern_replace_requires_content' === $error_code,
-            'awpt_invalid_block_position' === $error_code
+            'awpt_invalid_block_position' === $error_code,
                 => [self::pattern_insert_position($error_code, $error_data, $error_message)],
             'http_request_failed' === $error_code,
-            'awpt_proposal_output_truncated' === $error_code
+            'awpt_proposal_output_truncated' === $error_code,
                 => [self::provider_timeout_or_truncation($error_code, $error_data, $error_message)],
             'awpt_required_page_h1_missing' === $error_code => [self::requires_page_h1($error_code, $error_data)],
             'awpt_heading_level_skipped' === $error_code,
@@ -147,10 +147,7 @@ final class ProposalFailureNormalizer {
             'error_code' => $error_code,
             'summary' => '' !== trim($error_message)
                 ? trim($error_message)
-                : __(
-                    'A block references an unresolved same-site Media Library URL.',
-                    'agent-wordpress-terminal',
-                ),
+                : __('A block references an unresolved same-site Media Library URL.', 'agent-wordpress-terminal'),
             'facts' => self::selected_facts($error_data, [
                 'block_path',
                 'block_name',
@@ -179,11 +176,7 @@ final class ProposalFailureNormalizer {
      * @param array<string, mixed> $error_data
      * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
      */
-    private static function domain_validation(
-        string $error_code,
-        array $error_data,
-        string $error_message,
-    ): array {
+    private static function domain_validation(string $error_code, array $error_data, string $error_message): array {
         $blocking = is_array($error_data['blocking_findings'] ?? null)
             ? $error_data['blocking_findings']
             : (is_array($error_data['validation_findings'] ?? null) ? $error_data['validation_findings'] : []);
@@ -460,9 +453,11 @@ final class ProposalFailureNormalizer {
         $facts = [];
 
         foreach ($keys as $key) {
-            if (array_key_exists($key, $error_data)) {
-                $facts[$key] = $error_data[$key];
+            if (!array_key_exists($key, $error_data)) {
+                continue;
             }
+
+            $facts[$key] = $error_data[$key];
         }
 
         return $facts;

@@ -61,10 +61,12 @@ final class PatternStructureCompleter {
             $duplicate = false;
 
             foreach (array_keys($source_names) as $source_name) {
-                if (isset($present[$source_name]) && $source_name === $name) {
-                    $duplicate = true;
-                    break;
+                if (!(isset($present[$source_name]) && $source_name === $name)) {
+                    continue;
                 }
+
+                $duplicate = true;
+                break;
             }
 
             if ($duplicate) {

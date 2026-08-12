@@ -120,7 +120,7 @@ final class ProviderToolCallExecutor {
         }
 
         $proposal_items = array_values(array_filter($items, static fn(array $item): bool => ProposalAbilities::is_proposal(
-            (string) ($item['tool_name'] ?? ''),
+            $item['tool_name'],
         )));
 
         if (count($proposal_items) > 1) {
@@ -218,10 +218,7 @@ final class ProviderToolCallExecutor {
      * }
      */
     private function reject_non_atomic_proposal_batch(array $items): array {
-        $requested_tools = array_values(array_map(
-            static fn(array $item): string => (string) ($item['tool_name'] ?? ''),
-            $items,
-        ));
+        $requested_tools = array_values(array_map(static fn(array $item): string => $item['tool_name'], $items));
         $tool_calls = [];
         $messages = [];
 
@@ -255,7 +252,7 @@ final class ProviderToolCallExecutor {
                 ],
             ];
             $tool_calls[] = [
-                'tool' => (string) $item['tool_name'],
+                'tool' => $item['tool_name'],
                 'input' => $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}')),
                 'output' => $output,
                 'status' => 'failed',
@@ -329,11 +326,7 @@ final class ProviderToolCallExecutor {
         }
 
         // Pattern prep abilities are readonly but mint session-bound receipts.
-        if (in_array(
-            $tool_name,
-            ['awpt/prepare-pattern-change', 'awpt/prepare-pattern-draft'],
-            true,
-        )) {
+        if (in_array($tool_name, ['awpt/prepare-pattern-change', 'awpt/prepare-pattern-draft'], true)) {
             $input['session_id'] = $session_id;
         }
 
@@ -371,7 +364,7 @@ final class ProviderToolCallExecutor {
                 $session_id,
                 $input,
                 $turn_context,
-                (string) $tool_name,
+                $tool_name,
             ));
         }
 
@@ -535,7 +528,7 @@ final class ProviderToolCallExecutor {
                 $constraints = ProposalFailureNormalizer::normalize(
                     (string) $result->get_error_code(),
                     $error_data,
-                    (string) $result->get_error_message(),
+                    $result->get_error_message(),
                 );
 
                 if ([] !== $constraints) {
@@ -580,7 +573,7 @@ final class ProviderToolCallExecutor {
 
         $schema = $ability->get_input_schema();
 
-        return new AbilityTransportCodec()->ability_input(is_array($schema) ? $schema : [], $provider_input);
+        return new AbilityTransportCodec()->ability_input($schema, $provider_input);
     }
 
     private function encoded_tool_output(mixed $output): string {

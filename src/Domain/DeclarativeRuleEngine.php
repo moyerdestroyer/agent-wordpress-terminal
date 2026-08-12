@@ -119,9 +119,11 @@ final class DeclarativeRuleEngine {
         $findings = [];
 
         foreach ($flat as $row) {
-            if (in_array((string) $row['name'], $names, true)) {
-                $findings[] = $this->finding($rule, (string) $row['path'], ['actual' => $row['name']]);
+            if (!in_array((string) $row['name'], $names, true)) {
+                continue;
             }
+
+            $findings[] = $this->finding($rule, (string) $row['path'], ['actual' => $row['name']]);
         }
 
         return $findings;
@@ -138,9 +140,11 @@ final class DeclarativeRuleEngine {
         $findings = [];
 
         foreach ($names as $name) {
-            if (!array_key_exists($name, $present)) {
-                $findings[] = $this->finding($rule, '', ['expected' => $name, 'actual' => 'missing']);
+            if (array_key_exists($name, $present)) {
+                continue;
             }
+
+            $findings[] = $this->finding($rule, '', ['expected' => $name, 'actual' => 'missing']);
         }
 
         return $findings;
@@ -254,12 +258,14 @@ final class DeclarativeRuleEngine {
             $row_attrs = ArrayKey::as_map($row['attrs'] ?? null);
 
             foreach ($attributes as $attribute) {
-                if (!array_key_exists($attribute, $row_attrs)) {
-                    $findings[] = $this->finding($rule, (string) $row['path'] . '.attrs.' . sanitize_key($attribute), [
-                        'expected' => $attribute,
-                        'actual' => 'missing',
-                    ]);
+                if (array_key_exists($attribute, $row_attrs)) {
+                    continue;
                 }
+
+                $findings[] = $this->finding($rule, (string) $row['path'] . '.attrs.' . sanitize_key($attribute), [
+                    'expected' => $attribute,
+                    'actual' => 'missing',
+                ]);
             }
         }
 
@@ -357,7 +363,7 @@ final class DeclarativeRuleEngine {
         $values = [];
 
         foreach ($attrs as $key => $value) {
-            $next_path = '' === $path ? (string) $key : $path . '.' . $key;
+            $next_path = '' === $path ? $key : $path . '.' . $key;
 
             if (is_array($value)) {
                 array_push($values, ...$this->hardcoded_token_values(
@@ -449,25 +455,27 @@ final class DeclarativeRuleEngine {
             }
 
             foreach (ArrayKey::list_of_strings($metadata['required_blocks'] ?? null) as $required) {
-                if (!array_key_exists($required, $present_names)) {
-                    $findings[] = [
-                        'severity' => 'error',
-                        'code' => 'pattern-required-block-missing',
-                        'rule_id' => 'pattern-required-block-missing',
-                        'message' => sprintf(
-                            __('Pattern %1$s requires block %2$s.', 'agent-wordpress-terminal'),
-                            $pattern,
-                            $required,
-                        ),
-                        'block_path' => '',
-                        'source' => 'Pattern metadata',
-                        'suggestion' => __('Restore the registered pattern structure.', 'agent-wordpress-terminal'),
-                        'pack_id' => sanitize_key((string) ($metadata['pack_id'] ?? '')),
-                        'expected' => $required,
-                        'actual' => 'missing',
-                        'docs' => (string) ($metadata['docs'] ?? ''),
-                    ];
+                if (array_key_exists($required, $present_names)) {
+                    continue;
                 }
+
+                $findings[] = [
+                    'severity' => 'error',
+                    'code' => 'pattern-required-block-missing',
+                    'rule_id' => 'pattern-required-block-missing',
+                    'message' => sprintf(
+                        __('Pattern %1$s requires block %2$s.', 'agent-wordpress-terminal'),
+                        $pattern,
+                        $required,
+                    ),
+                    'block_path' => '',
+                    'source' => 'Pattern metadata',
+                    'suggestion' => __('Restore the registered pattern structure.', 'agent-wordpress-terminal'),
+                    'pack_id' => sanitize_key((string) ($metadata['pack_id'] ?? '')),
+                    'expected' => $required,
+                    'actual' => 'missing',
+                    'docs' => (string) ($metadata['docs'] ?? ''),
+                ];
             }
         }
 

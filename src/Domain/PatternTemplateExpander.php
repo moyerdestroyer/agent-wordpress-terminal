@@ -52,7 +52,7 @@ final class PatternTemplateExpander {
         $expanded = preg_replace_callback(
             '/<!--\s+wp:pattern\s+(\{.*?\})\s*\/-->/s',
             function (array $match) use ($stack, $depth, &$failure): string {
-                $attrs = json_decode((string) ($match[1] ?? ''), true);
+                $attrs = json_decode($match[1] ?? '', true);
                 $slug = is_array($attrs) ? sanitize_text_field((string) ($attrs['slug'] ?? '')) : '';
 
                 if ('' === $slug || in_array($slug, $stack, true)) {
@@ -61,7 +61,7 @@ final class PatternTemplateExpander {
                         'message' => __('A pattern reference is missing or recursive.', 'agent-wordpress-terminal'),
                         'data' => ['status' => 409, 'pattern_stack' => [...$stack, $slug]],
                     ];
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 $pattern = $this->patterns->find($slug);
@@ -75,7 +75,7 @@ final class PatternTemplateExpander {
                         ),
                         'data' => ['status' => 409, 'pattern_stack' => [...$stack, $slug]],
                     ];
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 $result = $this->expand_content((string) ($pattern['content'] ?? ''), [...$stack, $slug], $depth + 1);
@@ -86,7 +86,7 @@ final class PatternTemplateExpander {
                         'message' => $result->get_error_message(),
                         'data' => $result->get_error_data(),
                     ];
-                    return (string) $match[0];
+                    return $match[0];
                 }
 
                 return $result;
@@ -96,8 +96,8 @@ final class PatternTemplateExpander {
 
         if ([] !== $failure) {
             return new \WP_Error(
-                (string) ($failure['code'] ?? 'awpt_pattern_expansion_failed'),
-                (string) ($failure['message'] ?? __('Pattern expansion failed.', 'agent-wordpress-terminal')),
+                $failure['code'] ?? 'awpt_pattern_expansion_failed',
+                $failure['message'] ?? __('Pattern expansion failed.', 'agent-wordpress-terminal'),
                 $failure['data'] ?? ['status' => 409],
             );
         }

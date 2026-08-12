@@ -201,7 +201,6 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 		return () => {
 			active = false;
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- mount per focused post
 	}, [postId, title]);
 
 	useEffect(() => {

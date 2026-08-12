@@ -373,7 +373,7 @@ final class SessionRepository {
             $this->current_user_id(),
         ));
 
-        if (!is_array($ids) || count($ids) <= self::MAX_PER_USER) {
+        if (count($ids) <= self::MAX_PER_USER) {
             return;
         }
 
