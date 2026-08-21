@@ -104,10 +104,6 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             $payload['max_tokens'] = $payload['max_completion_tokens'];
             unset($payload['max_completion_tokens']);
 
-            if ((int) ($options['session_id'] ?? 0) > 0) {
-                $payload['session_id'] = 'awpt-' . (int) $options['session_id'];
-            }
-
             $reasoning_effort = sanitize_key((string) ($options['reasoning_effort'] ?? ''));
 
             if (in_array($reasoning_effort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], true)) {
@@ -124,10 +120,22 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             }
         }
 
-        // The runtime owns the per-turn wall and may reserve a longer single
-        // request for a slow reasoning model. Do not impose a second, shorter
-        // transport ceiling that aborts an otherwise healthy completion.
-        $timeout = max(5, min(480, (int) ($options['timeout'] ?? 45)));
+        $payload = $this->decorate_request_payload($payload, $options);
+        $headers = $this->decorate_request_headers($this->get_headers($api_key), $options);
+
+        // The runtime owns request lifetime. Do not silently clamp a long-running
+        // development request back to twelve minutes: that made healthy agent
+        // work surface as cURL 28. Operators can still impose an infrastructure-
+        // appropriate ceiling with awpt_provider_request_timeout.
+        $timeout = max(
+            5,
+            (int) apply_filters(
+                'awpt_provider_request_timeout',
+                (int) ($options['timeout'] ?? 45),
+                $this->get_name(),
+                $model,
+            ),
+        );
         $encoded_payload = wp_json_encode($payload);
 
         if (!is_string($encoded_payload)) {
@@ -136,7 +144,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
 
         $response = wp_remote_post($endpoint, [
             'timeout' => $timeout,
-            'headers' => $this->get_headers($api_key),
+            'headers' => $headers,
             'body' => $encoded_payload,
         ]);
 
@@ -179,7 +187,7 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
                 }
                 $fallback_response = wp_remote_post($endpoint, [
                     'timeout' => $timeout,
-                    'headers' => $this->get_headers($api_key),
+                    'headers' => $headers,
                     'body' => $encoded_payload,
                 ]);
 
@@ -234,6 +242,28 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             ]);
 
             return $error;
+        }
+
+        // OpenRouter (and some OpenAI-compatible proxies) return HTTP 200 with
+        // {"error":{"message":"...","code":504}} when the upstream model times out.
+        // Treat that as a request failure so the UI shows the real timeout, not
+        // "response did not include an assistant message."
+        $embedded_error = $this->embedded_provider_error(\AWPT\Support\ArrayKey::as_map($data), $status, $body);
+
+        if (null !== $embedded_error) {
+            $this->log_complete($messages, $tools, $options, $embedded_error, [
+                'started_at' => $started_at,
+                'meta' => [
+                    'endpoint' => $endpoint,
+                    'model' => $model,
+                    'http_status' => $status,
+                    'timeout' => $timeout,
+                    'image_fallback' => $used_image_fallback,
+                    'raw_response' => $data,
+                ],
+            ]);
+
+            return $embedded_error;
         }
 
         $message = $data['choices'][0]['message'] ?? null;
@@ -408,6 +438,60 @@ abstract class ChatCompletionsProvider implements ProviderInterface {
             'Authorization' => 'Bearer ' . $api_key,
             'Content-Type' => 'application/json',
         ];
+    }
+
+    /**
+     * Provider-specific body fields (cache affinity, etc.).
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    protected function decorate_request_payload(array $payload, array $options): array {
+        unset($options);
+
+        return $payload;
+    }
+
+    /**
+     * Provider-specific headers (e.g. OpenRouter x-session-id).
+     *
+     * @param array<string, string> $headers
+     * @param array<string, mixed>  $options
+     * @return array<string, string>
+     */
+    protected function decorate_request_headers(array $headers, array $options): array {
+        unset($options);
+
+        return $headers;
+    }
+
+    /**
+     * Map an HTTP-200 error envelope (OpenRouter upstream 504, etc.) to a WP_Error.
+     *
+     * @param array<string, mixed> $data Decoded provider JSON.
+     */
+    private function embedded_provider_error(array $data, int $status, string $body): ?\WP_Error {
+        if (isset($data['choices'][0]['message']) && is_array($data['choices'][0]['message'])) {
+            return null;
+        }
+
+        if (!isset($data['error']) && !array_key_exists('message', $data)) {
+            return null;
+        }
+
+        $error = $data['error'] ?? null;
+        $error_status = $status;
+
+        if (is_array($error) && is_numeric($error['code'] ?? null)) {
+            $error_status = (int) $error['code'];
+        }
+
+        return new \WP_Error(
+            'awpt_provider_request_failed',
+            $this->format_error_message($error_status, \AWPT\Support\ArrayKey::as_map($data), $body),
+            ['status' => $error_status],
+        );
     }
 
     /**

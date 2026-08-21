@@ -30,7 +30,8 @@ final class ProposalFailureNormalizer {
      */
     public static function normalize(string $error_code, array $error_data = [], string $error_message = ''): array {
         $error_code = sanitize_key($error_code);
-        $combined = trim($error_message . ' ' . wp_json_encode($error_data));
+        $encoded_error_data = wp_json_encode($error_data);
+        $combined = trim($error_message . ' ' . (false === $encoded_error_data ? '' : $encoded_error_data));
 
         return match (true) {
             'awpt_presentation_content_loss' === $error_code => [self::preserve_content($error_code, $error_data)],
@@ -55,6 +56,27 @@ final class ProposalFailureNormalizer {
             'awpt_duplicate_page_heading' === $error_code,
                 => [self::heading_outline($error_code, $error_data, $error_message)],
             'awpt_block_fingerprint_mismatch' === $error_code => [self::exact_fingerprints($error_code, $error_data)],
+            'awpt_pattern_text_block_not_editable' === $error_code,
+            'awpt_block_inner_html_not_editable' === $error_code,
+                => [self::unsupported_block_edit($error_code, $error_data, $error_message)],
+            'awpt_pattern_text_updates_required' === $error_code => [self::pattern_text_updates_required(
+                $error_code,
+                $error_data,
+                $error_message,
+            )],
+            'awpt_pattern_text_path_invalid' === $error_code => [self::pattern_text_path_invalid(
+                $error_code,
+                $error_data,
+                $error_message,
+            )],
+            'awpt_empty_block_attrs' === $error_code,
+            'awpt_unknown_block_attribute' === $error_code,
+                => [self::invalid_block_attributes($error_code, $error_data, $error_message)],
+            'awpt_multiple_proposals' === $error_code => [self::multiple_proposals(
+                $error_code,
+                $error_data,
+                $error_message,
+            )],
             'ability_invalid_input' === $error_code && self::mentions_fingerprint($combined)
                 => [self::exact_fingerprints($error_code, $error_data, $error_message)],
             'awpt_pattern_fallback_reason_required' === $error_code => [self::pattern_fallback_reason(
@@ -96,6 +118,118 @@ final class ProposalFailureNormalizer {
 
     private static function mentions_fingerprint(string $text): bool {
         return (bool) preg_match('/expected_fingerprint|fingerprint/i', $text);
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
+     */
+    private static function unsupported_block_edit(
+        string $error_code,
+        array $error_data,
+        string $error_message,
+    ): array {
+        return [
+            'id' => 'supported_block_operation',
+            'error_code' => $error_code,
+            'summary' => '' !== trim($error_message)
+                ? trim($error_message)
+                : __('The selected block operation cannot edit this block shape.', 'agent-wordpress-terminal'),
+            'facts' => self::selected_facts($error_data, [
+                'block_path',
+                'block_name',
+                'inner_count',
+                'recommended_next_tools',
+            ]),
+            'hints' => [
+                __(
+                    'Call awpt/get-block for the exact target. If inner_html_editable is true, use one replace_inner_html change with the returned complete inner_html and fingerprint.',
+                    'agent-wordpress-terminal',
+                ),
+                __(
+                    'For nested blocks, edit supported child paths. Use propose-content-update only when the verified block cannot be expressed surgically.',
+                    'agent-wordpress-terminal',
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
+     */
+    private static function invalid_block_attributes(
+        string $error_code,
+        array $error_data,
+        string $error_message,
+    ): array {
+        return [
+            'id' => 'valid_block_attributes',
+            'error_code' => $error_code,
+            'summary' => '' !== trim($error_message)
+                ? trim($error_message)
+                : __('The block attribute mutation is not valid for its target.', 'agent-wordpress-terminal'),
+            'facts' => self::selected_facts($error_data, [
+                'block_path',
+                'block_name',
+                'unknown_attributes',
+                'allowed_attributes',
+                'recommended_next_tools',
+            ]),
+            'hints' => [
+                self::attribute_recovery_hint($error_data, $error_message),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     */
+    private static function attribute_recovery_hint(array $error_data, string $error_message): string {
+        $block = (string) ($error_data['block_name'] ?? '');
+        $unknown = is_array($error_data['unknown_attributes'] ?? null)
+            ? array_map('strval', $error_data['unknown_attributes'])
+            : [];
+
+        if (in_array('level', $unknown, true) && str_contains($block, 'paragraph')) {
+            return __(
+                'Attribute level belongs on core/heading, not core/paragraph. Keep body copy as a paragraph, or remove the paragraph and insert a heading block — do not set level on paragraphs.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        if (str_contains($error_message, 'level') && str_contains($error_message, 'paragraph')) {
+            return __(
+                'Attribute level belongs on core/heading, not core/paragraph. Keep body copy as a paragraph, or remove the paragraph and insert a heading block — do not set level on paragraphs.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        return __(
+            'Do not invent empty or unrelated attrs. For an HTML attribute inside saved markup, call awpt/get-block and use replace_inner_html when eligible. Prefer html/text fields over attrs.content for rich text.',
+            'agent-wordpress-terminal',
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
+     */
+    private static function multiple_proposals(string $error_code, array $error_data, string $error_message): array {
+        return [
+            'id' => 'one_atomic_proposal',
+            'error_code' => $error_code,
+            'summary' => '' !== trim($error_message)
+                ? trim($error_message)
+                : __('Distinct staging proposals must be consolidated.', 'agent-wordpress-terminal'),
+            'facts' => self::selected_facts($error_data, ['requested_tools', 'recommended_next_tools']),
+            'hints' => [
+                __(
+                    'Return exactly one complete proposal call. Exact duplicate calls are collapsed automatically, but different proposal arguments remain unsafe.',
+                    'agent-wordpress-terminal',
+                ),
+            ],
+        ];
     }
 
     /**
@@ -257,7 +391,7 @@ final class ProposalFailureNormalizer {
                     'agent-wordpress-terminal',
                 ),
                 __(
-                    'For a section swap, call awpt/prepare-pattern-change (mode=replace) then awpt/propose-pattern-replace.',
+                    'For a section swap, call awpt/propose-pattern-replace with path and intent — the server prepares.',
                     'agent-wordpress-terminal',
                 ),
             ],
@@ -332,6 +466,10 @@ final class ProposalFailureNormalizer {
                     'After an H1, top-level sections must be H2 unless a real H2 parent precedes H3 children.',
                     'agent-wordpress-terminal',
                 ),
+                __(
+                    'If you insert a page H1, include heading-level fixes for remaining FAQ/section headings in the same batch so the outline does not skip.',
+                    'agent-wordpress-terminal',
+                ),
             ],
         ];
     }
@@ -373,6 +511,75 @@ final class ProposalFailureNormalizer {
             'hints' => [
                 __(
                     'Copy current_fingerprint exactly from the latest read-block-tree evidence; fingerprints are 64 characters and must not be shortened.',
+                    'agent-wordpress-terminal',
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
+     */
+    private static function pattern_text_updates_required(
+        string $error_code,
+        array $error_data,
+        string $error_message,
+    ): array {
+        return [
+            'id' => 'pattern_text_updates_required',
+            'error_code' => $error_code,
+            'summary' => '' !== trim($error_message)
+                ? trim($error_message)
+                : __(
+                    'Map existing page copy into pattern editable_slots before staging this replace.',
+                    'agent-wordpress-terminal',
+                ),
+            'facts' => self::selected_facts($error_data, [
+                'preparation_id',
+                'editable_slots',
+                'media_slots',
+                'carry_forward',
+                'recovery',
+                'retry_example',
+                'status',
+            ]),
+            'hints' => [
+                __(
+                    'Reuse preparation_id. Send pattern_text_updates with block_path values from editable_slots and content drawn from carry_forward / the live page. Do not call prepare again.',
+                    'agent-wordpress-terminal',
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $error_data
+     * @return array{id: string, error_code: string, summary: string, facts: array<string, mixed>, hints: list<string>}
+     */
+    private static function pattern_text_path_invalid(
+        string $error_code,
+        array $error_data,
+        string $error_message,
+    ): array {
+        return [
+            'id' => 'pattern_text_path_invalid',
+            'error_code' => $error_code,
+            'summary' => '' !== trim($error_message)
+                ? trim($error_message)
+                : __('pattern_text_updates used invalid block_path values.', 'agent-wordpress-terminal'),
+            'facts' => self::selected_facts($error_data, [
+                'preparation_id',
+                'editable_slots',
+                'invalid_paths',
+                'invalid_updates',
+                'recovery',
+                'retry_example',
+                'status',
+            ]),
+            'hints' => [
+                __(
+                    'Copy block_path exactly from editable_slots (dotted numbers like 1.0.1.0.0). Do not invent names such as intro_paragraph or first_h2. Optional: use slot_id when the slot contract exposes one.',
                     'agent-wordpress-terminal',
                 ),
             ],

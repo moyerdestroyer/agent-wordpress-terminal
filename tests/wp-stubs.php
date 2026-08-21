@@ -79,6 +79,29 @@ function awpt_test_reset_state(): void {
     $GLOBALS['awpt_test_registered_patterns'] = [];
     $GLOBALS['awpt_test_transients'] = [];
     $GLOBALS['awpt_test_uuid_counter'] = 0;
+
+    if (class_exists('WP_Block_Type_Registry', false)) {
+        WP_Block_Type_Registry::get_instance()->reset();
+    }
+}
+
+/** @return list<array<string, mixed>> */
+function awpt_test_improve_tree_evidence(int $post_id = 828): array {
+    return [[
+        'tool' => 'awpt/read-block-tree',
+        'status' => 'success',
+        'input' => ['id' => $post_id],
+        'output' => [
+            'id' => $post_id,
+            'top_level_sections' => [
+                ['path' => '0', 'heading' => 'Page', 'role' => 'body'],
+                ['path' => '1', 'heading' => 'Details', 'role' => 'body'],
+                ['path' => '2', 'heading' => 'More', 'role' => 'body'],
+                ['path' => '3', 'heading' => 'Additional', 'role' => 'body'],
+                ['path' => '4', 'heading' => 'End', 'role' => 'body'],
+            ],
+        ],
+    ]];
 }
 
 awpt_test_reset_state();
@@ -127,6 +150,56 @@ if (!class_exists('WP_Ability', false)) {
             $callback = $this->config['execute_callback'] ?? null;
 
             return is_callable($callback) ? $callback($input) : $input;
+        }
+    }
+}
+
+if (!class_exists('WP_Block_Type', false)) {
+    class WP_Block_Type {
+        /** @var array<string, mixed>|null */
+        public ?array $attributes;
+
+        /** @param array<string, mixed> $args */
+        public function __construct(
+            public string $name,
+            array $args = [],
+        ) {
+            $this->attributes = is_array($args['attributes'] ?? null) ? $args['attributes'] : null;
+        }
+    }
+}
+
+if (!class_exists('WP_Block_Type_Registry', false)) {
+    final class WP_Block_Type_Registry {
+        private static ?self $instance = null;
+
+        /** @var array<string, WP_Block_Type> */
+        private array $types = [];
+
+        public static function get_instance(): self {
+            self::$instance ??= new self();
+
+            return self::$instance;
+        }
+
+        /** @param array<string, mixed> $args */
+        public function register(string $name, array $args = []): WP_Block_Type {
+            $type = new WP_Block_Type($name, $args);
+            $this->types[$name] = $type;
+
+            return $type;
+        }
+
+        public function get_registered(string $name): ?WP_Block_Type {
+            return $this->types[$name] ?? null;
+        }
+
+        public function is_registered(string $name): bool {
+            return [] === $this->types || array_key_exists($name, $this->types);
+        }
+
+        public function reset(): void {
+            $this->types = [];
         }
     }
 }
@@ -434,6 +507,29 @@ if (!function_exists('update_option')) {
         $GLOBALS['awpt_test_options'][$name] = $value;
 
         return true;
+    }
+}
+
+if (!function_exists('add_option')) {
+    function add_option(string $name, mixed $value, string $deprecated = '', bool $autoload = true): bool {
+        unset($deprecated, $autoload);
+
+        if (array_key_exists($name, $GLOBALS['awpt_test_options'])) {
+            return false;
+        }
+
+        $GLOBALS['awpt_test_options'][$name] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('delete_option')) {
+    function delete_option(string $name): bool {
+        $existed = array_key_exists($name, $GLOBALS['awpt_test_options']);
+        unset($GLOBALS['awpt_test_options'][$name]);
+
+        return $existed;
     }
 }
 

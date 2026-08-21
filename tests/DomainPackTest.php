@@ -9,6 +9,8 @@
 declare(strict_types=1);
 
 use AWPT\Domain\CompositionProposalGuard;
+use AWPT\Domain\DeclarativeRuleEngine;
+use AWPT\Domain\DesignCatalog;
 use AWPT\Domain\DomainPackHealth;
 use AWPT\Domain\DomainPackRegistry;
 use AWPT\Domain\DomainProposalManager;
@@ -155,6 +157,99 @@ function test_domain_pack_rejects_outside_references(): void {
     $loaded = $registry->load_manifest($root);
     Assert::true(is_array($loaded), 'a manifest with one bad optional reference can still load');
     Assert::same([], $loaded['guidance'] ?? null, 'outside guidance references must be discarded');
+
+    awpt_remove_domain_test_directory($root);
+}
+
+function test_domain_pack_design_catalog_is_typed_and_fault_tolerant(): void {
+    $root = awpt_domain_test_directory();
+    file_put_contents($root . '/agent/design.json', wp_json_encode([
+        'schema_version' => 1,
+        'token_roles' => [
+            'surface' => ['domain' => 'color', 'slugs' => ['background']],
+            'broken' => ['domain' => 'unknown', 'slugs' => []],
+        ],
+        'components' => [
+            'button' => [
+                'label' => 'Button',
+                'block' => 'core/button',
+                'kind' => 'style',
+                'name' => 'brand',
+                'class_names' => ['is-style-brand'],
+            ],
+        ],
+        'guidance_sets' => ['edit' => ['design-system']],
+    ]));
+    file_put_contents($root . '/awpt-domain.json', wp_json_encode([
+        'schema_version' => 2,
+        'id' => 'demo',
+        'label' => 'Demo',
+        'version' => '2.1.0',
+        'design' => ['catalog' => 'agent/design.json'],
+    ]));
+
+    $registry = new DomainPackRegistry();
+    $loaded = $registry->load_manifest($root);
+    $catalog = new DesignCatalog($registry);
+
+    Assert::same(
+        'agent/design.json',
+        $loaded['design']['catalog'] ?? '',
+        'v2 should retain a safe design catalog reference',
+    );
+    Assert::same(
+        ['background'],
+        $catalog->all()['token_roles']['surface']['slugs'] ?? [],
+        'valid semantic token roles should load',
+    );
+    Assert::false(isset($catalog->all()['token_roles']['broken']), 'invalid optional design records should be dropped');
+    Assert::same(
+        'core/button',
+        $catalog->all()['components']['button']['block'] ?? '',
+        'registered component contracts should load',
+    );
+    Assert::same(['design-system'], $catalog->guidance_for('edit'), 'task guidance sets should be addressable');
+    Assert::same(
+        '/demo/token_roles/broken',
+        $catalog->diagnostics()[0]['pointer'] ?? '',
+        'dropped records should report a JSON pointer',
+    );
+
+    awpt_remove_domain_test_directory($root);
+}
+
+function test_pattern_required_blocks_are_scoped_to_each_materialized_instance(): void {
+    $root = awpt_domain_test_directory();
+    file_put_contents($root . '/agent/patterns.json', wp_json_encode([
+        'patterns' => [
+            'demo/card' => ['required_blocks' => ['core/button']],
+        ],
+    ]));
+    file_put_contents($root . '/awpt-domain.json', wp_json_encode([
+        'schema_version' => 2,
+        'id' => 'demo',
+        'label' => 'Demo',
+        'version' => '2.0.0',
+        'patterns' => ['namespace' => 'demo', 'catalog' => 'agent/patterns.json'],
+    ]));
+    $registry = new DomainPackRegistry();
+    $registry->load_manifest($root);
+    $engine = new DeclarativeRuleEngine(new DomainRuleRepository($registry), new PatternMetadataCatalog($registry));
+    $content = implode('', [
+        '<!-- wp:group {"metadata":{"patternName":"demo/card","patternInstance":"one"}} --><div class="wp-block-group">',
+        '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link">Go</a></div><!-- /wp:button -->',
+        '</div><!-- /wp:group -->',
+        '<!-- wp:group {"metadata":{"patternName":"demo/card","patternInstance":"two"}} --><div class="wp-block-group">',
+        '<!-- wp:paragraph --><p>Missing action</p><!-- /wp:paragraph -->',
+        '</div><!-- /wp:group -->',
+    ]);
+    $missing = array_values(array_filter(
+        $engine->validate($content),
+        static fn(array $finding): bool => 'pattern-required-block-missing' === ($finding['code'] ?? ''),
+    ));
+
+    Assert::same(1, count($missing), 'a required block in one instance must not satisfy a different instance');
+    Assert::same('1', $missing[0]['block_path'] ?? '', 'the finding should identify the incomplete instance');
 
     awpt_remove_domain_test_directory($root);
 }
@@ -435,6 +530,8 @@ function test_proposal_guard_grandfathers_shifted_import_debt_without_hiding_new
 
 test_domain_pack_loads_scoped_manifest_and_catalog();
 test_domain_pack_rejects_outside_references();
+test_domain_pack_design_catalog_is_typed_and_fault_tolerant();
+test_pattern_required_blocks_are_scoped_to_each_materialized_instance();
 test_domain_pack_health_reports_contract_quality_problems();
 test_domain_validation_normalizes_typed_findings();
 test_pattern_materializer_preserves_pattern_name();

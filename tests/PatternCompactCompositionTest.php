@@ -55,6 +55,32 @@ function test_pattern_text_update_accepts_idempotent_slot_values(): void {
     Assert::same($content, $updated, 'repeating the current slot value should be a successful no-op');
 }
 
+function test_pattern_text_update_preserves_button_link_wrapper(): void {
+    $content =
+        '<!-- wp:button {"className":"is-style-fill"} -->'
+        . '<div class="wp-block-button is-style-fill"><a class="wp-block-button__link wp-element-button">Old action</a></div>'
+        . '<!-- /wp:button -->';
+    $updated = new PatternTextUpdater()->apply($content, [[
+        'block_path' => '0',
+        'content' => 'View service details',
+    ]]);
+
+    Assert::true(is_string($updated), 'button text should be replaceable');
+    Assert::true(
+        is_string($updated)
+        && str_contains(
+            $updated,
+            '<div class="wp-block-button is-style-fill"><a class="wp-block-button__link wp-element-button">View service details</a></div>',
+        ),
+        'button updates should preserve both the block wrapper and inner link wrapper',
+    );
+    Assert::false(
+        is_string($updated)
+        && str_contains($updated, '<div class="wp-block-button is-style-fill">View service details</div>'),
+        'button updates must not replace the required inner link wrapper with bare text',
+    );
+}
+
 function test_pattern_editable_slots_exclude_dynamic_query_descendants_and_unreplaceable_markup(): void {
     $content =
         '<!-- wp:heading --><h2>Static introduction</h2><!-- /wp:heading -->'
@@ -219,6 +245,7 @@ function test_pattern_composition_builder_materializes_any_ordered_pattern_list(
 test_pattern_editable_slots_and_text_updates_use_stable_paths();
 test_pattern_text_update_rejects_non_text_blocks();
 test_pattern_text_update_accepts_idempotent_slot_values();
+test_pattern_text_update_preserves_button_link_wrapper();
 test_pattern_editable_slots_exclude_dynamic_query_descendants_and_unreplaceable_markup();
 test_pattern_media_placer_uses_explicit_anchor_and_preserves_requested_order();
 test_pattern_media_slots_and_featured_cover_placement_preserve_hero_structure();

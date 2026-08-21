@@ -167,7 +167,10 @@ final class TurnProfile {
                 'work_mode' => self::MODE_INVESTIGATE,
                 'design_level' => SiteDesignContext::LEVEL_SECTION,
                 'tool_profile' => self::TOOL_INVESTIGATE,
-                'auto_retrieve_knowledge' => true,
+                // Domain Pack guidance, the design-system slice, and focused-page
+                // reads are authoritative for Improve. Broad filesystem retrieval
+                // tended to inject unrelated pattern docs into every evaluation.
+                'auto_retrieve_knowledge' => false,
                 'history_limit' => 16,
                 'flags' => [
                     'site_data' => false,
@@ -369,10 +372,10 @@ final class TurnProfile {
         if ($this->is_improve_evaluate()) {
             return [
                 'core/get-site-info',
-                'awpt/read-content',
                 'awpt/read-block-tree',
-                'awpt/analyze-page',
+                'awpt/get-block',
                 'awpt/get-work-context',
+                'awpt/read-design-system',
                 'awpt/recommend-patterns',
                 'awpt/list-domain-packs',
                 'awpt/read-domain-guidance',
@@ -408,8 +411,10 @@ final class TurnProfile {
                 'awpt/read-knowledge',
                 'awpt/read-themes',
                 'awpt/read-theme-json',
+                'awpt/read-design-system',
                 'awpt/read-theme-file',
                 'awpt/get-work-context',
+                'awpt/read-design-system',
                 'awpt/list-patterns',
                 'awpt/recommend-patterns',
                 'awpt/read-pattern',
@@ -423,6 +428,8 @@ final class TurnProfile {
                 'awpt/read-block-tree',
                 'awpt/list-blocks',
                 'awpt/get-block',
+                'awpt/read-design-system',
+                'awpt/read-domain-guidance',
                 'awpt/render-block',
                 'awpt/inspect-frontend',
                 'awpt/analyze-page',
@@ -436,10 +443,7 @@ final class TurnProfile {
             self::TOOL_EDIT => [
                 ...$this->explore_allowlist_for_edit(),
                 'awpt/propose-content-update',
-                'awpt/propose-block-attrs-update',
                 'awpt/propose-block-batch-update',
-                'awpt/propose-block-insert',
-                'awpt/propose-block-remove',
                 'awpt/propose-pattern-insert',
                 'awpt/propose-pattern-replace',
                 'awpt/propose-new-post',
@@ -478,13 +482,11 @@ final class TurnProfile {
             ));
         }
 
-        // Act: trust the plan — only tools needed for fingerprints / prepare / one pattern load.
+        // Act: trust the plan — fingerprints / one pattern load only (server prepares on propose).
         if ($this->is_improve_act()) {
             return [
-                'awpt/read-content',
                 'awpt/read-block-tree',
                 'awpt/get-block',
-                'awpt/prepare-pattern-change',
                 'awpt/recommend-patterns',
                 'awpt/read-pattern',
             ];
@@ -507,8 +509,10 @@ final class TurnProfile {
             'awpt/read-knowledge',
             'awpt/read-themes',
             'awpt/read-theme-json',
+            'awpt/read-design-system',
             'awpt/read-theme-file',
             'awpt/get-work-context',
+            'awpt/read-design-system',
             'awpt/list-patterns',
             'awpt/recommend-patterns',
             'awpt/read-pattern',
@@ -533,13 +537,11 @@ final class TurnProfile {
             'awpt/list-content',
             'awpt/search-content',
             'awpt/read-content',
-            'awpt/analyze-page',
             'awpt/read-attachment-document',
             'awpt/search-knowledge',
             'awpt/list-knowledge-sources',
             'awpt/read-knowledge',
             'awpt/read-block-tree',
-            'awpt/list-blocks',
             'awpt/get-block',
             'awpt/render-block',
             'awpt/inspect-rendered-element',
@@ -582,21 +584,33 @@ final class TurnProfile {
                 'awpt/propose-pattern-insert',
                 'awpt/propose-block-batch-update',
                 'awpt/propose-content-update',
-                'awpt/propose-block-attrs-update',
-                'awpt/propose-block-insert',
-                'awpt/propose-block-remove',
             ];
         }
 
         if (self::TOOL_EDIT === $this->tool_profile || $this->content_edit_turn) {
+            $unit_op = ImprovePagePrompt::unit_op_from_act_message($this->message);
+
+            if ('batch' === $unit_op) {
+                return ['awpt/propose-block-batch-update'];
+            }
+
+            if ('pattern_replace' === $unit_op) {
+                return ['awpt/propose-pattern-replace', 'awpt/propose-block-batch-update'];
+            }
+
+            if ('pattern_insert' === $unit_op) {
+                return ['awpt/propose-pattern-insert', 'awpt/propose-block-batch-update'];
+            }
+
+            if ('none' === $unit_op) {
+                return [];
+            }
+
             // Batch and prepared section ops first; freehand last (act isolation relies on this order).
             return [
                 'awpt/propose-block-batch-update',
                 'awpt/propose-pattern-replace',
                 'awpt/propose-pattern-insert',
-                'awpt/propose-block-attrs-update',
-                'awpt/propose-block-insert',
-                'awpt/propose-block-remove',
                 'awpt/propose-content-update',
             ];
         }
@@ -878,7 +892,7 @@ final class TurnProfile {
         }
 
         if ((bool) preg_match('/\b(global\s+styles?|theme\.json|color\s+palette|typography)\b/i', $message)) {
-            return ['awpt/propose-global-styles-patch', 'awpt/propose-global-styles-update'];
+            return ['awpt/propose-global-styles-patch'];
         }
 
         if ((bool) preg_match('/\b(template|template\s+part|fse|site\s+editor)\b/i', $message)) {

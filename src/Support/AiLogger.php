@@ -95,6 +95,8 @@ final class AiLogger {
         $meta = is_array($context['meta'] ?? null) ? $context['meta'] : [];
         $error = is_wp_error($result) ? $result : null;
         $success = is_array($result) ? $result : [];
+        $response_message = is_array($success['message'] ?? null) ? $success['message'] : [];
+        $reasoning = (string) ($response_message['reasoning'] ?? '');
         $log_options = $options;
         unset($log_options['api_key'], $log_options['authorization']);
 
@@ -125,8 +127,187 @@ final class AiLogger {
                     'message' => $success['message'] ?? null,
                     'usage' => $success['usage'] ?? [],
                 ],
-            'meta' => $meta,
+            'meta' => array_merge($meta, [
+                'prompt_audit' => self::prompt_audit($messages, $tools, $log_options),
+                'native_tool_calls_count' => count(
+                    is_array($success['raw_tool_calls'] ?? null) ? $success['raw_tool_calls'] : [],
+                ),
+                'strict_tools_count' => count(array_filter($tools, static function (array $tool): bool {
+                    $function = is_array($tool['function'] ?? null) ? $tool['function'] : [];
+
+                    return true === ($function['strict'] ?? null);
+                })),
+                'reasoning_tool_markup_detected' =>
+                    '' !== $reasoning && (str_contains($reasoning, 'tool_calls') || str_contains($reasoning, 'DSML')),
+            ]),
         ]);
+    }
+
+    /**
+     * Compact, testable summary of what the model was actually sent.
+     *
+     * @param array<int, array<string, mixed>> $messages
+     * @param array<int, array<string, mixed>> $tools
+     * @param array<string, mixed>             $options
+     * @return array<string, mixed>
+     */
+    public static function prompt_audit(array $messages, array $tools, array $options = []): array {
+        $parts = [];
+        $message_rows = [];
+        $latest_user_marker = '';
+        $role_chars = [];
+        $prefix_material = '';
+        $largest_message = ['index' => -1, 'role' => '', 'chars' => 0];
+        $proposal_checkpoint_chars = 0;
+
+        foreach ($messages as $index => $message) {
+            $text = self::message_text($message);
+            $parts[] = $text;
+            if ('user' === (string) ($message['role'] ?? '')) {
+                if (str_contains($text, '[awpt:improve_evaluate]')) {
+                    $latest_user_marker = 'improve_evaluate';
+                } elseif (str_contains($text, '[awpt:improve_act]')) {
+                    $latest_user_marker = 'improve_act';
+                }
+            }
+            $role = (string) ($message['role'] ?? '');
+            $encoded_message = wp_json_encode($message);
+            $encoded_message = is_string($encoded_message) ? $encoded_message : '';
+            $prefix_material .= "\0" . $encoded_message;
+            $chars = strlen($text);
+            $role_chars[$role] = (int) ($role_chars[$role] ?? 0) + $chars;
+            if ($chars > (int) $largest_message['chars']) {
+                $largest_message = ['index' => (int) $index, 'role' => $role, 'chars' => $chars];
+            }
+            if (str_contains($text, 'proposal_checkpoint_v1')) {
+                $proposal_checkpoint_chars += $chars;
+            }
+            $message_rows[] = [
+                'index' => (int) $index,
+                'role' => $role,
+                'chars' => $chars,
+                'content_sha256' => hash('sha256', $encoded_message),
+                'prefix_sha256' => hash('sha256', $prefix_material),
+                'preview' => self::first_line($text, 180),
+            ];
+        }
+
+        $blob = implode("\n", $parts);
+        $tool_names = [];
+
+        foreach ($tools as $tool) {
+            $function = is_array($tool['function'] ?? null) ? $tool['function'] : [];
+            $name = (string) ($function['name'] ?? $tool['name'] ?? '');
+
+            if ('' !== $name) {
+                $tool_names[] = $name;
+            }
+        }
+
+        $unit = [];
+        $matches = [];
+
+        if (preg_match('/```awpt-unit\s*(.*?)\s*```/s', $blob, $matches) === 1) {
+            $decoded = json_decode(trim($matches[1]), true);
+
+            if (is_array($decoded)) {
+                $paths = [];
+
+                foreach (is_array($decoded['paths'] ?? null) ? $decoded['paths'] : [] as $path) {
+                    $path = trim((string) $path);
+
+                    if ('' !== $path) {
+                        $paths[] = $path;
+                    }
+                }
+
+                $unit = [
+                    'id' => sanitize_key((string) ($decoded['id'] ?? '')),
+                    'op' => sanitize_key((string) ($decoded['op'] ?? '')),
+                    'title' => sanitize_text_field((string) ($decoded['title'] ?? '')),
+                    'paths' => $paths,
+                ];
+            }
+        }
+
+        $kind = 'chat';
+
+        if ('' !== $latest_user_marker) {
+            $kind = $latest_user_marker;
+        }
+
+        $tool_choice = $options['tool_choice'] ?? '';
+        $encoded_tools = wp_json_encode($tools);
+        $encoded_tools = is_string($encoded_tools) ? $encoded_tools : '';
+        $encoded_messages = wp_json_encode($messages);
+        $encoded_messages = is_string($encoded_messages) ? $encoded_messages : '';
+
+        return [
+            'kind' => $kind,
+            'log_phase' => sanitize_key((string) ($options['log_phase'] ?? '')),
+            'tool_choice' => is_array($tool_choice) ? 'exact' : sanitize_key((string) $tool_choice),
+            'tool_names' => $tool_names,
+            'unit' => $unit,
+            'flags' => [
+                'has_evaluate_marker' => str_contains($blob, '[awpt:improve_evaluate]'),
+                'has_act_marker' => str_contains($blob, '[awpt:improve_act]'),
+                'has_unit_fence' => [] !== $unit,
+                'has_full_plan_heading' => str_contains($blob, '## Plan'),
+                'has_unit_list_fence' => str_contains($blob, '```awpt-units'),
+            ],
+            'messages' => $message_rows,
+            'message_chars' => strlen($blob),
+            'context_manifest' => [
+                'message_count' => count($message_rows),
+                'message_json_chars' => strlen($encoded_messages),
+                'message_sha256' => hash('sha256', $encoded_messages),
+                'role_chars' => $role_chars,
+                'largest_message' => $largest_message,
+                'proposal_checkpoint_chars' => $proposal_checkpoint_chars,
+                'tool_count' => count($tools),
+                'tool_schema_chars' => strlen($encoded_tools),
+                'tool_schema_sha256' => hash('sha256', $encoded_tools),
+                'request_prefix_sha256' => hash('sha256', $prefix_material . "\0tools\0" . $encoded_tools),
+            ],
+        ];
+    }
+
+    /** @param array<string, mixed> $message */
+    private static function message_text(array $message): string {
+        $content = $message['content'] ?? '';
+
+        if (is_string($content)) {
+            return $content;
+        }
+
+        if (!is_array($content)) {
+            return '';
+        }
+
+        $parts = [];
+
+        foreach ($content as $part) {
+            if (is_string($part)) {
+                $parts[] = $part;
+                continue;
+            }
+
+            if (is_array($part) && is_string($part['text'] ?? null)) {
+                $parts[] = $part['text'];
+            }
+        }
+
+        return implode("\n", $parts);
+    }
+
+    private static function first_line(string $text, int $max): string {
+        $line = trim(explode("\n", $text, 2)[0]);
+
+        if (strlen($line) <= $max) {
+            return $line;
+        }
+
+        return substr($line, 0, $max) . '…';
     }
 
     /**
@@ -378,6 +559,9 @@ final class AiLogger {
                     'original_bytes' => strlen($encoded),
                     'provider' => $entry['provider'] ?? '',
                     'model' => $entry['model'] ?? '',
+                    'prompt_audit' => is_array($entry['meta']['prompt_audit'] ?? null)
+                        ? $entry['meta']['prompt_audit']
+                        : [],
                 ],
             ]);
 
@@ -393,7 +577,7 @@ final class AiLogger {
         if (function_exists('wp_upload_dir')) {
             $uploads = wp_upload_dir();
 
-            if ((false === $uploads['error'] || '' === $uploads['error']) && is_string($uploads['basedir'])) {
+            if (false === $uploads['error'] || '' === $uploads['error']) {
                 return trailingslashit($uploads['basedir']) . 'awpt-logs';
             }
         }

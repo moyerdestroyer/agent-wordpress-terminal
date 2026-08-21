@@ -11,9 +11,14 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\Abilities\RecommendPatterns;
+use AWPT\Domain\DesignCatalog;
 use AWPT\Domain\DomainPackRegistry;
 use AWPT\Domain\DomainRuleRepository;
+use AWPT\Domain\PatternMetadataCatalog;
 use AWPT\Support\ArrayKey;
+use AWPT\Support\DesignSystemContextService;
+use AWPT\Support\PatternCandidateProjector;
+use AWPT\Support\PatternCatalog;
 use AWPT\Support\SiteDesignContext;
 
 if (!defined('ABSPATH')) {
@@ -32,28 +37,35 @@ final class AgentWorkContextService {
      */
     public function compile(string $message, TurnProfile $profile, string $post_type = 'page'): array {
         $work_type = $this->work_type($message, $profile);
+        $scope = $this->scope($profile);
         $design = new SiteDesignContext()->resolve();
         $gates = $this->gates($work_type);
-        $guidance = $this->guidance_refs($work_type, $message);
+        $guidance = $this->guidance_refs($scope, $message);
+        $design_catalog = new DesignCatalog($this->packs);
+        $design_snapshot = new DesignSystemContextService(null, $design_catalog)->snapshot($scope);
         $patterns = [];
 
-        if ('compose' === $work_type) {
-            $recommended = new RecommendPatterns()->execute([
+        if ('compose' === $work_type || $profile->is_redesign() && !$profile->is_improve_evaluate()) {
+            $recommended = new RecommendPatterns(
+                new PatternCatalog(null, new PatternMetadataCatalog($this->packs)),
+                $this->packs,
+            )->execute([
                 'intent' => $message,
                 'post_type' => $post_type,
                 'max' => 4,
                 'semantic' => false,
             ]);
-            $patterns = array_values(array_map(static fn(array $row): array => [
-                'name' => (string) ($row['pattern']['name'] ?? ''),
-                'title' => (string) ($row['pattern']['title'] ?? ''),
-                'score' => (int) ($row['score'] ?? 0),
-                'rationale' => (string) ($row['rationale'] ?? ''),
-            ], ArrayKey::list_of_maps($recommended['recommendations'] ?? null)));
+            $patterns = new PatternCandidateProjector()->many(
+                ArrayKey::list_of_maps($recommended['recommendations'] ?? null),
+                4,
+                4_500,
+            );
         }
 
         return [
             'work_type' => $work_type,
+            'design_scope' => $scope,
+            'design_detail' => $this->design_detail($profile),
             'intent' => sanitize_textarea_field($message),
             'workflow' => [
                 'phases' => ['discover', 'decide', 'propose', 'validate', 'human_review'],
@@ -66,6 +78,11 @@ final class AgentWorkContextService {
                 'stylesheet' => $design['stylesheet'],
                 'template' => $design['template'],
                 'preferred_pattern_namespaces' => ArrayKey::list_of_strings($design['preferred_pattern_namespaces']),
+                'context_hash' => (string) ($design_snapshot['hash'] ?? ''),
+                'catalog_hash' => $design_catalog->hash(),
+                'pattern_catalog' => $design_snapshot['pattern_catalog'] ?? [],
+                'pattern_catalog_hash' => (string) ($design_snapshot['pattern_catalog_hash'] ?? ''),
+                'guidance_ids' => $design_catalog->guidance_for($scope),
             ],
             'domain_packs' => $this->packs->status(),
             'guidance' => $guidance,
@@ -80,19 +97,40 @@ final class AgentWorkContextService {
         ];
     }
 
-    public function format_for_prompt(string $message, TurnProfile $profile, int $max_chars = 5_000): string {
+    public function format_for_prompt(string $message, TurnProfile $profile, int $max_chars = 8_000): string {
         if (TurnProfile::TOOL_CHAT === $profile->tool_profile) {
             return '';
         }
 
         $context = $this->compile($message, $profile);
+        unset($context['intent']);
         $encoded = wp_json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         if (!is_string($encoded)) {
             return '';
         }
 
-        $encoded = mb_substr($encoded, 0, max(1_000, $max_chars), 'UTF-8');
+        if (strlen($encoded) > max(1_000, $max_chars)) {
+            // Preserve valid JSON and every workflow/safety contract. Candidates and
+            // guidance are detail channels that can be retrieved by their abilities.
+            $context['pattern_candidates'] = array_slice(
+                ArrayKey::list_of_maps($context['pattern_candidates'] ?? null),
+                0,
+                4,
+            );
+            $context['guidance'] = array_slice(ArrayKey::list_of_maps($context['guidance'] ?? null), 0, 4);
+            $context['domain_packs'] = array_map(
+                static fn(array $pack): array => array_intersect_key($pack, array_flip([
+                    'id',
+                    'version',
+                    'enabled',
+                    'design_catalog',
+                    'diagnostic_count',
+                ])),
+                ArrayKey::list_of_maps($context['domain_packs'] ?? null),
+            );
+            $encoded = wp_json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
 
         return implode("\n", [
             '<awpt-work-context>',
@@ -102,8 +140,45 @@ final class AgentWorkContextService {
         ]);
     }
 
+    /**
+     * Design-catalog / guidance-set key for this turn.
+     *
+     * Distinct from {@see TurnProfile::$work_mode}, which is a routing flag
+     * (`create`, `redesign`, `edit`) and is not a catalog key.
+     */
+    public function scope(TurnProfile $profile): string {
+        if ($profile->is_improve_evaluate()) {
+            return 'evaluate';
+        }
+
+        return $this->work_type($profile->message, $profile);
+    }
+
+    /**
+     * How much compiled design evidence belongs in the always-on prompt slice.
+     */
+    public function design_detail(TurnProfile $profile): string {
+        $scope = $this->scope($profile);
+
+        if ($profile->is_improve_evaluate()) {
+            // Evaluation gets the catalog index; concrete names require recommendation evidence.
+            return DesignSystemContextService::DETAIL_EVALUATE;
+        }
+
+        if ('global_styles' === $scope) {
+            return DesignSystemContextService::DETAIL_GLOBAL_STYLES;
+        }
+
+        if ('compose' === $scope || $profile->is_redesign() && !$profile->is_improve_evaluate()) {
+            return DesignSystemContextService::DETAIL_COMPOSE;
+        }
+
+        return DesignSystemContextService::DETAIL_SLIM;
+    }
+
     private function work_type(string $message, TurnProfile $profile): string {
         return match (true) {
+            $profile->is_improve_evaluate(), $profile->is_improve_act() => 'edit',
             $profile->needs_diagnosis_module() => 'diagnose',
             (bool) preg_match('/\b(navigation|menu|submenu|nav)\b/i', $message) => 'navigation',
             (bool) preg_match(
@@ -128,7 +203,7 @@ final class AgentWorkContextService {
             'compose' => [
                 [
                     'evidence' => 'active design context and compatible pattern candidates',
-                    'abilities' => ['awpt/recommend-patterns', 'awpt/read-theme-json'],
+                    'abilities' => ['awpt/recommend-patterns', 'awpt/read-design-system'],
                 ],
                 [
                     'evidence' => 'exact selected pattern structure or an explicit fallback reason',
@@ -136,6 +211,10 @@ final class AgentWorkContextService {
                 ],
             ],
             'edit' => [
+                [
+                    'evidence' => 'active design system, accessibility guidance, and composition rubric',
+                    'abilities' => ['awpt/read-design-system', 'awpt/read-domain-guidance'],
+                ],
                 [
                     'evidence' => 'resolved target and current content',
                     'abilities' => ['awpt/search-content', 'awpt/read-content'],
@@ -155,7 +234,7 @@ final class AgentWorkContextService {
             ]],
             'global_styles' => [[
                 'evidence' => 'current merged design tokens and active style revision',
-                'abilities' => ['awpt/read-theme-json', 'awpt/read-global-styles'],
+                'abilities' => ['awpt/read-design-system', 'awpt/read-global-styles'],
             ]],
             'diagnose' => [[
                 'evidence' => 'observed failure and relevant site/runtime evidence',
@@ -174,6 +253,7 @@ final class AgentWorkContextService {
     private function guidance_refs(string $work_type, string $message): array {
         $refs = [];
         $lower = mb_strtolower($message);
+        $forced = array_fill_keys(new DesignCatalog($this->packs)->guidance_for($work_type), true);
 
         foreach ($this->packs->active() as $pack) {
             foreach (ArrayKey::list_of_maps($pack['guidance'] ?? null) as $guidance) {
@@ -181,7 +261,8 @@ final class AgentWorkContextService {
                 $triggers = ArrayKey::list_of_strings($guidance['triggers'] ?? null);
                 $scope_match = in_array('all', $scopes, true) || in_array($work_type, $scopes, true);
                 $trigger_match =
-                    [] === $triggers
+                    isset($forced[(string) ($guidance['id'] ?? '')])
+                    || [] === $triggers
                     || [] !== array_filter($triggers, static fn(string $trigger): bool => str_contains(
                         $lower,
                         mb_strtolower($trigger),
@@ -195,7 +276,7 @@ final class AgentWorkContextService {
                     'pack_id' => (string) $pack['id'],
                     'id' => (string) $guidance['id'],
                     'label' => (string) $guidance['label'],
-                    'hard' => (bool) $guidance['hard'],
+                    'hard' => ArrayKey::rest_bool($guidance['hard']),
                     'priority' => (int) $guidance['priority'],
                     'ability' => 'awpt/read-domain-guidance',
                 ];

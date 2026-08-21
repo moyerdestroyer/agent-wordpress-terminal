@@ -40,10 +40,7 @@ function test_read_block_tree_exposes_top_level_sections_for_prepare(): void {
         array_key_exists('has_dynamic_blocks', $result['top_level_sections'][0]),
         'has_dynamic_blocks present',
     );
-    Assert::true(
-        array_key_exists('heading', $result['top_level_sections'][0]),
-        'heading present on top-level section',
-    );
+    Assert::true(array_key_exists('heading', $result['top_level_sections'][0]), 'heading present on top-level section');
     Assert::true(
         is_string($result['prepare_pattern_change_hint'] ?? null)
         && str_contains((string) $result['prepare_pattern_change_hint'], 'prepare-pattern-change'),
@@ -103,8 +100,7 @@ function test_prepare_pattern_change_missing_path_returns_section_menu(): void {
     $post->ID = 503;
     $post->post_type = 'page';
     $post->post_content =
-        '<!-- wp:paragraph --><p>A</p><!-- /wp:paragraph -->'
-        . '<!-- wp:paragraph --><p>B</p><!-- /wp:paragraph -->';
+        '<!-- wp:paragraph --><p>A</p><!-- /wp:paragraph -->' . '<!-- wp:paragraph --><p>B</p><!-- /wp:paragraph -->';
     $GLOBALS['awpt_test_posts'][503] = $post;
 
     $result = new PreparePatternChange()->execute([
@@ -181,9 +177,9 @@ function test_prepare_pattern_change_success_includes_section_context_and_carry_
             'description' => 'FAQ accordion section',
             'content' =>
                 '<!-- wp:group --><div class="wp-block-group">'
-                . '<!-- wp:heading --><h2>Questions</h2><!-- /wp:heading -->'
-                . '<!-- wp:paragraph --><p>Answer slot</p><!-- /wp:paragraph -->'
-                . '</div><!-- /wp:group -->',
+                    . '<!-- wp:heading --><h2>Questions</h2><!-- /wp:heading -->'
+                    . '<!-- wp:paragraph --><p>Answer slot</p><!-- /wp:paragraph -->'
+                    . '</div><!-- /wp:group -->',
         ],
         [
             'name' => 'demo/layout-page-home',
@@ -219,11 +215,7 @@ function test_prepare_pattern_change_success_includes_section_context_and_carry_
         in_array('555-0199', $result['carry_forward']['numeric_tokens'] ?? [], true),
         'carry_forward includes number',
     );
-    Assert::same(
-        'pattern_replace',
-        $result['recommended_operation']['operation'] ?? null,
-        'soft op hint is replace',
-    );
+    Assert::same('pattern_replace', $result['recommended_operation']['operation'] ?? null, 'soft op hint is replace');
     Assert::true(is_array($result['page_sections'] ?? null) && count($result['page_sections']) >= 2, 'page_sections');
     Assert::same('demo/faq-section', $result['pattern']['name'] ?? null, 'section FAQ pattern preferred over layout');
 }
@@ -274,6 +266,157 @@ function test_prepare_pattern_change_dynamic_section_warns_preserve(): void {
     );
 }
 
+function test_prepare_pattern_change_honors_explicit_layout_pattern_name(): void {
+    awpt_test_reset_state();
+    $post = new WP_Post();
+    $post->ID = 507;
+    $post->post_type = 'page';
+    $post->post_modified_gmt = '2026-01-01 00:00:00';
+    $post->post_content =
+        '<!-- wp:group --><div class="wp-block-group">'
+        . '<!-- wp:heading --><h2>FAQ</h2><!-- /wp:heading -->'
+        . '<!-- wp:paragraph --><p>See https://example.com/help or call 555-0199</p><!-- /wp:paragraph -->'
+        . '</div><!-- /wp:group -->'
+        . '<!-- wp:paragraph --><p>Footer</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][507] = $post;
+    $GLOBALS['awpt_test_registered_patterns'] = [
+        [
+            'name' => 'demo/faq-section',
+            'title' => 'FAQ Section',
+            'description' => 'Accordion FAQ section',
+            'content' =>
+                '<!-- wp:group --><div class="wp-block-group">'
+                    . '<!-- wp:heading --><h2>Questions</h2><!-- /wp:heading -->'
+                    . '<!-- wp:paragraph --><p>Answer slot</p><!-- /wp:paragraph -->'
+                    . '</div><!-- /wp:group -->',
+        ],
+        [
+            'name' => 'demo/layout-page-documentation',
+            'title' => 'Documentation Layout Page',
+            'description' => 'Full page documentation layout',
+            'content' =>
+                '<!-- wp:group --><div class="wp-block-group">'
+                    . '<!-- wp:heading --><h1>Docs</h1><!-- /wp:heading -->'
+                    . '<!-- wp:paragraph --><p>Body</p><!-- /wp:paragraph -->'
+                    . '</div><!-- /wp:group -->',
+        ],
+    ];
+
+    $named = new PreparePatternChange()->execute([
+        'post_id' => 507,
+        'intent' => 'replace FAQ with documentation layout',
+        'mode' => 'replace',
+        'target_path' => '0',
+        'pattern_name' => 'demo/layout-page-documentation',
+    ]);
+
+    Assert::false(is_wp_error($named), 'named layout prepare succeeds');
+    Assert::true(is_array($named), 'array result');
+    if (!is_array($named)) {
+        return;
+    }
+
+    Assert::same(
+        'demo/layout-page-documentation',
+        $named['pattern']['name'] ?? null,
+        'explicit layout name wins over section preference',
+    );
+    Assert::true('' !== (string) ($named['preparation_id'] ?? ''), 'preparation_id minted');
+    Assert::true(
+        str_contains((string) ($named['selection']['rationale'] ?? ''), 'Caller-bound'),
+        'selection notes caller-bound pattern',
+    );
+
+    $missing = new PreparePatternChange()->execute([
+        'post_id' => 507,
+        'intent' => 'replace with invented pattern',
+        'mode' => 'replace',
+        'target_path' => '0',
+        'pattern_name' => 'demo/does-not-exist',
+    ]);
+    Assert::true(is_wp_error($missing), 'unresolvable pattern_name hard-errors');
+    if (is_wp_error($missing)) {
+        Assert::same('awpt_pattern_not_found', $missing->get_error_code(), 'not-found code');
+    }
+
+    $unnamed = new PreparePatternChange()->execute([
+        'post_id' => 507,
+        'intent' => 'replace FAQ with a cleaner accordion',
+        'mode' => 'replace',
+        'target_path' => '0',
+    ]);
+    Assert::false(is_wp_error($unnamed), 'unnamed still discovers');
+    if (is_array($unnamed)) {
+        Assert::same(
+            'demo/faq-section',
+            $unnamed['pattern']['name'] ?? null,
+            'unnamed path still prefers section over layout',
+        );
+    }
+}
+
+function test_prepare_pattern_change_docs_intent_remaps_section_to_layout(): void {
+    awpt_test_reset_state();
+    $post = new WP_Post();
+    $post->ID = 508;
+    $post->post_type = 'page';
+    $post->post_modified_gmt = '2026-01-01 00:00:00';
+    $post->post_content =
+        '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+        . '<!-- wp:paragraph --><p>Body</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][508] = $post;
+    $GLOBALS['awpt_test_registered_patterns'] = [
+        [
+            'name' => 'demo/section-two-column-toc',
+            'title' => 'Two Column TOC',
+            'description' => 'Section TOC',
+            'content' =>
+                '<!-- wp:group --><div class="wp-block-group">'
+                    . '<!-- wp:heading --><h2>TOC</h2><!-- /wp:heading -->'
+                    . '</div><!-- /wp:group -->',
+        ],
+        [
+            'name' => 'demo/layout-page-documentation',
+            'title' => 'Documentation Layout Page',
+            'description' => 'Full page documentation layout',
+            'content' =>
+                '<!-- wp:group --><div class="wp-block-group">'
+                    . '<!-- wp:heading --><h1>Docs</h1><!-- /wp:heading -->'
+                    . '<!-- wp:paragraph --><p>Body</p><!-- /wp:paragraph -->'
+                    . '</div><!-- /wp:group -->',
+        ],
+    ];
+
+    $remapped = new PreparePatternChange()->execute([
+        'post_id' => 508,
+        'intent' => 'Make this a documentation page using layout-page-documentation',
+        'mode' => 'replace',
+        'target_path' => '0',
+        'pattern_name' => 'demo/section-two-column-toc',
+        'replace_entire_document' => true,
+    ]);
+    Assert::false(is_wp_error($remapped), 'explicit pattern prepares');
+    Assert::same(
+        'demo/section-two-column-toc',
+        is_array($remapped) ? $remapped['pattern']['name'] ?? null : null,
+        'prepare honors the agent-selected pattern instead of silently remapping it',
+    );
+
+    $bound = new PreparePatternChange()->execute([
+        'post_id' => 508,
+        'intent' => 'Make this a CivicPress documentation page',
+        'mode' => 'replace',
+        'target_path' => '0',
+        'replace_entire_document' => true,
+    ]);
+    Assert::false(is_wp_error($bound), 'ranked intent selects a layout without pattern_name');
+    Assert::same(
+        'demo/layout-page-documentation',
+        is_array($bound) ? $bound['pattern']['name'] ?? null : null,
+        'generic ranking can select the matching documentation layout',
+    );
+}
+
 function test_pattern_change_replace_nudge_text(): void {
     $runtime = new AWPT\Agent\ProviderRuntime();
     $method = new ReflectionMethod(AWPT\Agent\ProviderRuntime::class, 'pattern_change_replace_nudge');
@@ -292,15 +435,51 @@ function test_pattern_change_replace_nudge_text(): void {
             'target_path' => '0',
         ],
     ]]);
-    Assert::true(str_contains($nudge, 'prep-xyz'), 'nudge includes preparation_id');
+    Assert::true(
+        str_contains($nudge, 'path=0') || str_contains($nudge, 'path and intent'),
+        'nudge includes path or path+intent guidance',
+    );
+    Assert::false(str_contains($nudge, 'prep-xyz'), 'nudge does not center preparation_id');
     Assert::true(str_contains($nudge, 'propose-pattern-replace'), 'nudge names replace ability');
     Assert::false(str_contains(strtolower($nudge), 'will reject'), 'nudge is soft prefer not hard lock');
 }
 
+function test_read_block_tree_returns_complete_subtree_for_path(): void {
+    awpt_test_reset_state();
+    $post = new WP_Post();
+    $post->ID = 503;
+    $post->post_content =
+        '<!-- wp:group --><div class="wp-block-group">'
+        . '<!-- wp:heading {"level":4} --><h4>First</h4><!-- /wp:heading -->'
+        . '<!-- wp:paragraph --><p>A:</p><!-- /wp:paragraph -->'
+        . '</div><!-- /wp:group -->'
+        . '<!-- wp:group --><div class="wp-block-group">'
+        . '<!-- wp:heading {"level":4} --><h4>Second</h4><!-- /wp:heading -->'
+        . '<!-- wp:paragraph --><p>Body</p><!-- /wp:paragraph -->'
+        . '</div><!-- /wp:group -->';
+    $GLOBALS['awpt_test_posts'][503] = $post;
+
+    $result = new ReadBlockTree()->execute(['id' => 503, 'path' => '1']);
+    Assert::false(is_wp_error($result), 'path-scoped read should succeed');
+    Assert::same(['1'], $result['requested_paths'] ?? null, 'requested path is echoed');
+    Assert::same(1, count($result['blocks'] ?? []), 'only the requested subtree is returned');
+    Assert::same('1', $result['blocks'][0]['path'] ?? null, 'subtree keeps its page path');
+    Assert::true(
+        is_array($result['blocks'][0]['inner'] ?? null) && count($result['blocks'][0]['inner']) >= 2,
+        'subtree keeps children',
+    );
+
+    $missing = new ReadBlockTree()->execute(['id' => 503, 'path' => '9']);
+    Assert::true(is_wp_error($missing), 'unknown path is an error');
+}
+
 test_read_block_tree_exposes_top_level_sections_for_prepare();
+test_read_block_tree_returns_complete_subtree_for_path();
 test_prepare_pattern_change_autofills_fingerprint_when_omitted();
 test_prepare_pattern_change_missing_path_returns_section_menu();
 test_prepare_pattern_change_missing_path_includes_suggestions_and_routing();
 test_prepare_pattern_change_success_includes_section_context_and_carry_forward();
 test_prepare_pattern_change_dynamic_section_warns_preserve();
+test_prepare_pattern_change_honors_explicit_layout_pattern_name();
+test_prepare_pattern_change_docs_intent_remaps_section_to_layout();
 test_pattern_change_replace_nudge_text();

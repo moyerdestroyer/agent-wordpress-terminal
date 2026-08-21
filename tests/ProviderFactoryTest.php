@@ -60,6 +60,18 @@ function test_provider_factory(): void {
         $provider,
         'a selected, valid WordPress connector should select WordPressAIClientProvider',
     );
+    $strict_error = $provider->complete([['role' => 'user', 'content' => 'Use a tool']], [[
+        'type' => 'function',
+        'function' => ['name' => 'demo', 'strict' => true],
+    ]]);
+    Assert::true(is_wp_error($strict_error), 'unverifiable connectors reject strict agentic tool turns');
+    if (is_wp_error($strict_error)) {
+        Assert::same(
+            'awpt_connector_strict_tools_unsupported',
+            $strict_error->get_error_code(),
+            'connector capability failure is explicit',
+        );
+    }
 
     // An invalid/unregistered provider ID falls back to the guaranteed baseline instead
     // of ever failing to produce a usable provider.

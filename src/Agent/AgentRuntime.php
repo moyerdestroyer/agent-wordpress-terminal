@@ -12,6 +12,7 @@ namespace AWPT\Agent;
 
 use AWPT\Database\ImproveWorkflowRepository;
 use AWPT\Database\MessageRepository;
+use AWPT\Database\SessionEventRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Support\ArrayKey;
 use AWPT\Support\ImprovePagePrompt;
@@ -47,12 +48,38 @@ final class AgentRuntime {
             );
         }
 
-        $now = current_time('mysql');
+        $turn_id = sanitize_key((string) ($turn_context['turn_id'] ?? ''));
+        $turn_id = '' !== $turn_id ? $turn_id : sanitize_key((string) wp_generate_uuid4());
+        $turn_context['turn_id'] = $turn_id;
+        $lock = new SessionTurnLock();
+
+        if (!$lock->acquire($session_id, $turn_id)) {
+            return new \WP_Error(
+                'awpt_session_busy',
+                __('This session is already processing another turn.', 'agent-wordpress-terminal'),
+                ['status' => 409],
+            );
+        }
+
+        try {
+            return $this->handle_unlocked($session_id, $message, $turn_context);
+        } finally {
+            $lock->release($session_id);
+        }
+    }
+
+    /** @return array<string, mixed>|\WP_Error */
+    private function handle_unlocked(int $session_id, string $message, array $turn_context): array|\WP_Error {
+        $started_at = current_time('mysql');
 
         // Expand plan/improve slash aliases before storage so TurnProfile sees the
         // evaluate marker (or redesign brief) and the transcript matches the wire message.
         $expanded = ImprovePagePrompt::expand_slash_command($message);
         $wire_message = null !== $expanded ? $expanded['message'] : $message;
+
+        if (ImprovePagePrompt::is_evaluate_message($wire_message)) {
+            $wire_message = ImprovePagePrompt::refresh_evaluate_message($wire_message);
+        }
         $workflow_input = is_array($turn_context['workflow'] ?? null) ? $turn_context['workflow'] : [];
         $workflow_repository = new ImproveWorkflowRepository();
         $workflow = null;
@@ -77,11 +104,23 @@ final class AgentRuntime {
             if (is_wp_error($workflow)) {
                 return $workflow;
             }
-            $wire_message = ImprovePagePrompt::act_message((string) ($workflow['plan'] ?? ''));
+            $unit = ImprovePagePrompt::current_unit($workflow);
+            $plan = (string) ($workflow['plan'] ?? '');
+            $wire_message = null !== $unit
+                ? ImprovePagePrompt::act_message_for_unit($unit, $plan)
+                : ImprovePagePrompt::act_message($plan);
         }
 
         $stored_message = $this->message_with_attachment_summary($wire_message, $turn_context['attachments'] ?? []);
-        $this->messages->store_message($session_id, 'user', $stored_message, $now);
+        $events = new SessionEventRepository();
+        $events->import_legacy_if_needed($session_id);
+        $this->messages->store_message($session_id, 'user', $stored_message, $started_at);
+        $events->append($session_id, [
+            'turn_id' => (string) $turn_context['turn_id'],
+            'ordinal' => 0,
+            'event_type' => 'user',
+            'payload' => ['content' => $stored_message],
+        ]);
 
         $response = $this->dispatch_message($session_id, $wire_message, $turn_context);
 
@@ -104,7 +143,11 @@ final class AgentRuntime {
                     (string) ($outcome['error_code'] ?? 'awpt_improve_evaluate_failed'),
                     (string) ($outcome['message'] ?? __('Page evaluation failed.', 'agent-wordpress-terminal')),
                 )
-                : $workflow_repository->plan_ready($session_id, (string) ($response['content'] ?? ''));
+                : $workflow_repository->plan_ready(
+                    $session_id,
+                    (string) ($response['content'] ?? ''),
+                    ArrayKey::list_of_maps($response['tool_calls'] ?? []),
+                );
         } elseif (ImprovePagePrompt::is_act_message($wire_message)) {
             $action_ids = [];
             foreach (is_array($response['actions'] ?? null) ? $response['actions'] : [] as $action) {
@@ -123,12 +166,28 @@ final class AgentRuntime {
 
         if (is_array($workflow)) {
             $response['improve_workflow'] = $workflow;
+
+            if ('failed' === (string) ($workflow['state'] ?? '')) {
+                $response['turn_outcome'] = [
+                    'status' => 'failed',
+                    'error_code' => sanitize_key((string) ($workflow['error_code'] ?? 'awpt_improve_failed')),
+                    'message' => (string) (
+                        $workflow['error_message'] ?? __('Improve workflow failed.', 'agent-wordpress-terminal')
+                    ),
+                ];
+            }
         }
 
         if ('clear' === ($response['command'] ?? '')) {
             $this->sessions->clear_transcript($session_id);
         } else {
-            $stored = $this->messages->store_message($session_id, 'assistant', (string) $response['content'], $now);
+            $completed_at = current_time('mysql');
+            $stored = $this->messages->store_message(
+                $session_id,
+                'assistant',
+                (string) $response['content'],
+                $completed_at,
+            );
 
             if (!$stored) {
                 return new \WP_Error(
@@ -139,10 +198,18 @@ final class AgentRuntime {
             }
 
             $tool_calls = is_array($response['tool_calls'] ?? null) ? array_values($response['tool_calls']) : [];
-            $this->messages->store_tool_calls($session_id, $tool_calls, $now);
+            $this->messages->store_tool_calls($session_id, $tool_calls, $completed_at);
+            $events->append($session_id, [
+                'turn_id' => (string) $turn_context['turn_id'],
+                'ordinal' => 10_000,
+                'event_type' => 'assistant_final',
+                'payload' => ['content' => (string) $response['content']],
+            ]);
         }
 
-        $session_update = ['updated_at' => $now];
+        // A provider turn may run for minutes. Sort and audit sessions by when
+        // the outcome was actually recorded, not when the user started it.
+        $session_update = ['updated_at' => current_time('mysql')];
         $session_formats = ['%s'];
         $outcome = is_array($response['turn_outcome'] ?? null) ? $response['turn_outcome'] : [];
 

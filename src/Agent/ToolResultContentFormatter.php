@@ -176,11 +176,11 @@ final class ToolResultContentFormatter {
             );
         }
 
-        if (!empty($signals['has_position_sticky'])) {
+        if (true === ($signals['has_position_sticky'] ?? false)) {
             $lines[] = __('Sticky positioning detected on the page.', 'agent-wordpress-terminal');
         }
 
-        if (!empty($output['used_loopback'])) {
+        if (true === ($output['used_loopback'] ?? false)) {
             $lines[] = __(
                 'Fetched via server loopback (public host not reachable from PHP).',
                 'agent-wordpress-terminal',
@@ -194,7 +194,7 @@ final class ToolResultContentFormatter {
     private function format_list_knowledge_sources(array $output): string {
         $count = (int) ($output['source_count'] ?? 0);
         $chunks = (int) ($output['chunk_count'] ?? 0);
-        $stale = !empty($output['stale']);
+        $stale = true === ($output['stale'] ?? false);
         $samples = is_array($output['samples'] ?? null) ? $output['samples'] : [];
         $labels = [];
 

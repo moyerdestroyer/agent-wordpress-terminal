@@ -14,10 +14,10 @@ function test_composition_gate_evaluate_returns_contract_shape(): void {
     awpt_test_reset_state();
 
     $gate = new CompositionGate();
-    $result = $gate->evaluate(
-        '<!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph -->',
-        ['work_type' => 'edit', 'phase' => 'propose'],
-    );
+    $result = $gate->evaluate('<!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph -->', [
+        'work_type' => 'edit',
+        'phase' => 'propose',
+    ]);
 
     Assert::true(is_array($result['findings'] ?? null), 'findings list present');
     Assert::true(is_string($result['content'] ?? null), 'content present');

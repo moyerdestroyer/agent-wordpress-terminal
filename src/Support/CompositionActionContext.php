@@ -58,6 +58,7 @@ final class CompositionActionContext {
             : ($pattern_relevant ? 'custom' : 'not_applicable');
         $fallback_used =
             $pattern_relevant && !in_array($pattern_owner, ['active_theme', 'parent_theme', 'reusable'], true);
+        $system = new DesignSystemContextService()->snapshot('edit');
 
         $payload['composition_context'] = [
             'policy' => 'theme_native_preferred',
@@ -68,6 +69,11 @@ final class CompositionActionContext {
             'pattern_owner' => $pattern_owner,
             'fallback_used' => $fallback_used,
             'fallback_reason' => $fallback_reason,
+            'design_context_hash' => (string) ($system['hash'] ?? ''),
+            'design_catalog_hash' => (string) ($system['catalog_hash'] ?? ''),
+            'pattern_catalog_hash' => (string) ($system['pattern_catalog_hash'] ?? ''),
+            'design_sources' => $system['identity']['sources'] ?? [],
+            'guidance_ids' => $system['sections']['constraints']['guidance_ids'] ?? [],
         ];
 
         $trace = is_array($payload['decision_trace'] ?? null)

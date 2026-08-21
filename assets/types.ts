@@ -141,7 +141,13 @@ export interface ActionPayload {
 	template_area?: string;
 	attrs?: Record<string, unknown>;
 	batch_changes?: Array<{
-		kind: 'update_attrs' | 'replace_text' | 'update_block' | 'remove' | 'insert';
+		kind:
+			| 'update_attrs'
+			| 'replace_text'
+			| 'replace_inner_html'
+			| 'update_block'
+			| 'remove'
+			| 'insert';
 		block_path: string;
 		expected_fingerprint?: string;
 		block_name?: string;
@@ -355,6 +361,8 @@ export interface DomainPackStatus {
 	enabled: boolean;
 	guidance_count: number;
 	pattern_catalog: string;
+	design_catalog?: string;
+	diagnostic_count?: number;
 	schema_version?: number;
 	rules?: string;
 }
@@ -372,12 +380,22 @@ export interface DomainPackHealth {
 		missing_docs?: number;
 		broken_references?: number;
 		sparse_contracts?: number;
+		unbound_slots?: number;
+	};
+	design_coverage?: {
+		catalog_hash: string;
+		token_roles: number;
+		components: number;
+		style_variations: number;
+		archetypes: number;
+		diagnostics: number;
 	};
 	rule_count: number;
 	issues: Array<{
 		severity: 'error' | 'warning' | 'recommendation';
 		code: string;
 		message: string;
+		pointer?: string;
 	}>;
 }
 
@@ -484,12 +502,29 @@ export interface ImproveWorkflow {
 	evaluate_turn_id: string;
 	act_turn_id: string;
 	plan: string;
+	units?: ImproveUnit[];
+	cursor?: number;
 	action_ids: number[];
+	/** Compact top-level paths/headings from evaluate read-block-tree. */
+	tree_snapshot?: {
+		top_level_section_count?: number;
+		sections?: Array<{ path: string; heading?: string; role?: string }>;
+	};
 	error_code: string;
 	error_message: string;
 	created_at: string;
 	updated_at: string;
 	expires_at: number;
+}
+
+export interface ImproveUnit {
+	id: string;
+	title: string;
+	op: 'batch' | 'pattern_replace' | 'pattern_insert' | 'none' | string;
+	paths?: string[];
+	carry_forward?: string[];
+	do_not?: string[];
+	brief?: string;
 }
 
 export interface ImproveWorkflowRequest {

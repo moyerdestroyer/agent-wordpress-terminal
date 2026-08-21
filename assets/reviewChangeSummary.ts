@@ -94,7 +94,9 @@ function summarizeBatchChanges(changes: NonNullable<ActionPayload['batch_changes
 			sprintf(
 				/* translators: 1: change kind, 2: count */
 				__('%1$s × %2$d', 'agent-wordpress-terminal'),
-				titleCase(kind),
+				kind === 'replace_inner_html'
+					? __('Saved HTML replacement', 'agent-wordpress-terminal')
+					: titleCase(kind),
 				count,
 			),
 		);

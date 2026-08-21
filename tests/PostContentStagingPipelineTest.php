@@ -30,10 +30,7 @@ function test_post_content_staging_pipeline_repairs_cover_wrapper_before_validat
         str_contains($normalized['content'], '<section'),
         'pipeline should align the Cover wrapper to the declared tagName',
     );
-    Assert::true(
-        [] !== $normalized['repairs'],
-        'wrapper repair should be reported',
-    );
+    Assert::true([] !== $normalized['repairs'], 'wrapper repair should be reported');
     Assert::same(
         null,
         new PostCompositionValidator()->validate($normalized['content']),
@@ -67,7 +64,7 @@ function test_post_content_staging_pipeline_still_rejects_unresolved_local_media
     $data = is_array($data) ? $data : [];
     Assert::true(
         str_contains((string) ($data['recovery'] ?? ''), 'media_unavailable')
-            || str_contains((string) ($data['recovery'] ?? ''), 'omit'),
+        || str_contains((string) ($data['recovery'] ?? ''), 'omit'),
         'recovery should steer omit or media_unavailable',
     );
 }

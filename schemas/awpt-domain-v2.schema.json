@@ -64,6 +64,14 @@
 				"path": { "type": "string" }
 			}
 		},
+		"design": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["catalog"],
+			"properties": {
+				"catalog": { "type": "string", "minLength": 1 }
+			}
+		},
 		"validators": { "type": "array", "items": { "type": "string" } },
 		"recommenders": { "type": "array", "items": { "type": "string" } },
 		"materializers": { "type": "array", "items": { "type": "string" } },

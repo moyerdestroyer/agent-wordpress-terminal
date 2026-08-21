@@ -33,6 +33,16 @@ final class ExistingContentPreservationValidator {
         return $this->validate($message, $before, $after, $session_id);
     }
 
+    public function validate_required_for_session(int $session_id, string $before, string $after): ?\WP_Error {
+        if ($session_id <= 0 || '' === trim($before)) {
+            return null;
+        }
+
+        $message = new MessageRepository()->latest_user_message($session_id);
+
+        return $this->validate_required($message, $before, $after, $session_id);
+    }
+
     public function validate(string $message, string $before, string $after, int $session_id = 0): ?\WP_Error {
         if (!$this->strict_preservation_enabled($message, $session_id)) {
             return null;
@@ -42,6 +52,23 @@ final class ExistingContentPreservationValidator {
             return null;
         }
 
+        return $this->evaluate_preservation($message, $before, $after, $session_id);
+    }
+
+    public function validate_required(string $message, string $before, string $after, int $session_id = 0): ?\WP_Error {
+        if ($this->explicit_content_reduction($message)) {
+            return null;
+        }
+
+        return $this->evaluate_preservation($message, $before, $after, $session_id);
+    }
+
+    private function evaluate_preservation(
+        string $message,
+        string $before,
+        string $after,
+        int $session_id,
+    ): ?\WP_Error {
         /**
          * Filter the strict preservation policy (only consulted when strict mode is on).
          *
@@ -76,8 +103,8 @@ final class ExistingContentPreservationValidator {
             ? array_values(array_diff($this->numeric_tokens($before_text), $this->numeric_tokens($after_text)))
             : [];
         $missing_short_fragments = $this->missing_short_fragments($before, $after_text);
-        $minimum_recall = max(0.0, min(1.0, (float) ($policy['minimum_token_recall'] ?? 0.9)));
-        $minimum_length = max(0.0, min(1.0, (float) ($policy['minimum_text_length_ratio'] ?? 0.85)));
+        $minimum_recall = max(0.0, min(1.0, ArrayKey::as_float($policy['minimum_token_recall'] ?? null, 0.9)));
+        $minimum_length = max(0.0, min(1.0, ArrayKey::as_float($policy['minimum_text_length_ratio'] ?? null, 0.85)));
 
         if (
             $recall >= $minimum_recall
@@ -92,7 +119,7 @@ final class ExistingContentPreservationValidator {
         return new \WP_Error(
             'awpt_presentation_content_loss',
             __(
-                'Strict content preservation was requested, but the proposal removes or rewrites substantive existing content. Preserve the page copy, links, numbers, and legal references, or drop the strict-preservation requirement.',
+                'The proposal removes or rewrites substantive existing content. Preserve the page copy, links, numbers, and legal references, or explicitly request content reduction.',
                 'agent-wordpress-terminal',
             ),
             [
@@ -128,7 +155,7 @@ final class ExistingContentPreservationValidator {
          * @param int    $session_id
          * @param string $message
          */
-        $forced = (bool) apply_filters('awpt_strict_content_preservation', false, $session_id, $message);
+        $forced = ArrayKey::rest_bool(apply_filters('awpt_strict_content_preservation', false, $session_id, $message));
         if ($forced) {
             return true;
         }
@@ -237,7 +264,8 @@ final class ExistingContentPreservationValidator {
         $links = [];
 
         foreach (array_keys($matches[0] ?? []) as $index) {
-            $url = html_entity_decode($matches[1][$index] ?? '' ?: $matches[2][$index] ?? '');
+            $double_quoted = $matches[1][$index] ?? '';
+            $url = html_entity_decode('' !== $double_quoted ? $double_quoted : $matches[2][$index] ?? '');
 
             if ('' !== $url) {
                 $links[] = $url;
@@ -302,7 +330,8 @@ final class ExistingContentPreservationValidator {
 
     /** @param list<string> $after_tokens */
     private function missing_excerpt(string $before_text, array $after_tokens): string {
-        $sentences = preg_split('/(?<=[.!?])\s+/u', $before_text) ?: [];
+        $split = preg_split('/(?<=[.!?])\s+/u', $before_text);
+        $sentences = false === $split ? [] : $split;
         $after_counts = array_count_values($after_tokens);
 
         foreach ($sentences as $sentence) {

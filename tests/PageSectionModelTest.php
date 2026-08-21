@@ -105,10 +105,8 @@ function test_page_section_model_recommend_operation(): void {
 }
 
 function test_page_section_model_find_by_path(): void {
-    $sections = PageSectionModel::from_content(
-        '<!-- wp:paragraph --><p>A</p><!-- /wp:paragraph -->'
-        . '<!-- wp:paragraph --><p>B</p><!-- /wp:paragraph -->',
-    );
+    $sections = PageSectionModel::from_content('<!-- wp:paragraph --><p>A</p><!-- /wp:paragraph -->'
+    . '<!-- wp:paragraph --><p>B</p><!-- /wp:paragraph -->');
     $found = PageSectionModel::find_by_path($sections, '1');
     Assert::true(is_array($found), 'found section 1');
     Assert::same('1', $found['path'] ?? null, 'path 1');

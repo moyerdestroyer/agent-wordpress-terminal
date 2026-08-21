@@ -243,7 +243,7 @@ if ($two_step) {
         $post_id,
         $turn_id,
         $runtime,
-        $evaluation_context,
+        ['evaluation_context' => $evaluation_context],
     );
     $eval_result = $workflow_run['evaluate'];
     if (is_wp_error($eval_result)) {

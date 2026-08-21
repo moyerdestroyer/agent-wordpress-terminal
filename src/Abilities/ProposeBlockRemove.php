@@ -45,7 +45,7 @@ final class ProposeBlockRemove implements AbilityInterface {
             'name' => 'awpt/propose-block-remove',
             'label' => __('Propose Block Remove', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages removal of a Gutenberg block by path and optional fingerprint from awpt/list-blocks.',
+                'Deprecated. Use awpt/propose-block-batch-update with kind remove.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [

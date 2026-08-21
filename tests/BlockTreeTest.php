@@ -54,6 +54,21 @@ function test_block_tree_paths_and_updates(): void {
     Assert::true(is_wp_error($stale), 'stale block fingerprints should be rejected');
 }
 
+function test_block_tree_marks_leaf_excerpt_clipping(): void {
+    $text = str_repeat('Complete factual paragraph. ', 12);
+    $tree = BlockTree::from_content('<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->');
+    $flat = $tree->flat_list();
+    $normalized = $tree->normalized();
+
+    Assert::same(true, $flat[0]['text_excerpt_truncated'] ?? null, 'flat evidence marks its clipped preview');
+    Assert::same(mb_strlen(trim($text), 'UTF-8'), $flat[0]['text_length'] ?? null, 'flat evidence reports full length');
+    Assert::same(
+        true,
+        $normalized[0]['text_excerpt_truncated'] ?? null,
+        'normalized evidence marks a leaf clipped beyond its larger preview',
+    );
+}
+
 function test_block_tree_insert_and_remove(): void {
     awpt_test_reset_state();
 
@@ -218,7 +233,52 @@ function test_block_tree_nested_insert_updates_wordpress_inner_content_placehold
     }
 }
 
+function test_block_tree_deep_removal_only_updates_direct_parent_placeholder(): void {
+    $paragraph = static fn(string $text): string => '<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->';
+    $nested = '';
+
+    for ($index = 0; $index < 8; ++$index) {
+        $nested .= $paragraph('Nested ' . $index);
+    }
+
+    $content =
+        $paragraph('Bulletin')
+        . '<!-- wp:group --><div class="wp-block-group">'
+        . '<!-- wp:heading --><h2>Duplicate heading</h2><!-- /wp:heading -->'
+        . '<!-- wp:group --><div class="wp-block-group">'
+        . $nested
+        . '</div><!-- /wp:group -->'
+        . '</div><!-- /wp:group -->';
+
+    foreach (['1.1.7', '1.1.6', '1.1.5', '1.0'] as $path) {
+        $removed = BlockTree::from_content($content)->remove_block($path);
+        Assert::false(is_wp_error($removed), 'deep descending removal should keep later paths resolvable: ' . $path);
+
+        if (is_wp_error($removed)) {
+            return;
+        }
+
+        $content = $removed['content'];
+    }
+
+    $tree = BlockTree::from_content($content);
+    Assert::same(
+        'core/group',
+        $tree->get_block('1.0')['blockName'] ?? '',
+        'the nested group survives ancestor serialization',
+    );
+    Assert::same(
+        5,
+        count($tree->get_block('1.0')['innerBlocks'] ?? []),
+        'only the three requested nested children are removed',
+    );
+    Assert::true(str_contains($content, '<p>Nested 0</p>'), 'unrelated nested content survives');
+    Assert::false(str_contains($content, 'Duplicate heading'), 'the requested outer sibling is removed');
+}
+
 test_block_tree_paths_and_updates();
+test_block_tree_marks_leaf_excerpt_clipping();
 test_block_tree_insert_and_remove();
 test_block_tree_insert_composition_in_order();
 test_block_tree_nested_insert_updates_wordpress_inner_content_placeholders();
+test_block_tree_deep_removal_only_updates_direct_parent_placeholder();

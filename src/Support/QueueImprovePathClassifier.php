@@ -51,10 +51,6 @@ final class QueueImprovePathClassifier {
         $materialized_ops = [];
 
         foreach ($actions as $action) {
-            if (!is_array($action)) {
-                continue;
-            }
-
             $payload = is_array($action['payload'] ?? null)
                 ? ArrayKey::as_map($action['payload'])
                 : ArrayKey::string_map($action);

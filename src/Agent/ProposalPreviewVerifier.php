@@ -11,6 +11,8 @@ declare(strict_types=1);
 namespace AWPT\Agent;
 
 use AWPT\Abilities\InspectRenderedElement;
+use AWPT\Support\ArrayKey;
+use AWPT\Support\BlockTree;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -34,7 +36,7 @@ final class ProposalPreviewVerifier {
         /** @var array<string, mixed> $payload */
         $preview_url = (string) ($payload['preview_url'] ?? '');
 
-        if ($action_id <= 0 || '' === $preview_url) {
+        if ($action_id <= 0) {
             return null;
         }
 
@@ -43,39 +45,61 @@ final class ProposalPreviewVerifier {
             'selector' => $this->selector_for_payload($payload),
             'include_screenshot' => true,
         ];
-        $result = new InspectRenderedElement()->execute($input);
-
-        if (is_wp_error($result)) {
-            return [
-                'tool_call' => [
-                    'tool' => 'awpt/inspect-rendered-element',
-                    'input' => $input,
-                    'output' => ['error' => $result->get_error_message()],
-                    'status' => 'failed',
-                    'provider_call_id' => 'awpt_visual_verify_' . wp_generate_password(8, false),
+        $inspection = '' !== $preview_url ? new InspectRenderedElement()->execute($input) : null;
+        $render_error = is_wp_error($inspection) ? $inspection->get_error_message() : '';
+        $rendered = is_array($inspection) && true === ($inspection['rendered'] ?? false);
+        $before = $this->document_metrics((string) ($payload['original_post_content'] ?? ''));
+        $candidate_content = (string) ($payload['post_content'] ?? '');
+        $candidate = $this->document_metrics($candidate_content);
+        $candidate['actionable_findings'] = $this->actionable_findings($candidate_content);
+        $comparison = [
+            'action_id' => $action_id,
+            'candidate_sha256' => hash('sha256', (string) ($payload['post_content'] ?? '')),
+            'before' => $before,
+            'candidate' => $candidate,
+            'semantic_diff' => [
+                'a_prefix_paragraphs' => [
+                    'before' => (int) ($before['a_prefix_paragraphs'] ?? 0),
+                    'candidate' => (int) ($candidate['a_prefix_paragraphs'] ?? 0),
                 ],
-                'message' => [
-                    'role' => 'user',
-                    'content' =>
-                        'The staged preview could not be rendered automatically: '
-                            . $result->get_error_message()
-                            . ' Keep the proposal available for human preview and do not claim visual verification.',
-                ],
-            ];
+                'removed_links' => array_values(array_diff(
+                    ArrayKey::list_of_strings($before['links'] ?? null),
+                    ArrayKey::list_of_strings($candidate['links'] ?? null),
+                )),
+                'added_links' => array_values(array_diff(
+                    ArrayKey::list_of_strings($candidate['links'] ?? null),
+                    ArrayKey::list_of_strings($before['links'] ?? null),
+                )),
+                'removed_numbers' => array_values(array_diff(
+                    ArrayKey::list_of_strings($before['numbers'] ?? null),
+                    ArrayKey::list_of_strings($candidate['numbers'] ?? null),
+                )),
+                'added_numbers' => array_values(array_diff(
+                    ArrayKey::list_of_strings($candidate['numbers'] ?? null),
+                    ArrayKey::list_of_strings($before['numbers'] ?? null),
+                )),
+            ],
+            'rendered' => $rendered,
+            'render_error' => $render_error,
+        ];
+        if (is_array($inspection)) {
+            $comparison['rendered_evidence'] = new ToolResultTruncator()->for_provider(
+                'awpt/inspect-rendered-element',
+                $inspection,
+            );
         }
 
-        $provider_output = new ToolResultTruncator()->for_provider('awpt/inspect-rendered-element', $result);
-        $verification_instruction = true === ($result['rendered'] ?? false)
+        $verification_instruction = $rendered
             ? "Review this rendered evidence against the user's exact request."
-            : 'A headless browser was unavailable, so this is static fallback evidence only. Do not claim that the preview was visually verified. The reported main_heading_outline and main_h1_count are authoritative semantic evidence; revise the proposal if they contradict the requested hierarchy.';
+            : 'A rendered screenshot was unavailable, so do not claim visual verification. The before/candidate metrics and any static heading outline remain authoritative semantic evidence.';
         $text =
-            "Automatic staged-preview inspection result:\n"
-            . (string) wp_json_encode($provider_output)
+            "Automatic internal Improve-candidate review packet:\n"
+            . (string) wp_json_encode($comparison)
             . "\n"
             . $verification_instruction
-            . ' If the evidence is not satisfactory, revise with the most targeted proposal tool. If it is satisfactory, respond without another tool call.';
-        $visual = new RenderedInspectionVisualEvidence()->build($result);
-        $content = is_array($visual['content'] ?? null)
+            . ' Compare it with the approved plan and reviewer request. Check headings, short standalone labels/prefixes, raw HTML, links, numbers, and preserved copy. If it is not satisfactory, revise with the most targeted proposal tool and review the replacement candidate. If it is satisfactory, call awpt/finalize-proposal-review with decision accept. If it cannot be made satisfactory, call that tool with decision abandon. Do not finish with prose alone.';
+        $visual = is_array($inspection) ? new RenderedInspectionVisualEvidence()->build($inspection) : null;
+        $content = is_array($visual) && is_array($visual['content'] ?? null)
             ? [
                 ['type' => 'text', 'text' => $text],
                 ...$visual['content'],
@@ -87,7 +111,7 @@ final class ProposalPreviewVerifier {
             'tool_call' => [
                 'tool' => 'awpt/inspect-rendered-element',
                 'input' => $input,
-                'output' => new ToolResultTruncator()->for_storage('awpt/inspect-rendered-element', $result),
+                'output' => $comparison,
                 'status' => 'success',
                 'provider_call_id' => $provider_call_id,
             ],
@@ -96,6 +120,155 @@ final class ProposalPreviewVerifier {
                 'content' => $content,
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function document_metrics(string $content): array {
+        $plain = trim((string) preg_replace('/\s+/u', ' ', wp_strip_all_tags($content)));
+        $heading_matches = [];
+        $paragraph_matches = [];
+        $link_matches = [];
+        $number_matches = [];
+        preg_match_all('/<h([1-6])\b[^>]*>(.*?)<\/h\1>/is', $content, $heading_matches, PREG_SET_ORDER);
+        preg_match_all('/<p\b[^>]*>(.*?)<\/p>/is', $content, $paragraph_matches, PREG_SET_ORDER);
+        preg_match_all('/\bhref=["\']([^"\']+)["\']/i', $content, $link_matches);
+        preg_match_all('/(?<![\pL\pN])\$?\d[\d,.]*%?/u', $plain, $number_matches);
+        $headings = [];
+        $short_paragraphs = [];
+
+        foreach (array_slice($heading_matches, 0, 80) as $heading) {
+            $headings[] = [
+                'level' => (int) ($heading[1] ?? 0),
+                'text' => trim(wp_strip_all_tags($heading[2] ?? '')),
+            ];
+        }
+
+        foreach ($paragraph_matches as $paragraph) {
+            $text = trim(wp_strip_all_tags($paragraph[1] ?? ''));
+
+            if ('' !== $text && mb_strlen($text) <= 80) {
+                $short_paragraphs[] = $text;
+            }
+        }
+
+        return [
+            'block_count' => count(parse_blocks($content)),
+            'word_count' => '' === $plain ? 0 : str_word_count($plain),
+            'headings' => $headings,
+            'short_paragraphs' => array_slice($short_paragraphs, 0, 80),
+            'a_prefix_paragraphs' => count(array_filter(
+                $short_paragraphs,
+                static fn(string $text): bool => 1 === preg_match('/^A\s*:/i', $text),
+            )),
+            'html_block_count' => substr_count($content, '<!-- wp:html'),
+            'links' => array_values(array_unique(array_slice($link_matches[1] ?? [], 0, 80))),
+            'numbers' => array_values(array_unique(array_map(
+                static fn(string $number): string => rtrim($number, '.,'),
+                array_slice($number_matches[0] ?? [], 0, 80),
+            ))),
+        ];
+    }
+
+    /**
+     * Return exact candidate paths/fingerprints for deterministic checks. The
+     * model remains responsible for deciding whether each finding violates the
+     * request; AWPT merely makes the evidence directly editable.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function actionable_findings(string $content): array {
+        if ('' === trim($content)) {
+            return [];
+        }
+
+        $tree = BlockTree::from_content($content);
+        $findings = [];
+
+        foreach ($tree->flat_list(null, 500) as $summary) {
+            $path = (string) ($summary['path'] ?? '');
+            $name = (string) ($summary['name'] ?? '');
+            $text = trim((string) ($summary['text_excerpt'] ?? ''));
+            $block = $tree->get_block($path);
+
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $fingerprint = (string) ($summary['fingerprint'] ?? BlockTree::fingerprint($block));
+            $attrs = ArrayKey::as_map($block['attrs'] ?? null);
+            $children = ArrayKey::list_of_maps($block['innerBlocks'] ?? null);
+            $base = [
+                'path' => $path,
+                'name' => $name,
+                'fingerprint' => $fingerprint,
+                'text_excerpt' => $text,
+            ];
+
+            if (1 === preg_match('/^A\s*:\s*$/iu', $text)) {
+                $findings[] = ['kind' => 'standalone_answer_prefix', ...$base];
+            } elseif (
+                '' !== $text
+                && mb_strlen($text, 'UTF-8') <= 24
+                && 1 === preg_match('/^[\p{L}\p{N} .&\/-]+:\s*$/u', $text)
+            ) {
+                $findings[] = ['kind' => 'short_standalone_label', ...$base];
+            }
+
+            if ('core/heading' === $name) {
+                $findings[] = [
+                    'kind' => 'heading',
+                    'level' => max(1, min(6, (int) ($attrs['level'] ?? 2))),
+                    ...$base,
+                ];
+            }
+
+            if ('' === $text && in_array($name, ['core/heading', 'core/html', 'core/list', 'core/paragraph'], true)) {
+                $finding = [
+                    'kind' => 'empty_or_textless_block',
+                    'child_count' => count($children),
+                    ...$base,
+                ];
+
+                if ([] !== $children) {
+                    $finding['children'] = $this->child_summaries($tree, $path, count($children));
+                }
+                $findings[] = $finding;
+            }
+
+            if (count($findings) >= 160) {
+                break;
+            }
+        }
+
+        return $findings;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function child_summaries(BlockTree $tree, string $parent_path, int $count): array {
+        $children = [];
+
+        for ($index = 0; $index < min(100, $count); ++$index) {
+            $path = $parent_path . '.' . $index;
+            $block = $tree->get_block($path);
+
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $children[] = [
+                'path' => $path,
+                'name' => (string) ($block['blockName'] ?? ''),
+                'fingerprint' => BlockTree::fingerprint($block),
+                'text_excerpt' => mb_substr(
+                    trim(wp_strip_all_tags((string) ($block['innerHTML'] ?? ''))),
+                    0,
+                    120,
+                    'UTF-8',
+                ),
+            ];
+        }
+
+        return $children;
     }
 
     /** @param array<string, mixed> $payload */

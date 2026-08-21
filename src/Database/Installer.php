@@ -23,7 +23,7 @@ final class Installer {
     /**
      * Current custom database schema version.
      */
-    private const SCHEMA_VERSION = '12';
+    private const SCHEMA_VERSION = '15';
 
     /**
      * Plugin activation hook.
@@ -135,6 +135,23 @@ final class Installer {
 			KEY session_id (session_id)
 		) {$charset_collate};";
 
+        $session_events = "CREATE TABLE {$prefix}session_events (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			session_id bigint(20) unsigned NOT NULL,
+			turn_id varchar(64) NOT NULL DEFAULT '',
+			ordinal int unsigned NOT NULL DEFAULT 0,
+			event_type varchar(40) NOT NULL,
+			call_id varchar(191) NULL,
+			payload_json longtext NOT NULL,
+			token_estimate int unsigned NOT NULL DEFAULT 0,
+			covers_through_event_id bigint(20) unsigned NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY session_id (session_id),
+			KEY session_turn (session_id, turn_id),
+			KEY checkpoint_coverage (session_id, covers_through_event_id)
+		) {$charset_collate};";
+
         $provider_calls = "CREATE TABLE {$prefix}provider_calls (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			session_id bigint(20) unsigned NOT NULL,
@@ -148,6 +165,12 @@ final class Installer {
 			prompt_tokens int unsigned NOT NULL DEFAULT 0,
 			completion_tokens int unsigned NOT NULL DEFAULT 0,
 			total_tokens int unsigned NOT NULL DEFAULT 0,
+			cached_tokens int unsigned NOT NULL DEFAULT 0,
+			cache_write_tokens int unsigned NOT NULL DEFAULT 0,
+			context_tokens_estimate int unsigned NOT NULL DEFAULT 0,
+			checkpoint_event_id bigint(20) unsigned NULL,
+			cache_mode varchar(20) NOT NULL DEFAULT 'native',
+			cache_status varchar(20) NOT NULL DEFAULT 'unreported',
 			duration_ms int unsigned NOT NULL DEFAULT 0,
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
@@ -325,6 +348,7 @@ final class Installer {
         dbDelta($sessions);
         dbDelta($messages);
         dbDelta($tool_calls);
+        dbDelta($session_events);
         dbDelta($provider_calls);
         dbDelta($ai_logs);
         dbDelta($context_items);

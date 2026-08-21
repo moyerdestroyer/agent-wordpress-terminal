@@ -81,12 +81,26 @@ final class ToolResultFormatter {
     }
 
     /**
+     * Improve act unit op:none — plan said no staging.
+     */
+    public function format_no_change_from_plan(): string {
+        return __(
+            'The plan’s unit is op: none. No propose tools were offered and no change was staged.',
+            'agent-wordpress-terminal',
+        );
+    }
+
+    /**
      * Summarize verified evidence without replaying raw tool output when the
      * provider cannot finish the turn.
      *
      * @param array<int, array<string, mixed>> $tool_calls Executed tool calls.
      */
-    public function format_incomplete_turn(array $tool_calls, string $provider_error = ''): string {
+    public function format_incomplete_turn(
+        array $tool_calls,
+        string $provider_error = '',
+        string $provider_error_code = '',
+    ): string {
         $content = null;
         $block_count = null;
         $patterns = [];
@@ -183,10 +197,7 @@ final class ToolResultFormatter {
 
         if (!is_array($staged_action)) {
             $lines[] = '' !== trim($provider_error)
-                ? __(
-                    'The AI provider timed out before it could finish the answer, so no change was staged. Please retry; the completed evidence remains available in the Evidence details.',
-                    'agent-wordpress-terminal',
-                )
+                ? $this->provider_failure_summary($provider_error, $provider_error_code)
                 : __(
                     'This turn ran out of time before a final answer could be completed, so no change was staged. Please retry; the completed evidence remains available in the Evidence details.',
                     'agent-wordpress-terminal',
@@ -202,6 +213,27 @@ final class ToolResultFormatter {
         }
 
         return implode("\n\n", $lines);
+    }
+
+    private function provider_failure_summary(string $error, string $code): string {
+        if (preg_match('/timed? out|cURL error 28/i', $error) === 1) {
+            return __(
+                'The AI provider timed out before it could finish the answer, so no change was staged. Please retry; the completed evidence remains available in the Evidence details.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        if ('awpt_provider_request_failed' === $code || str_contains($error, 'Provider request failed')) {
+            return __(
+                'The AI provider rejected the request before it could finish the answer, so no change was staged. The completed evidence remains available in the Evidence details.',
+                'agent-wordpress-terminal',
+            );
+        }
+
+        return __(
+            'The AI provider could not finish the answer, so no change was staged. The completed evidence remains available in the Evidence details.',
+            'agent-wordpress-terminal',
+        );
     }
 
     /**
@@ -252,21 +284,50 @@ final class ToolResultFormatter {
     private function format_failure(array $tool_call): string {
         $tool = (string) ($tool_call['tool'] ?? '');
         $output = is_array($tool_call['output'] ?? null) ? $tool_call['output'] : [];
+
+        // Provider-shaped failures already promote fix / retry_with.
+        if (false === ($output['ok'] ?? null) && isset($output['error'])) {
+            $lines = [
+                sprintf(
+                    /* translators: 1: tool name, 2: error message */
+                    __('Tool %1$s failed: %2$s', 'agent-wordpress-terminal'),
+                    $tool,
+                    (string) $output['error'],
+                ),
+            ];
+            $fix = trim((string) ($output['fix'] ?? ''));
+
+            if ('' !== $fix) {
+                $lines[] = __('Fix:', 'agent-wordpress-terminal') . ' ' . $fix;
+            }
+
+            return implode("\n", $lines);
+        }
+
         $error = (string) ($output['error'] ?? $tool_call['status'] ?? 'failed');
         $error_data = is_array($output['error_data'] ?? null) ? $output['error_data'] : [];
         $feedback = is_array($error_data['agent_feedback'] ?? null) ? $error_data['agent_feedback'] : [];
         $summary = trim((string) ($feedback['summary'] ?? ''));
+        $recovery = trim((string) ($error_data['recovery'] ?? ''));
 
         if ('' !== $summary) {
             $error .= ' ' . $summary;
         }
 
-        return sprintf(
-            /* translators: 1: tool name, 2: error message */
-            __('Tool %1$s failed: %2$s', 'agent-wordpress-terminal'),
-            $tool,
-            $error,
-        );
+        $lines = [
+            sprintf(
+                /* translators: 1: tool name, 2: error message */
+                __('Tool %1$s failed: %2$s', 'agent-wordpress-terminal'),
+                $tool,
+                $error,
+            ),
+        ];
+
+        if ('' !== $recovery) {
+            $lines[] = __('Fix:', 'agent-wordpress-terminal') . ' ' . $recovery;
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

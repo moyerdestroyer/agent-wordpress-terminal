@@ -165,7 +165,7 @@ final class ContentSearchService {
 
         $search = new \WP_Query($search_args);
 
-        foreach ($search->posts as $post) {
+        foreach ($search->posts ?? [] as $post) {
             if (!$post instanceof \WP_Post) {
                 continue;
             }

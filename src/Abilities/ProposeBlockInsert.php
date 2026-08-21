@@ -47,7 +47,7 @@ final class ProposeBlockInsert implements AbilityInterface {
             'name' => 'awpt/propose-block-insert',
             'label' => __('Propose Block Insert', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages insertion of a Gutenberg block at a path (before, after, or append). Use paths from awpt/list-blocks.',
+                'Deprecated. Use awpt/propose-block-batch-update with kind insert.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [

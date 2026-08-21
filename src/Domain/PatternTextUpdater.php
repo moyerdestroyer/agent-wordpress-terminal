@@ -141,8 +141,11 @@ final class PatternTextUpdater {
 
             $inner_html = is_string($block['innerHTML'] ?? null) ? $block['innerHTML'] : '';
             $match_count = 0;
+            $pattern = 'core/button' === $name
+                ? '/^(\s*<div\b[^>]*>\s*<(a|button)\b[^>]*>).*?(<\/\2>\s*<\/div>\s*)$/is'
+                : '/^(\s*<([a-z][a-z0-9-]*)\b[^>]*>).*?(<\/\2>\s*)$/is';
             $updated = preg_replace_callback(
-                '/^(\s*<([a-z][a-z0-9-]*)\b[^>]*>).*?(<\/\2>\s*)$/is',
+                $pattern,
                 static fn(array $matches): string => $matches[1] . $replacement . $matches[3],
                 $inner_html,
                 1,

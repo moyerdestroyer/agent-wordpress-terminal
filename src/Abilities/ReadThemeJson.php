@@ -38,6 +38,15 @@ final class ReadThemeJson implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    'sections' => [
+                        'type' => 'array',
+                        'items' => ['enum' => ['settings', 'styles', 'customTemplates', 'templateParts']],
+                        'maxItems' => 4,
+                        'description' => __(
+                            'Optional top-level sections to return. Omit for a compact index.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                 ],
             ],
             'output_schema' => ['type' => 'object'],
@@ -101,13 +110,29 @@ final class ReadThemeJson implements AbilityInterface {
             ));
         }
 
-        $summary = [
-            'version' => $decoded['version'] ?? null,
-            'settings' => $decoded['settings'] ?? null,
-            'styles' => $decoded['styles'] ?? null,
-            'customTemplates' => $decoded['customTemplates'] ?? null,
-            'templateParts' => $decoded['templateParts'] ?? null,
-        ];
+        $allowed = ['settings', 'styles', 'customTemplates', 'templateParts'];
+        $sections = is_array($input['sections'] ?? null)
+            ? array_values(array_intersect($allowed, array_map('strval', $input['sections'])))
+            : [];
+        $summary = ['version' => $decoded['version'] ?? null];
+
+        foreach ($sections as $section) {
+            $summary[$section] = $decoded[$section] ?? null;
+        }
+
+        if ([] === $sections) {
+            $summary += [
+                'available_sections' => $allowed,
+                'settings_keys' => is_array($decoded['settings'] ?? null) ? array_keys($decoded['settings']) : [],
+                'styles_keys' => is_array($decoded['styles'] ?? null) ? array_keys($decoded['styles']) : [],
+                'custom_template_count' => count(
+                    is_array($decoded['customTemplates'] ?? null) ? $decoded['customTemplates'] : [],
+                ),
+                'template_part_count' => count(
+                    is_array($decoded['templateParts'] ?? null) ? $decoded['templateParts'] : [],
+                ),
+            ];
+        }
         $encoded = wp_json_encode($summary);
         $truncated = false;
 
@@ -119,7 +144,8 @@ final class ReadThemeJson implements AbilityInterface {
                 'styles_keys' => is_array($decoded['styles'] ?? null) ? array_keys($decoded['styles']) : [],
                 'customTemplates' => $decoded['customTemplates'] ?? null,
                 'templateParts' => $decoded['templateParts'] ?? null,
-                'note' => 'theme.json truncated; ask for specific settings keys if needed.',
+                'available_sections' => $allowed,
+                'note' => 'The requested section exceeds the bounded response. Use awpt/read-design-system for compact design-system data.',
             ];
         }
 

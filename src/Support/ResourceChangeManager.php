@@ -468,7 +468,7 @@ final class ResourceChangeManager {
             (int) $id,
             $terms,
             sanitize_key((string) ($data['taxonomy'] ?? '')),
-            (bool) ($data['append'] ?? false),
+            ArrayKey::rest_bool($data['append'] ?? false),
         );
 
         return is_wp_error($result) ? $result : ['post_id' => (int) $id, 'term_ids' => $result];
@@ -646,7 +646,7 @@ final class ResourceChangeManager {
             ]);
 
             return (
-                $comment_id > 0
+                false !== $comment_id && $comment_id > 0
                     ? ['comment_id' => $comment_id]
                     : new \WP_Error('awpt_comment_create_failed', __(
                         'Comment could not be created.',
@@ -674,7 +674,7 @@ final class ResourceChangeManager {
             $updated = wp_set_comment_status((int) $id, $status, true);
 
             return (
-                $updated
+                true === $updated
                     ? ['comment_id' => (int) $id, 'status' => (string) ($data['status'] ?? '')]
                     : new \WP_Error('awpt_comment_status_failed', __(
                         'Comment status could not be changed.',

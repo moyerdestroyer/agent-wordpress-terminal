@@ -25,7 +25,7 @@ final class ListBlocks implements AbilityInterface {
             'name' => 'awpt/list-blocks',
             'label' => __('List Blocks', 'agent-wordpress-terminal'),
             'description' => __(
-                'Lists Gutenberg blocks for a post as a flat path/name/attrs summary. Optional name filter (e.g. core/image).',
+                'Deprecated for agent reads. Prefer awpt/read-block-tree. Lists Gutenberg blocks as a flat path/name/attrs summary.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [

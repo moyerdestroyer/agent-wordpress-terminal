@@ -76,6 +76,11 @@ final class ProposalConstraintSet {
                 'awpt_heading_level_skipped',
                 'awpt_duplicate_page_heading',
                 'awpt_block_fingerprint_mismatch',
+                'awpt_pattern_text_block_not_editable',
+                'awpt_block_inner_html_not_editable',
+                'awpt_empty_block_attrs',
+                'awpt_unknown_block_attribute',
+                'awpt_multiple_proposals',
                 'awpt_pattern_fallback_reason_required',
                 'ability_invalid_input',
             ],
@@ -93,21 +98,21 @@ final class ProposalConstraintSet {
 
         if ($this->is_empty()) {
             return __(
-                'The staging attempt failed validation. Make one corrected staging attempt now. Read the complete structured error_data, address every listed issue, and use exact identifiers already verified in this turn. Reuse pattern markup already returned in this turn; do not repeat unchanged arguments or ask the user to choose routine creative details you can decide.',
+                'The staging attempt failed validation. Read the failed tool result (fix, retry_with, use, constraints), change only the invalid arguments, and call the same propose tool again. Do not repeat unchanged arguments or restart discovery.',
                 'agent-wordpress-terminal',
             );
         }
 
         if ($this->has('pattern_read_required')) {
             return __(
-                'The proposal named a pattern that has not been read. Do not retry the proposal yet. Call awpt/read-pattern now with the exact name in error_data.recommended_next_tools; perform no unrelated discovery.',
+                'The proposal named a pattern that has not been read. Do not retry the proposal yet. Call awpt/read-pattern now with the exact name in the failed tool result (use / next_tools); perform no unrelated discovery.',
                 'agent-wordpress-terminal',
             );
         }
 
         $lines = [
             __(
-                'The staging attempt failed validation. Open requirements from this turn (address all of them together):',
+                'The staging attempt failed validation. Open requirements from the failed tool result (address all of them together):',
                 'agent-wordpress-terminal',
             ),
         ];

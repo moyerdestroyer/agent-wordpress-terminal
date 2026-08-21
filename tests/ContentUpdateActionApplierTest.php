@@ -233,3 +233,50 @@ function test_content_update_proposal_and_apply_boundaries_reject_noop_payloads(
 }
 
 test_content_update_proposal_and_apply_boundaries_reject_noop_payloads();
+
+function test_pattern_replace_apply_prefers_staged_post_content_over_fingerprint_rebuild(): void {
+    awpt_test_reset_state();
+    $GLOBALS['awpt_test_current_user_can'] = static fn(): bool => true;
+    $post = new WP_Post();
+    $post->ID = 814;
+    $post->post_title = 'Next Generation';
+    $post->post_content =
+        '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->'
+        . '<!-- wp:paragraph --><p>Members</p><!-- /wp:paragraph -->';
+    $GLOBALS['awpt_test_posts'][814] = $post;
+
+    // Whole-document prepares store sha256(post_content) as expected_fingerprint.
+    // Rebuild-at-apply would compare that to section 0 and fail — use staged markup.
+    $doc_hash = hash('sha256', $post->post_content);
+    $staged =
+        '<!-- wp:cover --><div class="wp-block-cover"><p>Documentation layout</p></div><!-- /wp:cover -->'
+        . '<!-- wp:paragraph --><p>Members roster</p><!-- /wp:paragraph -->';
+
+    $result = new ContentUpdateActionApplier()->apply([
+        'operation' => 'pattern_replace',
+        'post_id' => 814,
+        'block_path' => '0',
+        'expected_fingerprint' => $doc_hash,
+        'post_content' => $staged,
+        'original_post_content' => $post->post_content,
+        'blocks' => [[
+            'blockName' => 'core/cover',
+            'attrs' => [],
+            'innerHTML' => '<div class="wp-block-cover"><p>Documentation layout</p></div>',
+            'innerBlocks' => [],
+            'innerContent' => ['<div class="wp-block-cover"><p>Documentation layout</p></div>'],
+        ]],
+    ]);
+
+    Assert::false(is_wp_error($result), 'apply must succeed using staged post_content');
+    Assert::true(
+        str_contains((string) ($GLOBALS['awpt_test_posts'][814]->post_content ?? ''), 'Documentation layout'),
+        'staged documentation markup is written',
+    );
+    Assert::false(
+        str_contains((string) ($GLOBALS['awpt_test_posts'][814]->post_content ?? ''), 'Intro'),
+        'original intro is replaced by staged document',
+    );
+}
+
+test_pattern_replace_apply_prefers_staged_post_content_over_fingerprint_rebuild();

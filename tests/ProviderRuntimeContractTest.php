@@ -8,6 +8,7 @@ use AWPT\Agent\ProviderInterface;
 use AWPT\Agent\ProviderRuntime;
 use AWPT\Agent\ToolRegistry;
 use AWPT\Agent\TurnProfile;
+use AWPT\Support\ImprovePagePrompt;
 
 final class AwptBudgetTestProvider implements ProviderInterface {
     public int $completions = 0;
@@ -215,14 +216,46 @@ function test_provider_runtime_exposes_an_actionable_failed_turn_outcome(): void
     );
 }
 
+function test_provider_runtime_treats_review_finalizer_failure_as_failed_turn(): void {
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'turn_outcome');
+    $failed = $method->invoke(
+        $runtime,
+        [[
+            'tool' => 'awpt/finalize-proposal-review',
+            'status' => 'failed',
+            'output' => [
+                'error_code' => 'ability_invalid_permissions',
+                'error' => 'The review candidate is no longer finalizable.',
+            ],
+        ]],
+        [],
+        '',
+    );
+
+    Assert::same('failed', $failed['status'] ?? '', 'review lifecycle failures must not look like no-change turns');
+    Assert::same(
+        'ability_invalid_permissions',
+        $failed['error_code'] ?? '',
+        'review lifecycle failure keeps its concrete reason',
+    );
+}
+
 test_provider_runtime_keeps_focused_edits_out_of_patterned_post_finalization();
+test_provider_runtime_treats_review_finalizer_failure_as_failed_turn();
 
 function test_provider_runtime_presentation_compose_prefers_pattern_tools_after_recommendations(): void {
     $runtime = new ProviderRuntime();
     $method = new ReflectionMethod(ProviderRuntime::class, 'compose_abilities_for');
     $profile = AWPT\Agent\TurnProfile::from_message('Make this page more presentable.', [], ['has_focus' => true]);
     $pack = [
-        'coverage' => ['page_analysis', 'rendered_inspection', 'pattern_consulted', 'pattern_recommendation', 'pattern_structure'],
+        'coverage' => [
+            'page_analysis',
+            'rendered_inspection',
+            'pattern_consulted',
+            'pattern_recommendation',
+            'pattern_structure',
+        ],
         'content_reads' => [[
             'tool' => 'awpt/read-block-tree',
             'output' => [
@@ -238,7 +271,6 @@ function test_provider_runtime_presentation_compose_prefers_pattern_tools_after_
             'awpt/propose-content-update',
             'awpt/propose-block-batch-update',
             'awpt/propose-pattern-insert',
-            'awpt/propose-block-attrs-update',
         ],
         $pack,
         true,
@@ -246,18 +278,111 @@ function test_provider_runtime_presentation_compose_prefers_pattern_tools_after_
 
     // Pattern-first is advisory: redesign compose keeps the full proposal surface when fingerprints exist.
     Assert::true(in_array('awpt/propose-pattern-insert', $abilities, true), 'pattern insert should stay available');
-    Assert::true(in_array('awpt/propose-content-update', $abilities, true), 'pattern-backed content update should stay available');
+    Assert::true(
+        in_array('awpt/propose-content-update', $abilities, true),
+        'pattern-backed content update should stay available',
+    );
     Assert::true(
         in_array('awpt/propose-block-batch-update', $abilities, true),
         'surgical batch tools remain available without unfit ceremony',
     );
-    Assert::true(
+    Assert::false(
         in_array('awpt/propose-block-attrs-update', $abilities, true),
-        'attrs surgical tools remain available without unfit ceremony',
+        'single-path attr propose is not offered',
     );
 }
 
 test_provider_runtime_presentation_compose_prefers_pattern_tools_after_recommendations();
+
+function test_provider_runtime_widens_narrow_compose_after_repeated_failures(): void {
+    awpt_test_reset_state();
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'widen_compose_after_failures');
+    $act_message = AWPT\Support\ImprovePagePrompt::act_message_for_unit([
+        'id' => 'headings',
+        'title' => 'Fix heading hierarchy',
+        'op' => 'batch',
+        'paths' => ['2.0'],
+    ]);
+    $profile = TurnProfile::from_message($act_message, [], ['has_focus' => true]);
+
+    Assert::same(
+        ['awpt/propose-block-batch-update'],
+        $method->invoke($runtime, ['awpt/propose-block-batch-update'], 1, $profile),
+        'a first rejection keeps the unit-narrowed compose surface',
+    );
+
+    $widened = $method->invoke($runtime, ['awpt/propose-block-batch-update'], 2, $profile);
+    Assert::same(
+        ['awpt/propose-block-batch-update'],
+        $widened,
+        'unclassified failures do not trigger a predetermined pattern fallback',
+    );
+    $widened = $method->invoke(
+        $runtime,
+        ['awpt/propose-block-batch-update'],
+        2,
+        $profile,
+        'awpt_required_page_h1_missing',
+    );
+    Assert::true(
+        in_array('awpt/recommend-patterns', $widened, true),
+        'repeated rejections re-admit pattern recommendation',
+    );
+    Assert::false(
+        in_array('awpt/prepare-pattern-change', $widened, true),
+        'prepare stays off the act recovery hot path; propose auto-prepares',
+    );
+    Assert::true(
+        in_array('awpt/propose-pattern-insert', $widened, true),
+        'the server-materialized pattern fallback stays reachable',
+    );
+    Assert::true(
+        in_array('awpt/propose-block-batch-update', $widened, true),
+        'the narrowed batch tool remains available for a corrected retry',
+    );
+
+    Assert::same(
+        ['awpt/propose-block-batch-update'],
+        $method->invoke($runtime, ['awpt/propose-block-batch-update'], 0, $profile),
+        'healthy compose rounds keep the narrow unit surface',
+    );
+    Assert::same(
+        ['awpt/read-block-tree'],
+        $method->invoke($runtime, ['awpt/read-block-tree'], 3, $profile, 'awpt_required_page_h1_missing'),
+        'surfaces that already contain read tools are left alone',
+    );
+
+    Assert::same(
+        ['awpt/propose-block-batch-update'],
+        $method->invoke(
+            $runtime,
+            ['awpt/propose-block-batch-update'],
+            3,
+            $profile,
+            'awpt_provider_transport_json_invalid',
+        ),
+        'transport failures stay on the authoritative batch unit',
+    );
+}
+
+test_provider_runtime_widens_narrow_compose_after_repeated_failures();
+
+function test_provider_runtime_does_not_retry_deterministic_provider_rejections(): void {
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'is_retryable_finalization_error');
+    $schema_rejection = new WP_Error(
+        'awpt_provider_request_failed',
+        'Provider request failed (400): Tool schema is invalid.',
+        ['status' => 400],
+    );
+    $timeout = new WP_Error('http_request_failed', 'cURL error 28: Operation timed out.');
+
+    Assert::false($method->invoke($runtime, $schema_rejection), 'deterministic HTTP 400 is not replayed');
+    Assert::true($method->invoke($runtime, $timeout), 'transient transport timeout remains retryable');
+}
+
+test_provider_runtime_does_not_retry_deterministic_provider_rejections();
 
 function test_provider_runtime_narrows_compose_tools_without_fingerprints(): void {
     $runtime = new ProviderRuntime();
@@ -543,7 +668,12 @@ final class AwptComposeRecoveryStallProvider implements ProviderInterface {
             in_array('awpt__propose_block_batch_update', $names, true)
             || in_array('wpab__awpt__propose-block-batch-update', $names, true)
             || in_array('awpt/propose-block-batch-update', $names, true)
-            || [] !== array_filter($names, static fn(string $n): bool => str_contains($n, 'propose_block_batch') || str_contains($n, 'propose-block-batch')),
+            || [] !== array_filter(
+                $names,
+                static fn(string $n): bool => (
+                    str_contains($n, 'propose_block_batch') || str_contains($n, 'propose-block-batch')
+                ),
+            ),
             'stall nudge after compose recovery must keep proposal tools offered; got: ' . implode(',', $names),
         );
 
@@ -669,11 +799,11 @@ function test_provider_runtime_keeps_compose_tools_after_recovery_stall(): void 
     Assert::same(2, $provider->completions, 'stall prose then corrected proposal');
     Assert::same(1, count($result['actions']), 'corrected batch proposal should stage after stall nudge');
     $stall_tools = $provider->offered_by_completion[1] ?? [];
-    $has_propose = [] !== array_filter(
-        $stall_tools,
-        static fn(string $n): bool => str_contains($n, 'propose'),
+    $has_propose = [] !== array_filter($stall_tools, static fn(string $n): bool => str_contains($n, 'propose'));
+    Assert::true(
+        $has_propose,
+        'second completion after stall must offer propose tools, got: ' . implode(',', $stall_tools),
     );
-    Assert::true($has_propose, 'second completion after stall must offer propose tools, got: ' . implode(',', $stall_tools));
 }
 
 test_provider_runtime_keeps_compose_tools_after_recovery_stall();
@@ -1055,8 +1185,11 @@ function test_provider_runtime_retries_timed_out_finalization_once_with_compact_
 final class AwptCompositionRecoveryProvider implements ProviderInterface {
     public int $completions = 0;
 
+    /** @var list<array<int, array<string, mixed>>> */
+    public array $messageSets = [];
+
     public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
-        unset($messages);
+        $this->messageSets[] = $messages;
         ++$this->completions;
 
         Assert::same(
@@ -1151,6 +1284,17 @@ function test_provider_runtime_keeps_proposal_tool_after_validation_failure(): v
 
     Assert::same(3, $provider->completions, 'two bounded validation corrections should receive real proposal retries');
     Assert::same(1, count($result['actions']), 'the final corrected proposal should stage successfully');
+    // The first provider completion is still exploration; compose begins on
+    // the second and subsequent requests.
+    $compose_prefix = array_slice($provider->messageSets[1] ?? [], 0, 3);
+
+    foreach (array_slice($provider->messageSets, 2) as $message_set) {
+        Assert::same(
+            $compose_prefix,
+            array_slice($message_set, 0, 3),
+            'proposal recovery must append feedback without rewriting the compose checkpoint prefix',
+        );
+    }
 }
 
 final class AwptPatternReadRecoveryProvider implements ProviderInterface {
@@ -1556,9 +1700,7 @@ function test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone(): v
 
 test_provider_runtime_skips_doomed_follow_up_when_wall_nearly_gone();
 
-/**
- * Evaluate-only turns that thrash read tools until hop budget must still end with a plan.
- */
+/** Evaluate-only turns must finish through the internal strict plan contract. */
 final class AwptEvaluateThrashProvider implements ProviderInterface {
     public int $completions = 0;
 
@@ -1570,18 +1712,41 @@ final class AwptEvaluateThrashProvider implements ProviderInterface {
         ++$this->completions;
         $this->toolCounts[] = count($tools);
 
-        // Forced finalization passes tools=[] / tool_choice none.
-        if ([] === $tools) {
+        $selected_name = (string) ($tools[0]['function']['name'] ?? '');
+
+        if ('awpt_internal_submit_improve_plan' === $selected_name) {
+            $calls = [[
+                'id' => 'eval-plan-' . $this->completions,
+                'function' => [
+                    'name' => $selected_name,
+                    'arguments' => wp_json_encode([
+                        'plan' => "## Plan\n\nPreserve the FAQ copy and correct its heading hierarchy.",
+                        'units' => [[
+                            'id' => 'faq-outline',
+                            'title' => 'Correct FAQ outline',
+                            'op' => 'batch',
+                            'paths' => ['0.0'],
+                            'expected_fingerprint' => '',
+                            'pattern_name' => '',
+                            'carry_forward' => ['Preserve answer copy'],
+                            'do_not' => ['Invent facts'],
+                            'brief' => 'Promote the FAQ headings without changing the answers.',
+                        ]],
+                    ], JSON_UNESCAPED_SLASHES),
+                ],
+            ]];
+
             return [
-                'content' => "## Plan\n\n- Keep header path 0\n- Fix FAQ headings with batch/attrs on paths 0.0–8.0\n- No prepare-pattern-change needed\n",
-                'raw_tool_calls' => [],
+                'content' => '',
+                'raw_tool_calls' => $calls,
                 'message' => [
                     'role' => 'assistant',
-                    'content' => "## Plan\n\n- Keep header path 0\n- Fix FAQ headings with batch/attrs on paths 0.0–8.0\n- No prepare-pattern-change needed\n",
+                    'content' => '',
+                    'tool_calls' => $calls,
                 ],
                 'model' => 'fake-eval',
                 'usage' => [],
-                'finish_reason' => 'stop',
+                'finish_reason' => 'tool_calls',
             ];
         }
 
@@ -1617,7 +1782,7 @@ final class AwptEvaluateThrashProvider implements ProviderInterface {
     }
 }
 
-function test_provider_runtime_forces_plan_after_evaluate_tool_thrash(): void {
+function test_provider_runtime_submits_strict_plan_after_evaluate_evidence(): void {
     awpt_test_reset_state();
 
     $registry = new ToolRegistry();
@@ -1689,22 +1854,291 @@ function test_provider_runtime_forces_plan_after_evaluate_tool_thrash(): void {
         ],
     );
 
-    Assert::true(
-        str_contains($result['content'], '## Plan') || str_contains($result['content'], 'batch/attrs'),
-        'forced finalization must yield a plan, not thrash prose: ' . $result['content'],
-    );
+    Assert::false(str_contains($result['content'], '[awpt:plan_failed]'), 'strict plan submission should succeed');
+    Assert::same(1, count(\AWPT\Support\ImprovePagePrompt::units_from_plan($result['content'])), 'one unit');
     Assert::false(
         str_starts_with(trim($result['content']), 'Let me get the full block tree'),
         'must not leave intermediate thrash as the final answer',
     );
-    Assert::true(
-        in_array(0, $provider->toolCounts, true),
-        'must issue at least one tools-off finalization complete',
+    Assert::same(
+        4,
+        $provider->completions,
+        'repeated incomplete reads may use the bounded non-development harness before structured finalization',
     );
-    Assert::true(
-        count($result['tool_calls']) >= 1,
-        'read evidence from thrash hops should be retained',
+    Assert::true(count($result['tool_calls']) >= 1, 'read evidence from thrash hops should be retained');
+}
+
+test_provider_runtime_submits_strict_plan_after_evaluate_evidence();
+
+/** Evaluate must be allowed to obtain pattern evidence after its required tree read. */
+final class AwptEvaluatePatternEvidenceProvider implements ProviderInterface {
+    public int $completions = 0;
+
+    public bool $sawConstrainedPatternName = false;
+
+    public function complete(array $messages, array $tools = [], array $options = []): array|WP_Error {
+        unset($messages, $options);
+        ++$this->completions;
+        $tool_names = array_map(static fn(array $tool): string => (string) ($tool['function']['name'] ?? ''), $tools);
+
+        if (1 === $this->completions) {
+            Assert::true(
+                in_array('awpt__recommend_patterns', $tool_names, true),
+                'recommend-patterns remains available after the block-tree read',
+            );
+            $calls = [[
+                'id' => 'recommend-after-tree',
+                'function' => [
+                    'name' => 'awpt__recommend_patterns',
+                    'arguments' => '{"intent":"Restructure the advocacy page with a clear call to action"}',
+                ],
+            ]];
+
+            return [
+                'content' => '',
+                'raw_tool_calls' => $calls,
+                'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+                'model' => 'fake-eval-pattern',
+                'usage' => [],
+                'finish_reason' => 'tool_calls',
+            ];
+        }
+
+        if (2 === $this->completions) {
+            return [
+                'content' => 'Evidence is ready; I can now write the plan.',
+                'raw_tool_calls' => [],
+                'message' => ['role' => 'assistant', 'content' => 'Evidence is ready; I can now write the plan.'],
+                'model' => 'fake-eval-pattern',
+                'usage' => [],
+                'finish_reason' => 'stop',
+            ];
+        }
+
+        $pattern_enum = $tools[0]['function']['parameters']['properties']['units']['items']['properties']['pattern_name']['enum']
+        ?? [];
+        $this->sawConstrainedPatternName = ['', 'civicpress/layout-page'] === $pattern_enum;
+        $calls = [[
+            'id' => 'submit-evidenced-plan',
+            'function' => [
+                'name' => 'awpt_internal_submit_improve_plan',
+                'arguments' => wp_json_encode([
+                    'plan' => '## Plan\n\nUse the recommended layout and preserve the existing advocacy copy.',
+                    'units' => [[
+                        'id' => 'layout',
+                        'title' => 'Restructure the page',
+                        'op' => 'pattern_replace',
+                        'paths' => ['document'],
+                        'expected_fingerprint' => '',
+                        'pattern_name' => 'civicpress/layout-page',
+                        'carry_forward' => ['Existing copy and links'],
+                        'do_not' => ['Invent facts'],
+                        'brief' => 'Map all existing copy into the recommended page layout.',
+                    ]],
+                ]),
+            ],
+        ]];
+
+        return [
+            'content' => '',
+            'raw_tool_calls' => $calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls],
+            'model' => 'fake-eval-pattern',
+            'usage' => [],
+            'finish_reason' => 'tool_calls',
+        ];
+    }
+
+    public function get_name(): string {
+        return 'Evaluate pattern evidence test';
+    }
+
+    public function accepts_image_input(): bool {
+        return false;
+    }
+}
+
+function test_provider_runtime_keeps_evaluate_discovery_open_for_pattern_evidence(): void {
+    awpt_test_reset_state();
+    add_filter('awpt_mcp_tools', static fn(): array => [
+        [
+            'name' => 'awpt/read-block-tree',
+            'description' => 'Read block tree.',
+            'readonly' => true,
+            'destructive' => false,
+            'annotations' => ['readonly' => true, 'destructive' => false],
+        ],
+        [
+            'name' => 'awpt/recommend-patterns',
+            'description' => 'Recommend patterns.',
+            'readonly' => true,
+            'destructive' => false,
+            'annotations' => ['readonly' => true, 'destructive' => false],
+        ],
+    ]);
+    add_filter(
+        'awpt_mcp_execute_tool',
+        static function ($result, $name) {
+            unset($result);
+
+            if ('awpt/read-block-tree' === $name) {
+                return [
+                    'id' => 826,
+                    'count' => 1,
+                    'blocks' => [['path' => '0', 'name' => 'core/paragraph']],
+                    'top_level_sections' => [['path' => '0', 'role' => 'body', 'heading' => 'Advocacy']],
+                    'truncated' => false,
+                ];
+            }
+
+            return [
+                'recommendations' => [[
+                    'pattern' => [
+                        'name' => 'civicpress/layout-page',
+                        'title' => 'Page Layout',
+                    ],
+                    'score' => 9,
+                ]],
+            ];
+        },
+        10,
+        2,
+    );
+
+    $provider = new AwptEvaluatePatternEvidenceProvider();
+    $message = AWPT\Support\ImprovePagePrompt::evaluate_text();
+    $profile = TurnProfile::from_message($message, [], ['has_focus' => true]);
+    $initial_calls = [[
+        'id' => 'initial-tree',
+        'function' => ['name' => 'awpt__read_block_tree', 'arguments' => '{"id":826}'],
+    ]];
+    $result = new ProviderRuntime()->run_tool_loop(
+        1,
+        $provider,
+        [['role' => 'user', 'content' => $message]],
+        [
+            'content' => '',
+            'raw_tool_calls' => $initial_calls,
+            'message' => ['role' => 'assistant', 'content' => '', 'tool_calls' => $initial_calls],
+            'model' => 'fake-eval-pattern',
+            'usage' => [],
+            'finish_reason' => 'tool_calls',
+        ],
+        [
+            'tool_registry' => new ToolRegistry(),
+            'turn_profile' => $profile,
+            'turn_started_at' => microtime(true),
+            'turn_wall_seconds' => 150,
+            'turn_id' => 'eval-pattern-evidence',
+        ],
+    );
+
+    Assert::same(3, $provider->completions, 'tree, recommendation, and structured plan all get their own hop');
+    Assert::true($provider->sawConstrainedPatternName, 'final plan schema receives exact recommendation names');
+    Assert::same(
+        'civicpress/layout-page',
+        AWPT\Support\ImprovePagePrompt::units_from_plan($result['content'])[0]['pattern_name'] ?? '',
+        'the evidenced exact pattern name survives canonical plan storage',
     );
 }
 
-test_provider_runtime_forces_plan_after_evaluate_tool_thrash();
+test_provider_runtime_keeps_evaluate_discovery_open_for_pattern_evidence();
+
+function test_provider_runtime_improve_plan_contract_canonicalizes_machine_output(): void {
+    $runtime = new ProviderRuntime();
+    $tool_method = new ReflectionMethod(ProviderRuntime::class, 'improve_plan_submission_tool');
+    $tool = $tool_method->invoke($runtime);
+    $function = $tool['function'] ?? [];
+    $parameters = $function['parameters'] ?? [];
+    $unit = $parameters['properties']['units']['items'] ?? [];
+
+    Assert::same(true, $function['strict'] ?? null, 'internal plan submission uses strict mode');
+    Assert::same(false, $parameters['additionalProperties'] ?? null, 'root rejects unknown fields');
+    Assert::same(false, $unit['additionalProperties'] ?? null, 'unit rejects unknown fields');
+    Assert::same(array_keys($unit['properties'] ?? []), $unit['required'] ?? [], 'every strict unit field is required');
+    Assert::same(
+        ['batch', 'none'],
+        $unit['properties']['op']['enum'] ?? [],
+        'pattern operations are unavailable without recommendation evidence',
+    );
+    Assert::same(
+        [''],
+        $unit['properties']['pattern_name']['enum'] ?? [],
+        'an unevidenced pattern name cannot satisfy the call-level contract',
+    );
+
+    $evidenced_tool = $tool_method->invoke($runtime, ['civicpress/layout-page']);
+    $evidenced_unit = $evidenced_tool['function']['parameters']['properties']['units']['items'] ?? [];
+    Assert::true(
+        in_array('pattern_replace', $evidenced_unit['properties']['op']['enum'] ?? [], true),
+        'recommendation evidence enables pattern operations',
+    );
+    Assert::same(
+        ['', 'civicpress/layout-page'],
+        $evidenced_unit['properties']['pattern_name']['enum'] ?? [],
+        'pattern_name is constrained to exact recommendation evidence',
+    );
+
+    $result_method = new ReflectionMethod(ProviderRuntime::class, 'improve_plan_from_submission');
+    $plan = $result_method->invoke($runtime, [
+        'raw_tool_calls' => [[
+            'function' => [
+                'name' => 'awpt_internal_submit_improve_plan',
+                'arguments' => wp_json_encode([
+                    'plan' => "## Plan\n\nKeep the useful copy.",
+                    'units' => [[
+                        'id' => 'copy',
+                        'title' => 'Polish copy',
+                        'op' => 'batch',
+                        'paths' => ['0'],
+                        'expected_fingerprint' => '',
+                        'pattern_name' => '',
+                        'carry_forward' => [],
+                        'do_not' => [],
+                        'brief' => 'Tighten the introduction.',
+                    ]],
+                ]),
+            ],
+        ]],
+    ]);
+
+    Assert::true(str_contains($plan, '```awpt-units'), 'AWPT renders the canonical fence itself');
+    Assert::same(1, count(ImprovePagePrompt::units_from_plan($plan)), 'canonical result is executable');
+
+    $outcome_method = new ReflectionMethod(ProviderRuntime::class, 'turn_outcome');
+    $outcome = $outcome_method->invoke(
+        $runtime,
+        [],
+        [],
+        '[awpt:plan_failed] The provider did not submit an executable plan.',
+    );
+    Assert::same('failed', $outcome['status'] ?? null, 'plan-contract failure is not mislabeled no_change');
+    Assert::same(
+        'awpt_improve_plan_missing',
+        $outcome['error_code'] ?? null,
+        'plan-contract failure keeps a stable error code',
+    );
+}
+
+test_provider_runtime_improve_plan_contract_canonicalizes_machine_output();
+
+function test_provider_runtime_detects_reasoning_only_pseudo_tool_output(): void {
+    $runtime = new ProviderRuntime();
+    $method = new ReflectionMethod(ProviderRuntime::class, 'has_no_native_tool_call');
+    $reasoning_only = [
+        'content' => '',
+        'raw_tool_calls' => [],
+        'message' => [
+            'role' => 'assistant',
+            'content' => null,
+            'reasoning' => '<DSML>tool_calls read-block-tree</DSML>',
+        ],
+    ];
+
+    Assert::true(
+        $method->invoke($runtime, $reasoning_only),
+        'reasoning pseudo markup is not treated as a native provider tool call',
+    );
+}
+
+test_provider_runtime_detects_reasoning_only_pseudo_tool_output();

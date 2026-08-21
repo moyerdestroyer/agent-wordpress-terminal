@@ -42,10 +42,13 @@ final class RemediationHintBuilder {
      * @return list<array<string, mixed>>
      */
     public function build(array $context): array {
-        $hints = array_values(array_filter(
-            $this->rules->candidates($context),
-            static fn(?array $hint): bool => null !== $hint,
-        ));
+        $hints = array_map(
+            \AWPT\Support\ArrayKey::string_map(...),
+            array_values(array_filter(
+                $this->rules->candidates($context),
+                static fn(?array $hint): bool => null !== $hint,
+            )),
+        );
 
         return $this->order_hints($hints);
     }

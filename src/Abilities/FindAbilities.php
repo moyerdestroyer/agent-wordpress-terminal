@@ -59,7 +59,7 @@ final class FindAbilities implements AbilityInterface {
         $query = mb_strtolower(trim((string) ($input['query'] ?? '')));
         $namespace = trim((string) ($input['namespace'] ?? ''));
         $category = trim((string) ($input['category'] ?? ''));
-        $readonly = array_key_exists('readonly', $input) ? (bool) $input['readonly'] : null;
+        $readonly = array_key_exists('readonly', $input) ? \AWPT\Support\ArrayKey::rest_bool($input['readonly']) : null;
         $limit = min(20, max(1, (int) ($input['limit'] ?? 8)));
         $registry = new ToolRegistry();
         $matches = [];

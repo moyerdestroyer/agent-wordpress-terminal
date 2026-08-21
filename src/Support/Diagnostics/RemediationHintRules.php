@@ -29,11 +29,10 @@ final class RemediationHintRules {
 
     /**
      * @param array<string, mixed> $context
-     * @return list<?array<string, mixed>>
+     * @return list<?array<array-key, mixed>>
      */
     public function candidates(array $context): array {
-        /** @var list<?array<string, mixed>> $candidates */
-        $candidates = [
+        return [
             $this->basic->probe_url($context),
             $this->basic->check_site_health($context),
             $this->basic->fix_content($context),
@@ -42,8 +41,6 @@ final class RemediationHintRules {
             $this->basic->switch_theme($context),
             $this->deactivate_plugin($context),
         ];
-
-        return $candidates;
     }
 
     private function deactivate_plugin(array $context): ?array {

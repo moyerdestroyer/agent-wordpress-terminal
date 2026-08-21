@@ -42,14 +42,15 @@ final class PatternPreparationReceipt {
      *   pattern_content?: string,
      *   position?: string,
      *   post_type?: string,
-     *   carry_forward?: array<string, mixed>
+     *   carry_forward?: array<string, mixed>,
+     *   replace_entire_document?: bool
      * } $data
      * @return array{preparation_id: string, expires_at: int, receipt: array<string, mixed>}
      */
     public function mint(array $data): array {
         $mode = sanitize_key($data['mode']);
-        $pattern_names = array_values(array_filter(array_map(static fn(mixed $name): string => sanitize_text_field(
-            is_scalar($name) ? $name : '',
+        $pattern_names = array_values(array_filter(array_map(static fn(string $name): string => sanitize_text_field(
+            $name,
         ), $data['pattern_names'])));
         $position = sanitize_key($data['position'] ?? '');
 
@@ -79,6 +80,7 @@ final class PatternPreparationReceipt {
             'position' => $position,
             'post_type' => sanitize_key($data['post_type'] ?? ''),
             'carry_forward' => is_array($data['carry_forward'] ?? null) ? $data['carry_forward'] : [],
+            'replace_entire_document' => true === ($data['replace_entire_document'] ?? false),
             'created_at' => time(),
             'expires_at' => $expires_at,
             'signature' => '',

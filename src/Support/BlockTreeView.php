@@ -57,13 +57,121 @@ final class BlockTreeView {
     }
 
     /**
+     * Return the normalized node at a dotted path, including its children.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @return array<string, mixed>|null
+     */
+    public function subtree_at_path(array $blocks, string $path): ?array {
+        $path = trim($path);
+
+        if ('' === $path) {
+            return null;
+        }
+
+        foreach ($blocks as $block) {
+            $block_path = (string) ($block['path'] ?? '');
+
+            if ($block_path === $path) {
+                return $block;
+            }
+
+            if ('' !== $block_path && str_starts_with($path, $block_path . '.')) {
+                $found = $this->subtree_at_path(ArrayKey::list_of_maps($block['inner'] ?? null), $path);
+
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $blocks
+     * @param list<string>                     $paths
+     * @return list<array<string, mixed>>
+     */
+    public function subtrees_at_paths(array $blocks, array $paths): array {
+        $out = [];
+
+        foreach ($paths as $path) {
+            $path = trim($path);
+
+            if ('' === $path) {
+                continue;
+            }
+
+            $found = $this->subtree_at_path($blocks, $path);
+
+            if (null !== $found) {
+                $out[] = $found;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Pack complete top-level sections until the encoded budget is reached.
+     * Never strips children from a section that is included.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @return array{blocks: list<array<string, mixed>>, remaining_paths: list<string>}
+     */
+    public function complete_sections_within_budget(array $blocks, int $max_encoded_bytes): array {
+        $max_encoded_bytes = max(2_000, $max_encoded_bytes);
+        $included = [];
+        $remaining = [];
+        $taking = true;
+
+        foreach (array_values($blocks) as $block) {
+            $path = trim((string) ($block['path'] ?? ''));
+
+            if (!$taking) {
+                if ('' !== $path) {
+                    $remaining[] = $path;
+                }
+
+                continue;
+            }
+
+            $candidate = [...$included, $block];
+            $encoded = wp_json_encode($candidate);
+            $size = is_string($encoded) ? strlen($encoded) : $max_encoded_bytes + 1;
+
+            if ($size > $max_encoded_bytes && [] !== $included) {
+                $taking = false;
+
+                if ('' !== $path) {
+                    $remaining[] = $path;
+                }
+
+                continue;
+            }
+
+            $included[] = $block;
+        }
+
+        return [
+            'blocks' => $included,
+            'remaining_paths' => $remaining,
+        ];
+    }
+
+    /**
      * Compact a normalized block tree for compose evidence while retaining
      * every path + fingerprint needed for batch updates.
      *
      * @param array<int, array<string, mixed>> $blocks
      * @return array{blocks: list<array<string, mixed>>, count: int, truncated_excerpts?: bool, flat_index?: bool}
      */
-    public function compact_for_evidence(array $blocks, int $max_encoded_bytes = 12_000): array {
+    public function compact_for_evidence(
+        array $blocks,
+        int $max_encoded_bytes = 12_000,
+        bool $allow_flat_index = true,
+    ): array {
         $max_encoded_bytes = max(2_000, $max_encoded_bytes);
         $excerpt_limit = 120;
         $truncated_excerpts = false;
@@ -85,8 +193,17 @@ final class BlockTreeView {
             $truncated_excerpts = true;
         }
 
-        // Last resort: fingerprint-complete flat index (paths encode hierarchy).
-        // Drop excerpts/attrs so path+name+fingerprint fit denser pages.
+        if (!$allow_flat_index) {
+            $compacted = $this->compact_nodes($blocks, 0, true);
+
+            return [
+                'blocks' => $compacted,
+                'count' => $this->count_normalized($compacted),
+                'truncated_excerpts' => true,
+            ];
+        }
+
+        // Last resort for non-page evidence: fingerprint-complete flat index.
         $flat = $this->flat_from_normalized($blocks, 500, true);
 
         return [
@@ -127,6 +244,10 @@ final class BlockTreeView {
 
             if ('' !== $excerpt && $excerpt_limit > 0) {
                 $node['text_excerpt'] = mb_substr($excerpt, 0, $excerpt_limit, 'UTF-8');
+                $text_length = max(mb_strlen($excerpt, 'UTF-8'), (int) ($block['text_length'] ?? 0));
+                $node['text_length'] = $text_length;
+                $node['text_excerpt_truncated'] =
+                    true === ($block['text_excerpt_truncated'] ?? false) || $text_length > $excerpt_limit;
             }
 
             $inner = ArrayKey::list_of_maps($block['inner'] ?? null);
@@ -194,6 +315,10 @@ final class BlockTreeView {
 
                 if ('' !== $excerpt) {
                     $entry['text_excerpt'] = mb_substr($excerpt, 0, 40, 'UTF-8');
+                    $text_length = max(mb_strlen($excerpt, 'UTF-8'), (int) ($block['text_length'] ?? 0));
+                    $entry['text_length'] = $text_length;
+                    $entry['text_excerpt_truncated'] =
+                        true === ($block['text_excerpt_truncated'] ?? false) || $text_length > 40;
                 }
             }
 
@@ -244,13 +369,17 @@ final class BlockTreeView {
     private function format_block(array $block, string $path): array {
         $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
         $inner_html = is_string($block['innerHTML'] ?? null) ? $block['innerHTML'] : '';
+        $text = trim(wp_strip_all_tags($inner_html));
+        $text_length = mb_strlen($text, 'UTF-8');
 
         return [
             'path' => $path,
             'name' => $block['blockName'],
             'attributes' => $attrs,
             'attributes_summary' => $this->summarize_attrs($attrs, true),
-            'text_excerpt' => mb_substr(trim(wp_strip_all_tags($inner_html)), 0, 240, 'UTF-8'),
+            'text_excerpt' => mb_substr($text, 0, 240, 'UTF-8'),
+            'text_length' => $text_length,
+            'text_excerpt_truncated' => $text_length > 240,
             'fingerprint' => self::fingerprint($block),
             'inner' => $this->normalize_blocks($this->inner_blocks($block), $path),
         ];
@@ -285,11 +414,15 @@ final class BlockTreeView {
             if (null === $name_filter || '' === $name_filter || $name === $name_filter) {
                 $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
                 $inner_html = is_string($block['innerHTML'] ?? null) ? $block['innerHTML'] : '';
+                $text = trim(wp_strip_all_tags($inner_html));
+                $text_length = mb_strlen($text, 'UTF-8');
                 $items[] = [
                     'path' => $path,
                     'name' => $name,
                     'attributes_summary' => $this->summarize_attrs($attrs, false),
-                    'text_excerpt' => mb_substr(trim(wp_strip_all_tags($inner_html)), 0, 120, 'UTF-8'),
+                    'text_excerpt' => mb_substr($text, 0, 120, 'UTF-8'),
+                    'text_length' => $text_length,
+                    'text_excerpt_truncated' => $text_length > 120,
                     'fingerprint' => self::fingerprint($block),
                 ];
             }

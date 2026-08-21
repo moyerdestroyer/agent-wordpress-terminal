@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace AWPT\Agent;
 
+use AWPT\Support\ArrayKey;
+
 if (!defined('ABSPATH')) {
     exit();
 }
@@ -86,5 +88,30 @@ final class OpenRouterProvider extends ChatCompletionsProvider {
             'HTTP-Referer' => home_url('/'),
             'X-Title' => get_bloginfo('name'),
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    protected function decorate_request_payload(array $payload, array $options): array {
+        if (is_array($payload['messages'] ?? null)) {
+            $payload['messages'] = ProviderCacheAffinity::without_internal_boundary(ArrayKey::list_of_maps(
+                $payload['messages'],
+            ));
+        }
+        $applied = ProviderCacheAffinity::apply_openrouter($payload, [], ProviderCacheAffinity::key($options));
+
+        return $applied['payload'];
+    }
+
+    /**
+     * @param array<string, string> $headers
+     * @param array<string, mixed>  $options
+     * @return array<string, string>
+     */
+    protected function decorate_request_headers(array $headers, array $options): array {
+        return $headers;
     }
 }

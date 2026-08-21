@@ -46,7 +46,7 @@ final class ProposeBlockAttrsUpdate implements AbilityInterface {
             'name' => 'awpt/propose-block-attrs-update',
             'label' => __('Propose Block Attribute Update', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages a targeted Gutenberg block attribute update by post ID and block path.',
+                'Deprecated. Use awpt/propose-block-batch-update with kind set. Stages a targeted Gutenberg block attribute update by post ID and block path.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [

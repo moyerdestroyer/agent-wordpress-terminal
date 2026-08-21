@@ -28,7 +28,7 @@ final class WordPressResourceReader {
             'users', 'user' => current_user_can('list_users'),
             'comments', 'comment' => current_user_can('moderate_comments'),
             'registered_settings', 'registered_setting' => current_user_can('manage_options'),
-            default => (bool) apply_filters('awpt_can_read_wordpress_resource', false, $type, $input),
+            default => ArrayKey::rest_bool(apply_filters('awpt_can_read_wordpress_resource', false, $type, $input)),
         };
     }
 
@@ -171,10 +171,6 @@ final class WordPressResourceReader {
         $items = [];
 
         foreach (get_taxonomies(['show_ui' => true], 'objects') as $taxonomy) {
-            if (!$taxonomy instanceof \WP_Taxonomy) {
-                continue;
-            }
-
             $items[] = [
                 'name' => $taxonomy->name,
                 'label' => $taxonomy->label,
@@ -239,7 +235,9 @@ final class WordPressResourceReader {
 
     /** @return list<array<string, mixed>> */
     private function menus(): array {
-        return array_values(array_map($this->menu_row(...), wp_get_nav_menus()));
+        $menus = wp_get_nav_menus();
+
+        return is_wp_error($menus) ? [] : array_values(array_map($this->menu_row(...), $menus));
     }
 
     /** @return array<string, mixed> */
@@ -466,7 +464,7 @@ final class WordPressResourceReader {
                     'value' => get_post_meta($post_id, $key, false),
                     'registered' => true,
                     'type' => (string) ($registration['type'] ?? 'string'),
-                    'single' => (bool) ($registration['single'] ?? false),
+                    'single' => ArrayKey::rest_bool($registration['single'] ?? false),
                     'show_in_rest' => false !== ($registration['show_in_rest'] ?? false),
                 ];
             }

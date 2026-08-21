@@ -64,7 +64,13 @@ function test_openrouter_provider_tool_routing(): void {
         'OpenRouter should use the DeepSeek V4 Pro default',
     );
     Assert::false(array_key_exists('plugins', $payload), 'the pinned default should not invoke router plugins');
-    Assert::same('awpt-38', $payload['session_id'] ?? null, 'OpenRouter requests should retain session affinity');
+    Assert::same(
+        AWPT\Agent\ProviderCacheAffinity::key(['session_id' => 38]),
+        $payload['session_id'] ?? null,
+        'OpenRouter requests retain opaque session affinity',
+    );
+    $headers = is_array($args['headers'] ?? null) ? $args['headers'] : [];
+    Assert::false(isset($headers['x-session-id']), 'OpenRouter body is the single session affinity source');
 }
 
 test_openrouter_provider_tool_routing();
@@ -91,6 +97,39 @@ function test_openrouter_provider_preserves_completion_finish_reason(): void {
 
 test_openrouter_provider_preserves_completion_finish_reason();
 
+function test_openrouter_http_200_upstream_timeout_is_request_failed(): void {
+    awpt_test_reset_state();
+    update_option('awpt_openrouter_api_key', 'test-key');
+    $GLOBALS['awpt_test_http_response'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode([
+            'error' => [
+                'message' => 'Provider timed out after 20193ms',
+                'code' => 504,
+            ],
+        ]),
+    ];
+
+    $result = new OpenRouterProvider()->complete([['role' => 'user', 'content' => 'Improve this page.']]);
+
+    Assert::true(is_wp_error($result), 'an HTTP 200 error envelope is a failed completion');
+    Assert::same(
+        'awpt_provider_request_failed',
+        $result->get_error_code(),
+        'OpenRouter upstream timeouts must not look like a missing assistant message',
+    );
+    Assert::true(
+        str_contains($result->get_error_message(), 'Provider timed out after 20193ms'),
+        'the operator-facing error should include the upstream timeout text',
+    );
+    Assert::true(
+        str_contains($result->get_error_message(), '504'),
+        'the operator-facing error should include the upstream status code',
+    );
+}
+
+test_openrouter_http_200_upstream_timeout_is_request_failed();
+
 function test_openrouter_provider_can_bound_reasoning_for_large_structured_output(): void {
     awpt_test_reset_state();
     update_option('awpt_openrouter_api_key', 'test-key');
@@ -108,7 +147,7 @@ function test_openrouter_provider_can_bound_reasoning_for_large_structured_outpu
         [
             'max_completion_tokens' => 20_000,
             'reasoning_effort' => 'low',
-            'timeout' => 450,
+            'timeout' => 86_400,
         ],
     );
 
@@ -122,7 +161,11 @@ function test_openrouter_provider_can_bound_reasoning_for_large_structured_outpu
         $payload['reasoning']['exclude'] ?? false,
         'unused reasoning text should not inflate the response',
     );
-    Assert::same(450, (int) ($args['timeout'] ?? 0), 'the raw request may use the explicit extended timeout');
+    Assert::same(
+        86_400,
+        (int) ($args['timeout'] ?? 0),
+        'the provider must not clamp a development request back to twelve minutes',
+    );
 }
 
 test_openrouter_provider_can_bound_reasoning_for_large_structured_output();

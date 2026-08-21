@@ -37,6 +37,9 @@ new integrations should use the local v2 schema at
   "rules": {
     "path": "inc/blocks/awpt-rules.json"
   },
+  "design": {
+    "catalog": "inc/awpt-design.json"
+  },
   "validators": ["composition"],
   "recommenders": [],
   "materializers": [],
@@ -45,6 +48,20 @@ new integrations should use the local v2 schema at
 ```
 
 Manifest file references must remain inside the theme. AWPT bounds manifest and guidance sizes, sanitizes declarative values, and ignores invalid optional records.
+
+## Design catalog
+
+Domain Pack v2 can reference one optional design catalog through `design.catalog`; `awpt-domain.json` remains the sole manifest. The catalog uses [`schemas/awpt-design-v1.schema.json`](schemas/awpt-design-v1.schema.json) and can declare semantic token roles and valid pairings, registered block styles and variations, site style variations, page archetypes, and task-scoped guidance sets.
+
+AWPT merges this catalog with resolved WordPress theme/custom tokens and pattern contracts. `awpt/read-design-system` exposes bounded sections (`tokens`, `components`, `style_variations`, `archetypes`, `patterns`, and `constraints`) with source hashes. Malformed optional records are dropped with JSON-pointer diagnostics; they do not disable an otherwise valid pack. Missing pack identity remains a fatal manifest error.
+
+The compiler uses one scope vocabulary for catalog `guidance_sets`, work-context evidence, and the injected prompt slice: `compose`, `edit`, `evaluate`, `template`, `navigation`, `global_styles`, `diagnose`, and `investigate`. Improve evaluate uses `evaluate`. `TurnProfile` work modes (`create`, `redesign`, `edit`) are routing flags, not catalog keys.
+
+A slim design-system spine (identity, hashes, token counts, scope-specific `guidance_ids`, `prefer_presets`) is injected into design-aware turns. Compose and redesign also receive archetypes, components, and pattern roles. Global-style turns receive resolved token values and style variations. Call `awpt/read-design-system` only to expand a named section — not to discover that a design system exists.
+
+When the active theme publishes theme or custom presets, AWPT rejects newly introduced hardcoded color, spacing, and font-size values at the proposal boundary (`theme-require-presets`). Unchanged legacy markup is grandfathered. A pack `tokens.require_presets` rule replaces that baseline for the same validation pass; it is not required for preset enforcement.
+
+Use catalog components to describe assets the theme actually registers. Do not copy CSS classes into the catalog as aspirational components. Token roles should explain semantic purpose rather than duplicate every raw token. Guidance sets let Improve evaluation and other work types load the same design, accessibility, and rubric sources that proposal validation records.
 
 ## Guidance and `AGENTS.md`
 
@@ -84,7 +101,11 @@ The catalog is a JSON object with a `patterns` map keyed by the exact registered
 
 Catalog v2 treats an entry as a composition contract, not merely a search card. Keep selection judgment (`use_when`, `avoid_when`, alternatives), editing affordances (`slots`), and visual intent (`design`) curated. Generate deterministic facts such as composed pattern references, block dependencies, content hashes, and screenshot paths from the pattern source in CI whenever possible.
 
-AWPT merges this structured metadata with ordinary pattern headers. `awpt/recommend-patterns` ranks candidates by user intent, active-theme ownership, compatibility, and the curated semantics; `awpt/read-pattern` remains the source for exact markup.
+Every editable slot must include a real `block_path` into the materialized pattern. Do not generate generic heading/body/media slots merely because those blocks occur somewhere in a pattern. AWPT annotates the runtime editable inventory only when a path-bound catalog slot matches.
+
+AWPT merges this structured metadata with ordinary pattern headers. `awpt/recommend-patterns` ranks candidates by user intent, active-theme ownership, compatibility, and the curated semantics. Provider-facing recommendations are deliberately compact: identity, role/scope, summary, `use_when`, `avoid_when`, compatibility facts, score, and rationale. `awpt/read-pattern` remains the source for exact markup.
+
+Creation turns receive a bounded shortlist and should pass the selected exact `pattern_name` plus a brief `selection_reason` to `awpt/prepare-pattern-draft`. The server validates and materializes that choice. Omitting the name retains compatibility auto-selection for older callers; it is not the preferred agent path.
 
 When AWPT inserts or adapts a pattern, it stamps `metadata.patternName` onto materialized root blocks and stores a composition manifest with the pack version and source hash. Validators therefore retain the identity that is normally lost when a pattern becomes editable blocks.
 
@@ -182,7 +203,7 @@ genuinely requires.
 5. Activate the theme, open **Knowledge → Theme expertise**, and resolve Domain
    Pack health warnings about stale metadata, missing scopes, unsupported
    rules, or missing callbacks.
-6. Exercise `awpt/get-work-context`, `awpt/recommend-patterns`,
+6. Exercise `awpt/get-work-context`, `awpt/read-design-system`, `awpt/recommend-patterns`,
    `awpt/read-domain-guidance`, and `awpt/validate-composition` before testing a
    staged proposal and apply-time revalidation.
 

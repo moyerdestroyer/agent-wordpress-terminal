@@ -38,13 +38,11 @@ final class PatternSemanticReranker {
         }
 
         $candidates = array_slice($ranked, 0, self::CANDIDATE_LIMIT);
-        $fingerprint = hash(
-            'sha256',
-            wp_json_encode(array_map(static fn(array $row): array => [
-                'name' => (string) ($row['pattern']['name'] ?? ''),
-                'hash' => (string) ($row['pattern']['content_hash'] ?? ''),
-            ], $candidates)) ?: '',
-        );
+        $encoded_candidates = wp_json_encode(array_map(static fn(array $row): array => [
+            'name' => (string) ($row['pattern']['name'] ?? ''),
+            'hash' => (string) ($row['pattern']['content_hash'] ?? ''),
+        ], $candidates));
+        $fingerprint = hash('sha256', false === $encoded_candidates ? '' : $encoded_candidates);
         $cache_key =
             'awpt_pattern_rank_'
             . md5($this->embeddings->profile() . '|' . mb_strtolower(trim($intent)) . '|' . $fingerprint);

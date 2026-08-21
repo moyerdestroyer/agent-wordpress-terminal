@@ -83,12 +83,9 @@ final class ReadNavigation implements AbilityInterface {
         }
 
         $classic_items = [];
+        $menus = wp_get_nav_menus();
 
-        foreach (wp_get_nav_menus() as $menu) {
-            if (!$menu instanceof \WP_Term) {
-                continue;
-            }
-
+        foreach (is_wp_error($menus) ? [] : $menus as $menu) {
             $classic_items[] = [
                 'id' => $menu->term_id,
                 'name' => $menu->name,

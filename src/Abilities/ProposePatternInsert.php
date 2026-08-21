@@ -19,6 +19,7 @@ use AWPT\Domain\PatternTextUpdater;
 use AWPT\Support\ActionOperations;
 use AWPT\Support\BlockTree;
 use AWPT\Support\PatternCatalog;
+use AWPT\Support\PatternProposeAutoPrepare;
 use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentStagingPipeline;
 use AWPT\Support\StagedPostPreview;
@@ -51,7 +52,7 @@ final class ProposePatternInsert implements AbilityInterface {
             'name' => 'awpt/propose-pattern-insert',
             'label' => __('Propose Pattern Insert', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages a prepared compact pattern insert, or an uncustomized registered pattern, for approval.',
+                'Stages a theme-pattern insert. Pass preparation_id, or path and intent so the server prepares. Uncustomized pattern_name remains a legacy fallback.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -61,14 +62,64 @@ final class ProposePatternInsert implements AbilityInterface {
                     'post_id' => ['type' => 'integer'],
                     'pattern_name' => [
                         'type' => 'string',
-                        'description' => 'Exact registered name for the uncustomized legacy path only. Omit after successful preparation.',
+                        'description' => __(
+                            'Optional. Exact registered theme pattern. When preparing (no usable preparation_id), binds this pattern instead of re-ranking. Also used as uncustomized legacy fallback.',
+                            'agent-wordpress-terminal',
+                        ),
                     ],
                     'preparation_id' => [
                         'type' => 'string',
-                        'description' => 'Copy the exact ID from prepare-pattern-change mode=insert. Required after preparation succeeds.',
+                        'description' => 'Optional. Bound ID from prepare-pattern-change. Omit and pass path + intent to prepare in this call.',
                     ],
-                    'pattern_text_updates' => ['type' => 'array', 'items' => ['type' => 'object']],
-                    'media_placements' => ['type' => 'array', 'items' => ['type' => 'object']],
+                    'path' => [
+                        'type' => 'string',
+                        'description' => 'Insert anchor path when preparation_id is omitted.',
+                    ],
+                    'intent' => [
+                        'type' => 'string',
+                        'description' => 'What the new section should be when preparation_id is omitted.',
+                    ],
+                    'pattern_text_updates' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'block_path' => [
+                                    'type' => 'string',
+                                    'pattern' => '^\\d+(?:\\.\\d+)*$',
+                                    'description' => 'Dotted numeric path from editable_slots.',
+                                ],
+                                'slot_id' => [
+                                    'type' => 'string',
+                                    'description' => 'Optional pack slot id when block_path is omitted.',
+                                ],
+                                'content' => ['type' => 'string'],
+                            ],
+                            'required' => ['content'],
+                            'additionalProperties' => false,
+                        ],
+                    ],
+                    'media_placements' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'attachment_id' => ['type' => 'integer'],
+                                'placement' => [
+                                    'type' => 'string',
+                                    'enum' => ['insert', 'featured_cover'],
+                                ],
+                                'block_path' => ['type' => 'string'],
+                                'position' => [
+                                    'type' => 'string',
+                                    'enum' => ['before', 'after', 'append'],
+                                ],
+                                'alt' => ['type' => 'string'],
+                            ],
+                            'required' => ['attachment_id', 'block_path'],
+                            'additionalProperties' => false,
+                        ],
+                    ],
                     'block_path' => [
                         'type' => 'string',
                         'description' => 'Uncustomized legacy path only; prepared inserts use the receipt-bound target.',
@@ -114,6 +165,22 @@ final class ProposePatternInsert implements AbilityInterface {
         }
 
         $preparation_id = sanitize_text_field((string) ($input['preparation_id'] ?? ''));
+        $auto = new PatternProposeAutoPrepare();
+
+        if (
+            '' === $preparation_id
+            || $auto->looks_placeholder($preparation_id)
+            || $auto->looks_like_hash($preparation_id)
+        ) {
+            $resolved = $auto->resolve($input, PatternPreparationReceipt::MODE_INSERT);
+
+            if (!is_wp_error($resolved)) {
+                $preparation_id = sanitize_text_field((string) ($resolved['preparation_id'] ?? ''));
+            } elseif ('' === trim((string) ($input['pattern_name'] ?? ''))) {
+                return $resolved;
+            }
+        }
+
         $receipt = [];
 
         if ('' !== $preparation_id) {

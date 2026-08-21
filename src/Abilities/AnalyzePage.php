@@ -25,7 +25,7 @@ final class AnalyzePage implements AbilityInterface {
         wp_register_ability('awpt/analyze-page', [
             'label' => __('Analyze Page', 'agent-wordpress-terminal'),
             'description' => __(
-                'Returns an agent-friendly page brief with structure and risk signals.',
+                'Deprecated for page reads. Prefer awpt/read-block-tree, which includes title, status, url, and structure. This ability remains as a risk-signal supplement.',
                 'agent-wordpress-terminal',
             ),
             'category' => 'awpt',

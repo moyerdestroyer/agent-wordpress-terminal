@@ -14,6 +14,7 @@ use AWPT\Database\ActionRepository;
 use AWPT\MCP\Adapter;
 use AWPT\Support\AiLogger;
 use AWPT\Support\ArrayKey;
+use AWPT\Support\ImproveActProposeHydrator;
 use AWPT\Support\ProposalAbilities;
 use AWPT\Support\TurnToolEvidence;
 
@@ -119,12 +120,39 @@ final class ProviderToolCallExecutor {
             ];
         }
 
+        $all_items = $items;
         $proposal_items = array_values(array_filter($items, static fn(array $item): bool => ProposalAbilities::is_proposal(
             $item['tool_name'],
         )));
+        $proposal_signatures = [];
 
-        if (count($proposal_items) > 1) {
-            return $this->reject_non_atomic_proposal_batch($items);
+        foreach ($proposal_items as $item) {
+            $proposal_signatures[$this->proposal_signature($item)][] = $item;
+        }
+
+        if (count($proposal_signatures) > 1) {
+            return $this->reject_non_atomic_proposal_batch($all_items);
+        }
+
+        // Provider gateways occasionally repeat one mutation with different
+        // card copy or call IDs. That is one edit, not competing staging
+        // intent: execute the best copy once, then acknowledge every call ID.
+        if (1 === count($proposal_signatures) && count($proposal_items) > 1) {
+            $canonical = $this->canonical_proposal_item(array_values($proposal_signatures)[0], $session_id);
+            $canonical_index = $canonical['index'];
+            $items = array_values(array_filter(
+                $items,
+                static fn(array $item): bool => (
+                    !ProposalAbilities::is_proposal($item['tool_name'])
+                    || $item['index'] === $canonical_index
+                ),
+            ));
+
+            // ToolBatchRunner reassembles 0..count-1. After dropping duplicate
+            // proposals the kept row may still carry its original provider index.
+            foreach ($items as $reindex => $item) {
+                $items[$reindex]['index'] = $reindex;
+            }
         }
 
         $total = count($items);
@@ -184,16 +212,45 @@ final class ProviderToolCallExecutor {
         );
 
         $tool_calls = [];
-        $messages = [];
+        $message_content_by_call_id = [];
+        $canonical_proposal_content = null;
         $visual_messages = [];
 
         foreach ($results as $execution) {
             $tool_calls[] = $execution['tool_call'];
-            $messages[] = $execution['message'];
+            $message = $execution['message'];
+            $call_id = (string) ($message['tool_call_id'] ?? '');
+            $message_content_by_call_id[$call_id] = (string) ($message['content'] ?? '');
+
+            if (ProposalAbilities::is_proposal((string) ($execution['tool_call']['tool'] ?? ''))) {
+                $canonical_proposal_content = (string) ($message['content'] ?? '');
+            }
 
             if (is_array($execution['visual_message'] ?? null)) {
                 $visual_messages[] = $execution['visual_message'];
             }
+        }
+
+        $messages = [];
+
+        foreach ($all_items as $item) {
+            $raw = $item['raw'];
+            $provider_call_id = (string) ($raw['id'] ?? '');
+            $content = $message_content_by_call_id[$provider_call_id] ?? null;
+
+            if (null === $content && ProposalAbilities::is_proposal($item['tool_name'])) {
+                $content = $canonical_proposal_content;
+            }
+
+            if (null === $content) {
+                continue;
+            }
+
+            $messages[] = [
+                'role' => 'tool',
+                'tool_call_id' => $provider_call_id,
+                'content' => $content,
+            ];
         }
 
         return [
@@ -203,6 +260,99 @@ final class ProviderToolCallExecutor {
             'messages' => [...$messages, ...$visual_messages],
             'parallel_batch_size' => $parallel_safe_count,
         ];
+    }
+
+    /**
+     * Identity of the staged document change, not the action-card prose.
+     *
+     * Title, description, and other runtime-injected fields are dropped so a
+     * provider that repeats one batch with different copy is not treated as
+     * competing mutations. Unknown keys stay in the hash.
+     *
+     * @param array{index: int, tool_name: string, raw: array<string, mixed>} $item
+     */
+    private function proposal_signature(array $item): string {
+        $arguments = $this->proposal_arguments($item);
+        $encoded = wp_json_encode($this->canonicalize_value($this->mutation_arguments($arguments)));
+
+        return $item['tool_name'] . '|' . (is_string($encoded) ? $encoded : '{}');
+    }
+
+    /**
+     * @param list<array{index: int, tool_name: string, raw: array<string, mixed>}> $items
+     * @return array{index: int, tool_name: string, raw: array<string, mixed>}
+     */
+    private function canonical_proposal_item(array $items, int $session_id): array {
+        foreach ($items as $item) {
+            if ($session_id > 0 && $this->proposal_session_id($item) === $session_id) {
+                return $item;
+            }
+        }
+
+        foreach ($items as $item) {
+            if ($this->proposal_session_id($item) > 0) {
+                return $item;
+            }
+        }
+
+        return $items[0];
+    }
+
+    /** @param array{index: int, tool_name: string, raw: array<string, mixed>} $item */
+    private function proposal_session_id(array $item): int {
+        return (int) ($this->proposal_arguments($item)['session_id'] ?? 0);
+    }
+
+    /**
+     * @param array{index: int, tool_name: string, raw: array<string, mixed>} $item
+     * @return array<string, mixed>
+     */
+    private function proposal_arguments(array $item): array {
+        $function = ArrayKey::as_map($item['raw']['function'] ?? null);
+
+        return $this->decode_tool_arguments((string) ($function['arguments'] ?? '{}'));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function mutation_arguments(array $arguments): array {
+        foreach ([
+            'title',
+            'description',
+            'affected',
+            'pattern_unfit_code',
+            'pattern_fallback_reason',
+            'proposal_manifest',
+            'decision_trace',
+            'session_id',
+            'turn_id',
+            'proposal_key',
+            'presentation_requires_h1',
+        ] as $key) {
+            unset($arguments[$key]);
+        }
+
+        return $arguments;
+    }
+
+    private function canonicalize_value(mixed $value): mixed {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map($this->canonicalize_value(...), $value);
+        }
+
+        ksort($value);
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalize_value($item);
+        }
+
+        return $value;
     }
 
     /**
@@ -325,6 +475,12 @@ final class ProviderToolCallExecutor {
             $input['session_id'] = $session_id;
         }
 
+        if ('awpt/finalize-proposal-review' === $tool_name) {
+            $candidate_id = (int) ($turn_context['proposal_review_action_id'] ?? 0);
+            $input['action_id'] = $candidate_id;
+            $input['review_token'] = $candidate_id > 0;
+        }
+
         // Pattern prep abilities are readonly but mint session-bound receipts.
         if (in_array($tool_name, ['awpt/prepare-pattern-change', 'awpt/prepare-pattern-draft'], true)) {
             $input['session_id'] = $session_id;
@@ -366,6 +522,7 @@ final class ProviderToolCallExecutor {
                 $turn_context,
                 $tool_name,
             ));
+            $input = ArrayKey::string_map(new ImproveActProposeHydrator()->hydrate($session_id, $input, $tool_name));
         }
 
         if ('awpt/propose-patterned-post' === $tool_name) {
@@ -381,17 +538,26 @@ final class ProviderToolCallExecutor {
             }
         }
 
-        $execution_input = $this->ability_input($tool_name, $input, $tool_registry);
+        $execution_input = null === $tool_name ? $input : $tool_registry->native_input($tool_name, $input);
         $offered = is_array($turn_context['offered_tool_names'] ?? null)
             ? array_values(array_filter($turn_context['offered_tool_names'], 'is_string'))
             : null;
-        [$status, $output] = $this->run_safe_tool(
-            $tool_name,
-            $function_name,
-            $execution_input,
-            $tool_registry,
-            $offered,
-        );
+        if (is_wp_error($execution_input)) {
+            $status = 'failed';
+            $output = [
+                'error' => $execution_input->get_error_message(),
+                'error_code' => $execution_input->get_error_code(),
+                'error_data' => $execution_input->get_error_data(),
+            ];
+        } else {
+            [$status, $output] = $this->run_safe_tool(
+                $tool_name,
+                $function_name,
+                $execution_input,
+                $tool_registry,
+                $offered,
+            );
+        }
 
         if ('success' === $status && 'awpt/read-pattern' === $tool_name && is_array($output)) {
             $pattern_name = (string) ($output['name'] ?? $input['name'] ?? '');
@@ -418,8 +584,18 @@ final class ProviderToolCallExecutor {
         }
         $tool = $tool_name ?? $function_name;
         $truncator = new ToolResultTruncator();
-        $provider_output = $truncator->for_provider($tool, $output);
         $storage_output = $truncator->for_storage($tool, $output);
+        // Failed calls: CLI-style stderr for the next round (fix / retry_with / use).
+        // Keep full nested error_data in storage for the Tools UI.
+        $provider_output = in_array($status, ['failed', 'rejected'], true) && is_array($output)
+            ? FailedToolFeedback::for_provider($tool, ArrayKey::string_map($output))
+            : $truncator->for_provider($tool, $output);
+        if (is_array($provider_output['retry_with'] ?? null)) {
+            $provider_output['retry_with'] = $tool_registry->provider_input(
+                $tool,
+                ArrayKey::as_map($provider_output['retry_with']),
+            );
+        }
         $visual_output = is_array($output) ? ArrayKey::string_map($output) : [];
         $visual_message =
             'success' === $status && [] !== $visual_output
@@ -431,7 +607,7 @@ final class ProviderToolCallExecutor {
                 : null;
         $tool_call = [
             'tool' => $tool,
-            'input' => $execution_input,
+            'input' => is_wp_error($execution_input) ? $input : $execution_input,
             'output' => $storage_output,
             'status' => $status,
             'provider_call_id' => $provider_call_id,
@@ -446,7 +622,9 @@ final class ProviderToolCallExecutor {
             'session_id' => $session_id,
             'turn_id' => sanitize_key((string) ($turn_context['turn_id'] ?? '')),
             'tool_name' => $tool,
-            'input' => is_array($execution_input) ? $execution_input : ['value' => $execution_input],
+            'input' => is_wp_error($execution_input)
+                ? $input
+                : (is_array($execution_input) ? $execution_input : ['value' => $execution_input]),
             'status' => $status,
             'output' => $storage_output,
             'started_at' => $tool_started_at,
@@ -553,27 +731,6 @@ final class ProviderToolCallExecutor {
      */
     private function decode_tool_arguments(string $arguments): array {
         return ArrayKey::as_map(json_decode($arguments, true));
-    }
-
-    /**
-     * Convert provider-object arguments to the Ability's native JSON input.
-     *
-     * @param array<string, mixed> $provider_input
-     */
-    private function ability_input(?string $tool_name, array $provider_input, ToolRegistry $registry): mixed {
-        if (null === $tool_name || !$registry->is_ability($tool_name) || !function_exists('wp_get_ability')) {
-            return $provider_input;
-        }
-
-        $ability = wp_get_ability($tool_name);
-
-        if (null === $ability || !method_exists($ability, 'get_input_schema')) {
-            return $provider_input;
-        }
-
-        $schema = $ability->get_input_schema();
-
-        return new AbilityTransportCodec()->ability_input($schema, $provider_input);
     }
 
     private function encoded_tool_output(mixed $output): string {

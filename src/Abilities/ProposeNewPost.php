@@ -505,7 +505,7 @@ final class ProposeNewPost implements AbilityInterface {
             $text_updates = is_array($input['pattern_text_updates'] ?? null) ? $input['pattern_text_updates'] : [];
             $media_placements = is_array($input['media_placements'] ?? null) ? $input['media_placements'] : [];
             $materialized = new PatternCompositionBuilder()->build(
-                $requested_pattern_names ?: [$requested_pattern_name],
+                [] !== $requested_pattern_names ? $requested_pattern_names : [$requested_pattern_name],
                 $pattern_replacements,
                 $text_updates,
                 $media_placements,

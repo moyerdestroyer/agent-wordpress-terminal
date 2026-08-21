@@ -15,7 +15,10 @@ use AWPT\Database\ActionRepository;
 use AWPT\Database\SessionRepository;
 use AWPT\Domain\CompositionGate;
 use AWPT\Domain\ExistingContentPreservationValidator;
+use AWPT\Domain\PatternCarryForwardSlotFiller;
+use AWPT\Domain\PatternCompactFillGuard;
 use AWPT\Domain\PatternCompositionBuilder;
+use AWPT\Domain\PatternDocumentContentMapper;
 use AWPT\Domain\PatternEditableSlots;
 use AWPT\Domain\PatternMaterializer;
 use AWPT\Domain\PatternMediaPlacer;
@@ -23,8 +26,11 @@ use AWPT\Domain\PatternMediaSlots;
 use AWPT\Domain\PatternPreparationReceipt;
 use AWPT\Domain\PatternTextUpdater;
 use AWPT\Support\ActionOperations;
+use AWPT\Support\ArrayKey;
 use AWPT\Support\BlockTree;
+use AWPT\Support\ImprovePagePrompt;
 use AWPT\Support\PatternCatalog;
+use AWPT\Support\PatternProposeAutoPrepare;
 use AWPT\Support\PostContentMediaIntegrity;
 use AWPT\Support\PostContentStagingPipeline;
 use AWPT\Support\StagedPostPreview;
@@ -57,7 +63,7 @@ final class ProposePatternReplace implements AbilityInterface {
             'name' => 'awpt/propose-pattern-replace',
             'label' => __('Propose Pattern Replace', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages replacement of one existing section with a registered pattern prepared by awpt/prepare-pattern-change. Supply preparation_id and compact text/media updates; AWPT expands the pattern, replaces only the verified target path, and preserves unrelated sections. Does not accept full-document freehand markup.',
+                'Stages replacement of one existing section with a registered theme pattern. Pass preparation_id from awpt/prepare-pattern-change, or pass path (or target_path) and intent and the server prepares. Supply compact text/media updates; AWPT expands the pattern and preserves unrelated sections.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -67,7 +73,28 @@ final class ProposePatternReplace implements AbilityInterface {
                     'preparation_id' => [
                         'type' => 'string',
                         'description' => __(
-                            'Bound preparation_id returned by awpt/prepare-pattern-change (mode=replace).',
+                            'Optional. Bound preparation_id from awpt/prepare-pattern-change. Omit and pass path + intent to prepare in this call.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'path' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Dotted section path to replace, or document for a complete full-page replacement, when preparation_id is omitted.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'intent' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'What the section should become when preparation_id is omitted.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_name' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional. Exact registered theme pattern. When preparing (no usable preparation_id), binds this pattern instead of re-ranking section recommendations.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -77,13 +104,31 @@ final class ProposePatternReplace implements AbilityInterface {
                     ],
                     'pattern_text_updates' => [
                         'type' => 'array',
+                        'description' => __(
+                            'Path-addressed slot fills. block_path must be a dotted numeric path from prepare editable_slots (e.g. 1.0.1.0.0). Do not invent names like intro_paragraph.',
+                            'agent-wordpress-terminal',
+                        ),
                         'items' => [
                             'type' => 'object',
                             'properties' => [
-                                'block_path' => ['type' => 'string'],
+                                'block_path' => [
+                                    'type' => 'string',
+                                    'pattern' => '^\\d+(?:\\.\\d+)*$',
+                                    'description' => __(
+                                        'Dotted numeric path from editable_slots.',
+                                        'agent-wordpress-terminal',
+                                    ),
+                                ],
+                                'slot_id' => [
+                                    'type' => 'string',
+                                    'description' => __(
+                                        'Optional pack slot id (lead, primary-heading, …) when block_path is omitted.',
+                                        'agent-wordpress-terminal',
+                                    ),
+                                ],
                                 'content' => ['type' => 'string'],
                             ],
-                            'required' => ['block_path', 'content'],
+                            'required' => ['content'],
                         ],
                     ],
                     'media_placements' => [
@@ -109,7 +154,7 @@ final class ProposePatternReplace implements AbilityInterface {
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
                 ],
-                'required' => ['session_id', 'preparation_id', 'post_id', 'title', 'description'],
+                'required' => ['session_id', 'post_id', 'title', 'description'],
             ],
             'output_schema' => ['type' => 'object'],
             'permission_callback' => [$this, 'can_propose'],
@@ -132,7 +177,6 @@ final class ProposePatternReplace implements AbilityInterface {
     public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
         $post_id = (int) ($input['post_id'] ?? 0);
-        $preparation_id = sanitize_text_field((string) ($input['preparation_id'] ?? ''));
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -147,15 +191,13 @@ final class ProposePatternReplace implements AbilityInterface {
             ]);
         }
 
-        $receipt = new PatternPreparationReceipt()->require_for_propose($preparation_id, [
-            'post_id' => $post_id,
-            'session_id' => $session_id,
-            'mode' => PatternPreparationReceipt::MODE_REPLACE,
-        ]);
+        $receipt = new PatternProposeAutoPrepare()->resolve($input, PatternPreparationReceipt::MODE_REPLACE);
 
         if (is_wp_error($receipt)) {
             return $receipt;
         }
+
+        $preparation_id = sanitize_text_field((string) ($receipt['preparation_id'] ?? ''));
 
         $source_hash = hash('sha256', $post->post_content);
         $expected_source = (string) ($receipt['source_content_hash'] ?? '');
@@ -172,6 +214,7 @@ final class ProposePatternReplace implements AbilityInterface {
         }
 
         $target_path = sanitize_text_field((string) ($receipt['target_path'] ?? ''));
+        $replace_entire_document = true === ($receipt['replace_entire_document'] ?? false);
         $expected_fingerprint = sanitize_text_field((string) ($receipt['expected_fingerprint'] ?? ''));
         $pattern_names = array_values(array_filter(array_map(
             static fn(mixed $name): string => sanitize_text_field(is_scalar($name) ? (string) $name : ''),
@@ -186,7 +229,9 @@ final class ProposePatternReplace implements AbilityInterface {
             );
         }
 
-        $text_updates = is_array($input['pattern_text_updates'] ?? null) ? $input['pattern_text_updates'] : [];
+        $text_updates = is_array($input['pattern_text_updates'] ?? null)
+            ? array_values($input['pattern_text_updates'])
+            : [];
         $media_placements = is_array($input['media_placements'] ?? null) ? $input['media_placements'] : [];
 
         // Prefer the exact expanded markup bound at preparation so catalog drift
@@ -214,6 +259,23 @@ final class ProposePatternReplace implements AbilityInterface {
             );
         }
 
+        $text_updates = new PatternCarryForwardSlotFiller()->resolve_updates($receipt, $text_updates);
+
+        if (is_wp_error($text_updates)) {
+            return $this->prepared_slot_error($text_updates, $receipt);
+        }
+
+        if (new PatternCompactFillGuard()->should_block_replace($receipt, $text_updates)) {
+            return $this->prepared_slot_error(new \WP_Error(
+                'awpt_pattern_text_updates_required',
+                __(
+                    'This replace would overwrite real page copy with unmodified pattern filler. Retry with pattern_text_updates that map carry_forward into editable_slots.',
+                    'agent-wordpress-terminal',
+                ),
+                ['status' => 409],
+            ), $receipt);
+        }
+
         $built = new PatternTextUpdater()->apply($base, $text_updates);
 
         if (is_wp_error($built)) {
@@ -226,18 +288,39 @@ final class ProposePatternReplace implements AbilityInterface {
             return $this->prepared_slot_error($built, $receipt);
         }
 
+        if ($replace_entire_document) {
+            $built = new PatternDocumentContentMapper()->map($built, $post->post_content);
+
+            if (is_wp_error($built)) {
+                return $built;
+            }
+        }
+
         $pattern_name = $pattern_names[0];
         $materializer = new PatternMaterializer();
         $materialized_content = $materializer->materialize($pattern_name, $built);
-        $blocks = array_values(array_filter(parse_blocks($materialized_content), BlockTree::has_block_name(...)));
-        $update = BlockTree::from_content($post->post_content)->replace_blocks(
-            $target_path,
-            $blocks,
-            $expected_fingerprint,
-        );
 
-        if (is_wp_error($update)) {
-            return $update;
+        if ($replace_entire_document) {
+            $update = [
+                'content' => $materialized_content,
+                'blocks' => array_values(array_filter(
+                    parse_blocks($materialized_content),
+                    BlockTree::has_block_name(...),
+                )),
+                'paths' => ['document'],
+                'removed' => [],
+            ];
+        } else {
+            $blocks = array_values(array_filter(parse_blocks($materialized_content), BlockTree::has_block_name(...)));
+            $update = BlockTree::from_content($post->post_content)->replace_blocks(
+                $target_path,
+                $blocks,
+                $expected_fingerprint,
+            );
+
+            if (is_wp_error($update)) {
+                return $update;
+            }
         }
 
         $resolved = $this->patterns->resolve_name($pattern_name);
@@ -303,6 +386,24 @@ final class ProposePatternReplace implements AbilityInterface {
             return $validation_error;
         }
 
+        if (ImprovePagePrompt::staged_content_looks_chrome_incomplete($update['content'])) {
+            return new \WP_Error(
+                'awpt_layout_content_incomplete',
+                __(
+                    'The proposed pattern still contains authoring placeholders or incomplete layout copy. No action was staged.',
+                    'agent-wordpress-terminal',
+                ),
+                [
+                    'status' => 409,
+                    'preparation_id' => $preparation_id,
+                    'recovery' => __(
+                        'Reuse the preparation and map every required slot, or choose a pattern that can hold the complete source content.',
+                        'agent-wordpress-terminal',
+                    ),
+                ],
+            );
+        }
+
         $media_integrity = new PostContentMediaIntegrity()->prepare($update['content']);
 
         if (is_wp_error($media_integrity)) {
@@ -330,14 +431,22 @@ final class ProposePatternReplace implements AbilityInterface {
             'pattern_owner' => (string) ($summary['owner'] ?? ''),
             'blocks' => $update['blocks'],
             'replaced_paths' => $update['paths'],
-            'affected' => sprintf(
-                __('Replace section %1$s with pattern %2$s', 'agent-wordpress-terminal'),
-                $target_path,
-                (string) ($summary['title'] ?? $pattern_name),
-            ),
+            'affected' => $replace_entire_document
+                ? sprintf(
+                    __('Replace document with pattern %s', 'agent-wordpress-terminal'),
+                    (string) ($summary['title'] ?? $pattern_name),
+                )
+                : sprintf(
+                    __('Replace section %1$s with pattern %2$s', 'agent-wordpress-terminal'),
+                    $target_path,
+                    (string) ($summary['title'] ?? $pattern_name),
+                ),
             'composition_manifest' => $materializer->provenance($pattern_name, 'replaced', $base),
             'ruleset_hash' => $validation_result['ruleset_hash'],
-            'agent_feedback' => AgentFeedback::validation($findings, $validation_result['fixes'], true),
+            'agent_feedback' => $this->pattern_replace_feedback(
+                $findings,
+                ArrayKey::list_of_maps($validation_result['fixes']),
+            ),
         ];
 
         if ([] !== $repairs_applied) {
@@ -352,11 +461,21 @@ final class ProposePatternReplace implements AbilityInterface {
             $payload['safe_fixes'] = $validation_result['fixes'];
         }
 
-        $preservation_error = new ExistingContentPreservationValidator()->validate_for_session(
-            $session_id,
-            $post->post_content,
-            $payload['post_content'],
-        );
+        $preservation = new ExistingContentPreservationValidator();
+
+        if ($replace_entire_document) {
+            $preservation_error = $preservation->validate_required_for_session(
+                $session_id,
+                $post->post_content,
+                $payload['post_content'],
+            );
+        } else {
+            $preservation_error = $preservation->validate_for_session(
+                $session_id,
+                $post->post_content,
+                $payload['post_content'],
+            );
+        }
 
         if ($preservation_error instanceof \WP_Error) {
             return $preservation_error;
@@ -379,6 +498,10 @@ final class ProposePatternReplace implements AbilityInterface {
             sanitize_text_field((string) $input['title']),
             sanitize_textarea_field((string) $input['description']),
             $payload,
+            [
+                'turn_id' => sanitize_key((string) ($input['turn_id'] ?? '')),
+                'proposal_key' => sanitize_key((string) ($input['proposal_key'] ?? '')),
+            ],
         );
 
         if (null === $action_id) {
@@ -394,22 +517,40 @@ final class ProposePatternReplace implements AbilityInterface {
         return $this->actions->format_action($action_id) ?? [];
     }
 
+    /**
+     * @param list<array<string, mixed>> $findings
+     * @param list<array<string, mixed>> $fixes
+     */
+    private function pattern_replace_feedback(array $findings, array $fixes): array {
+        return AgentFeedback::validation($findings, $fixes, true);
+    }
+
     /** @param array<string, mixed> $receipt */
     private function prepared_slot_error(\WP_Error $error, array $receipt): \WP_Error {
         $data = $error->get_error_data();
         $data = is_array($data) ? $data : [];
         $content = (string) ($receipt['pattern_content'] ?? '');
+        $slots = new PatternEditableSlots()->from_content($content);
+        $sample_path = (string) ($slots[0]['block_path'] ?? '0.0');
         $data['preparation_id'] = (string) ($receipt['preparation_id'] ?? '');
-        $data['editable_slots'] = new PatternEditableSlots()->from_content($content);
+        $data['editable_slots'] = $slots;
         $data['media_slots'] = new PatternMediaSlots()->from_content($content);
         $data['carry_forward'] = is_array($receipt['carry_forward'] ?? null) ? $receipt['carry_forward'] : [];
-        $data['recovery'] = __(
-            'Retry with this preparation_id and a block_path from editable_slots or media_slots. Do not prepare again.',
-            'agent-wordpress-terminal',
-        );
+        $data['recovery'] = 'awpt_pattern_text_updates_required' === $error->get_error_code()
+            ? __(
+                'Retry with this preparation_id and pattern_text_updates for editable_slots. Map carry_forward heading/excerpt/links into slots. Do not prepare again.',
+                'agent-wordpress-terminal',
+            )
+            : __(
+                'Retry with this preparation_id and a block_path from editable_slots or media_slots. Do not prepare again.',
+                'agent-wordpress-terminal',
+            );
         $data['retry_example'] = [
             'preparation_id' => (string) ($receipt['preparation_id'] ?? ''),
-            'pattern_text_updates' => [['block_path' => '0.0', 'content' => 'Replacement copy']],
+            'pattern_text_updates' => [[
+                'block_path' => $sample_path,
+                'content' => __('Replacement copy from the page', 'agent-wordpress-terminal'),
+            ]],
         ];
 
         return new \WP_Error($error->get_error_code(), $error->get_error_message(), $data);

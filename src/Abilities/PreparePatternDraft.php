@@ -15,6 +15,7 @@ use AWPT\Domain\PatternEditableSlots;
 use AWPT\Domain\PatternMediaSlots;
 use AWPT\Support\ArrayKey;
 use AWPT\Support\ContentListService;
+use AWPT\Support\PatternCandidateProjector;
 use AWPT\Support\ThemePostTitleStrategy;
 
 if (!defined('ABSPATH')) {
@@ -56,6 +57,20 @@ final class PreparePatternDraft implements AbilityInterface {
                             'agent-wordpress-terminal',
                         ),
                     ],
+                    'pattern_name' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional exact full-document pattern selected from the injected shortlist. Omit only for compatibility auto-selection.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'selection_reason' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Required with pattern_name. Briefly explain why its use_when fits and its avoid_when does not.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                 ],
                 'required' => ['intent'],
             ],
@@ -74,6 +89,8 @@ final class PreparePatternDraft implements AbilityInterface {
         $intent = sanitize_text_field((string) ($input['intent'] ?? ''));
         $post_type = sanitize_key((string) ($input['post_type'] ?? 'page'));
         $media_count = max(0, min(200, (int) ($input['media_count'] ?? 0)));
+        $requested_pattern_name = sanitize_text_field((string) ($input['pattern_name'] ?? ''));
+        $selection_reason = sanitize_textarea_field((string) ($input['selection_reason'] ?? ''));
 
         if ('' === $intent) {
             return new \WP_Error(
@@ -105,7 +122,47 @@ final class PreparePatternDraft implements AbilityInterface {
             'semantic' => false,
         ]);
         $recommendations = ArrayKey::list_of_maps($ranked['recommendations'] ?? null);
-        $selected = $this->first_full_document_pattern($recommendations);
+        $selected = [];
+
+        if ('' !== $requested_pattern_name) {
+            if ('' === trim($selection_reason)) {
+                return new \WP_Error(
+                    'awpt_pattern_selection_reason_required',
+                    __(
+                        'Explain why the selected pattern fits its use_when and does not trigger its avoid_when guidance.',
+                        'agent-wordpress-terminal',
+                    ),
+                    ['status' => 400, 'pattern_name' => $requested_pattern_name],
+                );
+            }
+
+            foreach ($recommendations as $recommendation) {
+                $pattern = ArrayKey::as_map($recommendation['pattern'] ?? null);
+                if ($requested_pattern_name === (string) ($pattern['name'] ?? '')) {
+                    $selected = $recommendation;
+                    break;
+                }
+            }
+
+            if ([] === $selected || [] === $this->first_full_document_pattern([$selected])) {
+                return new \WP_Error(
+                    'awpt_pattern_draft_selection_invalid',
+                    __(
+                        'The selected pattern is stale, incompatible, or not a full-document pattern.',
+                        'agent-wordpress-terminal',
+                    ),
+                    [
+                        'status' => 409,
+                        'pattern_name' => $requested_pattern_name,
+                        'retry_with' => [
+                            'pattern_candidates' => new PatternCandidateProjector()->many($recommendations, 4, 4_500),
+                        ],
+                    ],
+                );
+            }
+        } else {
+            $selected = $this->first_full_document_pattern($recommendations);
+        }
 
         if ([] === $selected) {
             return $this->custom_fallback(
@@ -173,7 +230,10 @@ final class PreparePatternDraft implements AbilityInterface {
                 'role' => (string) ($domain['role'] ?? ''),
                 'composition_scope' => (string) ($read['composition_scope'] ?? ''),
                 'content_hash' => (string) ($read['content_hash'] ?? ''),
-                'selection_reason' => (string) ($recommendation['rationale'] ?? ''),
+                'selection_reason' =>
+                    0 === $index && '' !== $selection_reason
+                        ? $selection_reason
+                        : (string) ($recommendation['rationale'] ?? ''),
             ];
         }
 
@@ -204,8 +264,10 @@ final class PreparePatternDraft implements AbilityInterface {
             ],
             'media' => $media,
             'selection' => [
+                'mode' => '' !== $requested_pattern_name ? 'agent_selected' : 'automatic_compatibility',
                 'score' => (int) ($selected['score'] ?? 0),
-                'rationale' => (string) ($selected['rationale'] ?? ''),
+                'rationale' => '' !== $selection_reason ? $selection_reason : (string) ($selected['rationale'] ?? ''),
+                'candidate' => new PatternCandidateProjector()->one(ArrayKey::string_map($selected)),
                 'supporting_requirements' => $this->supporting_requirements($intent, $media_count),
             ],
             'policy' => 'Stage with awpt/propose-patterned-post using the ordered pattern_names, pattern_text_updates, and explicit media_placements. Prefer returned semantic media_slots over inserting images near text. Use featured_cover for a hero Cover background and ordinary insert placement for additional images. Do not serialize or resend pattern markup. The ordered composition is not subject to a page-size or section-count limit.',
@@ -313,7 +375,9 @@ final class PreparePatternDraft implements AbilityInterface {
                 foreach ($clauses as $clause) {
                     $clause = trim(sanitize_text_field($clause));
 
-                    if (count(preg_split('/\s+/', $clause) ?: []) >= 3) {
+                    $words = preg_split('/\s+/', $clause);
+
+                    if (false !== $words && count($words) >= 3) {
                         $requirements[] = $clause;
                     }
                 }

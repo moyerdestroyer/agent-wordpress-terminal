@@ -19,16 +19,15 @@ if (!defined('ABSPATH')) {
 /**
  * OpenAI API provider.
  *
- * Model selection is automatic (OpenAI's evergreen `chat-latest` alias, which OpenAI
- * itself keeps pointed at its current recommended chat model) — there is no manual
- * model field to configure.
+ * Default model is configurable (`awpt_openai_model`); falls back to
+ * {@see OpenAIProvider::DEFAULT_MODEL} when unset.
  */
 final class OpenAIProvider extends ChatCompletionsProvider {
     /**
-     * OpenAI's evergreen chat alias; always points at OpenAI's current recommended
-     * chat-completions model, so AWPT never has to track specific model versions.
+     * Default Chat Completions model (Improve matrix: more consistent than
+     * DeepSeek Flash / Terra on docs pattern-replace).
      */
-    private const DEFAULT_MODEL = 'chat-latest';
+    public const DEFAULT_MODEL = 'gpt-5.6-luna';
 
     /**
      * Get provider name.
@@ -73,15 +72,43 @@ final class OpenAIProvider extends ChatCompletionsProvider {
     }
 
     /**
-     * Provider model identifier. Always automatic; not user-configurable.
+     * Provider model identifier.
      */
     protected function get_model(): string {
+        $configured = trim((string) get_option('awpt_openai_model', ''));
+        $default = '' !== $configured ? $configured : self::DEFAULT_MODEL;
+
         /**
          * Filters the OpenAI model AWPT uses.
          *
-         * @param string $model Model identifier. Defaults to OpenAI's evergreen
-         *                       `chat-latest` alias.
+         * @param string $model Model identifier (e.g. gpt-5.6-luna, gpt-5.6-terra).
          */
-        return (string) apply_filters('awpt_openai_model', self::DEFAULT_MODEL);
+        return (string) apply_filters('awpt_openai_model', $default);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    protected function decorate_request_payload(array $payload, array $options): array {
+        $payload = ProviderCacheAffinity::apply_openai($payload, $options);
+
+        // GPT-5.6-* rejects function tools on Chat Completions unless reasoning is
+        // explicitly disabled (default effort is medium even when unset).
+        if (
+            [] !== ($payload['tools'] ?? [])
+            && self::model_requires_tools_without_reasoning((string) ($payload['model'] ?? ''))
+        ) {
+            $payload['reasoning_effort'] = 'none';
+        }
+
+        return $payload;
+    }
+
+    private static function model_requires_tools_without_reasoning(string $model): bool {
+        $model = strtolower(trim($model));
+
+        return str_starts_with($model, 'gpt-5.6') || str_contains($model, '/gpt-5.6');
     }
 }

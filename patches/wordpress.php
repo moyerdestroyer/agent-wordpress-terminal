@@ -99,9 +99,17 @@ namespace {
      * @param bool|null $associative
      * @param int       $depth
      * @param int       $flags
-     * @return array<array-key, mixed>|string|int|float|bool|null
+     * @return array<array-key, mixed>|\stdClass|string|int|float|bool|null
      */
-    function json_decode($json, $associative = null, $depth = 512, $flags = 0): array|string|int|float|bool|null {}
+    function json_decode($json, $associative = null, $depth = 512, $flags = 0): array|\stdClass|string|int|float|bool|null {}
+
+    /** @return int|false */
+    function wp_insert_comment($commentdata): int|false {}
+
+    function wp_set_comment_status($comment_id, $comment_status, $wp_error = false): bool|\WP_Error {}
+
+    /** @return list<\WP_Term>|\WP_Error */
+    function wp_get_nav_menus($args = []): array|\WP_Error {}
 
     /**
      * @param mixed $value

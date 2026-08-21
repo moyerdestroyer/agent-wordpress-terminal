@@ -124,8 +124,10 @@ final class RenderedVisualInspector {
     }
 
     private function wrapper_html(string $url, string $selector): string {
-        $target = wp_json_encode($url);
-        $requested = wp_json_encode($selector);
+        $encoded_url = wp_json_encode($url);
+        $encoded_selector = wp_json_encode($selector);
+        $target = false === $encoded_url ? '""' : $encoded_url;
+        $requested = false === $encoded_selector ? '""' : $encoded_selector;
 
         return (
             '<!doctype html><html><head><meta charset="utf-8"><style>'

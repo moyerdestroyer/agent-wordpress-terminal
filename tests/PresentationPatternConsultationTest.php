@@ -35,7 +35,7 @@ function test_pattern_first_uses_in_request_turn_tool_evidence(): void {
 
     Assert::same(
         [],
-        (new PatternFirstPolicy())->nonempty_recommendations($session_id),
+        new PatternFirstPolicy()->nonempty_recommendations($session_id),
         'empty turn + empty DB should yield no recommendations',
     );
 
@@ -50,7 +50,7 @@ function test_pattern_first_uses_in_request_turn_tool_evidence(): void {
         ],
     ]);
 
-    $recs = (new PatternFirstPolicy())->nonempty_recommendations($session_id);
+    $recs = new PatternFirstPolicy()->nonempty_recommendations($session_id);
     Assert::true([] !== $recs, 'in-request recommend-patterns should be visible mid-turn');
     Assert::same(
         'civicpress/layout-page-cards',

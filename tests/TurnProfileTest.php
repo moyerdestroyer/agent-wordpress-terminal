@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 use AWPT\Agent\TurnProfile;
+use AWPT\Support\ImprovePagePrompt;
 use AWPT\Support\SiteDesignContext;
 
 function test_turn_profile_chat_stays_light(): void {
@@ -123,7 +124,7 @@ function test_presentation_edit_is_inferred_from_prompt_and_focus(): void {
     Assert::false($profile->content_turn, 'a focused redesign must not enter new-page preparation');
     Assert::same(TurnProfile::TOOL_EDIT, $profile->tool_profile, 'a focused redesign uses the edit tool surface');
     Assert::true(
-        in_array('awpt/analyze-page', $profile->explore_allowlist(), true),
+        in_array('awpt/read-block-tree', $profile->explore_allowlist(), true),
         'redesign should inspect complete page structure',
     );
     Assert::true(
@@ -243,8 +244,12 @@ function test_turn_profile_explore_compose_allowlists(): void {
     $icon_edit = TurnProfile::from_message("Adjust the icon on page #32 so that it's a bit bigger.");
     Assert::same(TurnProfile::TOOL_EDIT, $icon_edit->tool_profile, 'targeted visual adjustments should use edit tools');
     Assert::true(
+        in_array('awpt/propose-block-batch-update', $icon_edit->compose_allowlist(), true),
+        'targeted edits use the surgical batch proposal',
+    );
+    Assert::false(
         in_array('awpt/propose-block-attrs-update', $icon_edit->compose_allowlist(), true),
-        'targeted edits must retain the surgical block proposal',
+        'single-path attr propose is not a model-facing tool',
     );
 }
 
@@ -269,14 +274,24 @@ function test_turn_profile_routes_non_content_mutations_to_one_compatible_operat
 
     $styles = TurnProfile::from_message('Update the site color palette.');
     Assert::same(
-        ['awpt/propose-global-styles-patch', 'awpt/propose-global-styles-update'],
+        ['awpt/propose-global-styles-patch'],
         $styles->compose_allowlist(),
-        'global style requests should prefer partial patches while retaining the full-document escape hatch',
+        'global style requests should use the partial patch tool',
     );
 
     $ambiguous = TurnProfile::from_message('Make the site look better.');
     Assert::same([], $ambiguous->compose_allowlist(), 'ambiguous site changes must not expose a broad proposal menu');
     Assert::true($ambiguous->needs_mutation_clarification(), 'ambiguous site changes should request a narrow target');
+}
+
+function test_improve_evaluate_uses_domain_guidance_without_broad_auto_retrieval(): void {
+    $profile = TurnProfile::from_message(ImprovePagePrompt::evaluate_text(), [], ['has_focus' => true]);
+
+    Assert::true($profile->is_improve_evaluate(), 'fixture uses the Improve evaluate profile');
+    Assert::false(
+        $profile->auto_retrieve_knowledge,
+        'Improve relies on its Domain Pack/design context and explicit reads instead of unrelated filesystem chunks',
+    );
 }
 
 test_turn_profile_chat_stays_light();
@@ -288,3 +303,4 @@ test_turn_profile_open_proposal_revision_uses_compose();
 test_turn_profile_design_level_none_for_chat();
 test_turn_profile_explore_compose_allowlists();
 test_turn_profile_routes_non_content_mutations_to_one_compatible_operation();
+test_improve_evaluate_uses_domain_guidance_without_broad_auto_retrieval();

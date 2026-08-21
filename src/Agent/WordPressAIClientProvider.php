@@ -37,6 +37,16 @@ final class WordPressAIClientProvider implements ProviderInterface {
     public function complete(array $messages, array $tools = [], array $options = []): array|\WP_Error {
         $started_at = microtime(true);
 
+        if ([] !== $tools) {
+            $error = new \WP_Error('awpt_connector_strict_tools_unsupported', __(
+                'The selected WordPress Connector cannot guarantee AWPT strict tool schemas. Select OpenAI or OpenRouter for agentic tool turns.',
+                'agent-wordpress-terminal',
+            ));
+            $this->log_complete($messages, $tools, $options, $error, ['started_at' => $started_at]);
+
+            return $error;
+        }
+
         if (!function_exists('wp_ai_client_prompt')) {
             $error = $this->response(
                 'WordPress AI Client is not available. Select OpenRouter or install a WordPress AI connector plugin.',

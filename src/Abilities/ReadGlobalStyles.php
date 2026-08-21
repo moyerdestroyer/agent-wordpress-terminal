@@ -18,7 +18,16 @@ final class ReadGlobalStyles implements AbilityInterface {
                 'Reads the active theme’s saved WordPress global-styles content and metadata.',
                 'agent-wordpress-terminal',
             ),
-            'input_schema' => ['type' => 'object'],
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'sections' => [
+                        'type' => 'array',
+                        'items' => ['enum' => ['saved_content', 'resolved_settings', 'resolved_styles']],
+                        'maxItems' => 3,
+                    ],
+                ],
+            ],
             'output_schema' => ['type' => 'object'],
             'permission_callback' => [$this, 'can_read'],
             'execute_callback' => [$this, 'execute'],
@@ -34,7 +43,12 @@ final class ReadGlobalStyles implements AbilityInterface {
 
     /** @param array<string, mixed> $input @return array<string, mixed>|\WP_Error */
     public function execute(array $input): array|\WP_Error {
-        unset($input);
+        $sections = is_array($input['sections'] ?? null)
+            ? array_values(array_intersect(
+                ['saved_content', 'resolved_settings', 'resolved_styles'],
+                array_map('strval', $input['sections']),
+            ))
+            : [];
         $theme = get_stylesheet();
         $posts = get_posts([
             'post_type' => 'wp_global_styles',
@@ -59,15 +73,20 @@ final class ReadGlobalStyles implements AbilityInterface {
                 'id' => $post->ID,
                 'theme' => '' !== $stylesheet ? $stylesheet : $theme,
                 'status' => $post->post_status,
-                'content' => $post->post_content,
+                'content_hash' => hash('sha256', $post->post_content),
                 'modified' => $post->post_modified,
+                'available_sections' => ['saved_content', 'resolved_settings', 'resolved_styles'],
             ];
 
-            if (function_exists('wp_get_global_settings')) {
+            if (in_array('saved_content', $sections, true)) {
+                $result['content'] = $post->post_content;
+            }
+
+            if (in_array('resolved_settings', $sections, true) && function_exists('wp_get_global_settings')) {
                 $result['resolved_settings'] = wp_get_global_settings();
             }
 
-            if (function_exists('wp_get_global_styles')) {
+            if (in_array('resolved_styles', $sections, true) && function_exists('wp_get_global_styles')) {
                 $result['resolved_styles'] = wp_get_global_styles();
             }
 
@@ -78,14 +97,16 @@ final class ReadGlobalStyles implements AbilityInterface {
             'id' => 0,
             'theme' => $theme,
             'content' => '',
+            'content_hash' => hash('sha256', ''),
+            'available_sections' => ['saved_content', 'resolved_settings', 'resolved_styles'],
             'note' => 'No saved global-styles revision exists for the active theme.',
         ];
 
-        if (function_exists('wp_get_global_settings')) {
+        if (in_array('resolved_settings', $sections, true) && function_exists('wp_get_global_settings')) {
             $result['resolved_settings'] = wp_get_global_settings();
         }
 
-        if (function_exists('wp_get_global_styles')) {
+        if (in_array('resolved_styles', $sections, true) && function_exists('wp_get_global_styles')) {
             $result['resolved_styles'] = wp_get_global_styles();
         }
 

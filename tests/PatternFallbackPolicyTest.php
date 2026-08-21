@@ -40,12 +40,7 @@ function test_pattern_fallback_policy_requires_structured_unfit_not_a_vague_reas
     );
     Assert::same(
         null,
-        $policy->validate(
-            $catalog,
-            'page',
-            'core',
-            'The theme patterns do not support the required map.',
-        ),
+        $policy->validate($catalog, 'page', 'core', 'The theme patterns do not support the required map.'),
         'a reason without pattern_unfit_code is allowed',
     );
     Assert::same(

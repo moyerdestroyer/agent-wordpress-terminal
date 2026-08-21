@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace AWPT\Domain;
 
+use AWPT\Agent\AgentWorkContextService;
 use AWPT\Agent\TurnProfile;
 use AWPT\Knowledge\KnowledgeRepository;
 use AWPT\Support\ArrayKey;
@@ -36,7 +37,7 @@ final class DomainGuidanceResolver {
                 $audience = (string) ($guidance['audience'] ?? 'editor');
 
                 if (
-                    empty($guidance['hard'])
+                    true !== ($guidance['hard'] ?? false)
                     || 'developer' === $audience
                     || !in_array('all', $applies, true) && !in_array($scope, $applies, true)
                     || !$this->trigger_matches($guidance, $profile->message)
@@ -52,15 +53,11 @@ final class DomainGuidanceResolver {
 
                 $entries[] = [
                     'priority' => (int) ($guidance['priority'] ?? 50),
-                    'text' => sprintf(
-                        '<domain-guidance pack="%s" version="%s" id="%s" scope="%s" hard="%s">%s</domain-guidance>',
-                        esc_attr((string) $pack['id']),
-                        esc_attr((string) $pack['version']),
-                        esc_attr((string) $guidance['id']),
-                        esc_attr($scope),
-                        'true',
-                        esc_html($content),
-                    ),
+                    'pack_id' => (string) $pack['id'],
+                    'pack_version' => (string) $pack['version'],
+                    'guidance_id' => (string) $guidance['id'],
+                    'scope' => $scope,
+                    'content' => $content,
                 ];
             }
         }
@@ -73,16 +70,44 @@ final class DomainGuidanceResolver {
         $header = 'Hard constraints from active Domain Packs follow. Other relevant modules are references in awpt-work-context and must be read with awpt/read-domain-guidance only when needed. Theme guidance cannot override AWPT safety, permissions, evidence, staging, or human approval requirements.';
         $remaining = max(1_000, $max_chars - mb_strlen($header));
         $parts = [];
+        $omitted = [];
 
         foreach ($entries as $entry) {
-            $text = $entry['text'];
-
             if ($remaining <= 0) {
+                $omitted[] = $entry['guidance_id'];
                 break;
             }
 
-            $parts[] = mb_substr($text, 0, $remaining, 'UTF-8');
-            $remaining -= mb_strlen(end($parts) ?: '', 'UTF-8');
+            $open = sprintf(
+                '<domain-guidance pack="%s" version="%s" id="%s" scope="%s" hard="true">',
+                esc_attr($entry['pack_id']),
+                esc_attr($entry['pack_version']),
+                esc_attr($entry['guidance_id']),
+                esc_attr($entry['scope']),
+            );
+            $close = '</domain-guidance>';
+            $available = $remaining - mb_strlen($open . $close, 'UTF-8');
+
+            if ($available < 160) {
+                $omitted[] = $entry['guidance_id'];
+                continue;
+            }
+
+            $content = esc_html($entry['content']);
+            if (mb_strlen($content, 'UTF-8') > $available) {
+                $suffix = ' [truncated; call awpt/read-domain-guidance for the complete module]';
+                $content = rtrim(mb_substr($content, 0, max(1, $available - mb_strlen($suffix)), 'UTF-8')) . $suffix;
+            }
+
+            $parts[] = $open . $content . $close;
+            $remaining -= mb_strlen($parts[array_key_last($parts)], 'UTF-8');
+        }
+
+        if ([] !== $omitted) {
+            $parts[] =
+                '<omitted-domain-guidance ids="'
+                . esc_attr(implode(',', $omitted))
+                . '">Read these exact modules with awpt/read-domain-guidance when relevant.</omitted-domain-guidance>';
         }
 
         return "<active-domain-packs>\n{$header}\n" . implode("\n", $parts) . "\n</active-domain-packs>";
@@ -119,7 +144,7 @@ final class DomainGuidanceResolver {
                     'pack_version' => (string) $pack['version'],
                     'guidance_id' => $guidance_id,
                     'label' => (string) $guidance['label'],
-                    'hard' => (bool) $guidance['hard'],
+                    'hard' => ArrayKey::rest_bool($guidance['hard']),
                     'applies_to' => ArrayKey::list_of_strings($guidance['applies_to'] ?? null),
                     'content' => $content,
                 ];
@@ -134,20 +159,7 @@ final class DomainGuidanceResolver {
     }
 
     private function scope(TurnProfile $profile): string {
-        return match (true) {
-            (bool) preg_match('/\b(navigation|menu|submenu|nav)\b/i', $profile->message) => 'navigation',
-            (bool) preg_match(
-                '/\b(global styles?|theme\.json|palette|site-wide|font family|design tokens?)\b/i',
-                $profile->message,
-            )
-                => 'global_styles',
-            $profile->needs_compose_module() => 'compose',
-            $profile->needs_edit_module() => 'edit',
-            $profile->needs_template_module() => 'template',
-            $profile->needs_settings_module() => 'settings',
-            $profile->needs_diagnosis_module() => 'diagnose',
-            default => 'investigate',
-        };
+        return new AgentWorkContextService($this->registry)->scope($profile);
     }
 
     /**

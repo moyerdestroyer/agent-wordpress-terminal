@@ -134,6 +134,21 @@ function test_incomplete_turn_formatter_summarizes_evidence_without_dumping_it()
 
 test_incomplete_turn_formatter_summarizes_evidence_without_dumping_it();
 
+function test_incomplete_turn_formatter_distinguishes_provider_rejection_from_timeout(): void {
+    $rejected = new ToolResultFormatter()->format_incomplete_turn(
+        [],
+        'Provider request failed (400): Tool schema is invalid.',
+        'awpt_provider_request_failed',
+    );
+    Assert::true(str_contains($rejected, 'provider rejected the request'), 'HTTP 400 is labeled as rejection');
+    Assert::false(str_contains($rejected, 'timed out'), 'HTTP 400 is not mislabeled as timeout');
+
+    $timeout = new ToolResultFormatter()->format_incomplete_turn([], 'cURL error 28: Operation timed out.');
+    Assert::true(str_contains($timeout, 'timed out'), 'real transport timeout keeps timeout wording');
+}
+
+test_incomplete_turn_formatter_distinguishes_provider_rejection_from_timeout();
+
 function test_incomplete_turn_formatter_does_not_deny_successful_staging(): void {
     $content = new ToolResultFormatter()->format_incomplete_turn([[
         'tool' => 'awpt/propose-content-update',

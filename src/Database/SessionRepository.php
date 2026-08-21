@@ -299,7 +299,7 @@ final class SessionRepository {
 
         $wpdb = WpDb::get();
 
-        foreach (['messages', 'tool_calls', 'actions'] as $suffix) {
+        foreach (['messages', 'tool_calls', 'session_events', 'provider_calls', 'actions'] as $suffix) {
             $wpdb->delete($wpdb->prefix . 'awpt_' . $suffix, ['session_id' => $session_id], where_format: ['%d']);
         }
 
@@ -324,6 +324,7 @@ final class SessionRepository {
 
         $wpdb->delete($wpdb->prefix . 'awpt_messages', ['session_id' => $session_id], where_format: ['%d']);
         $wpdb->delete($wpdb->prefix . 'awpt_tool_calls', ['session_id' => $session_id], where_format: ['%d']);
+        $wpdb->delete($wpdb->prefix . 'awpt_session_events', ['session_id' => $session_id], where_format: ['%d']);
         $wpdb->delete($wpdb->prefix . 'awpt_actions', ['session_id' => $session_id], where_format: ['%d']);
     }
 

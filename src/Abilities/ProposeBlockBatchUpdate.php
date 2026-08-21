@@ -29,13 +29,20 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             'name' => 'awpt/propose-block-batch-update',
             'label' => __('Propose Block Batch Update', 'agent-wordpress-terminal'),
             'description' => __(
-                'Stages one atomic existing-page update containing multiple verified attribute, rich-text, combined block, removal, or insertion changes. Each path accepts one non-insertion mutation; use update_block with both attrs and content when the same block needs attribute and rich-text changes. Use paths and fingerprints from the compose evidence pack content_reads block tree (from awpt/read-block-tree or server-side synthesis). Insertions must use a verified anchor path and before/after position.',
+                'Stages one atomic existing-page update. Each change is kind set, remove, or insert on a verified block_path and expected_fingerprint from awpt/read-block-tree. For set, send attrs and/or html. For inserted headings or paragraphs, send content on the insert itself; the server builds the semantic wrapper.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [
                     'session_id' => ['type' => 'integer'],
+                    'action_id' => [
+                        'type' => 'integer',
+                        'description' => __(
+                            'Optional staged candidate to revise in place. Paths and fingerprints must come from reading this action_id.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
                     'post_id' => ['type' => 'integer'],
                     'presentation_requires_h1' => ['type' => 'boolean'],
                     'changes' => [
@@ -47,9 +54,17 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                             'properties' => [
                                 'kind' => [
                                     'type' => 'string',
-                                    'enum' => ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'],
+                                    'enum' => [
+                                        'set',
+                                        'remove',
+                                        'insert',
+                                        'update_attrs',
+                                        'replace_text',
+                                        'replace_inner_html',
+                                        'update_block',
+                                    ],
                                     'description' => __(
-                                        'Use update_block—not separate update_attrs and replace_text entries—when one path needs both attrs and content changed.',
+                                        'Prefer set (attrs and/or html), remove, or insert. Legacy kind names still work.',
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
@@ -68,14 +83,30 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                                     'type' => 'object',
                                     'additionalProperties' => true,
                                     'description' => __(
-                                        'Required for update_attrs and update_block.',
+                                        'For set, attributes to merge. For insert, attributes of the new block (for example heading level).',
+                                        'agent-wordpress-terminal',
+                                    ),
+                                ],
+                                'html' => [
+                                    'type' => 'string',
+                                    'maxLength' => 20_000,
+                                    'description' => __(
+                                        'For set, leaf inner HTML from awpt/get-block without Gutenberg comments.',
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
                                 'content' => [
                                     'type' => 'string',
                                     'description' => __(
-                                        'Required for replace_text and update_block.',
+                                        'Rich text for set when html is not used, or text for an inserted heading/paragraph.',
+                                        'agent-wordpress-terminal',
+                                    ),
+                                ],
+                                'inner_html' => [
+                                    'type' => 'string',
+                                    'maxLength' => 20_000,
+                                    'description' => __(
+                                        'Alias of html. For insert, markup of the new block including its semantic wrapper.',
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
@@ -84,13 +115,6 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                                     'type' => 'string',
                                     'description' => __(
                                         'Required for insert, for example core/heading.',
-                                        'agent-wordpress-terminal',
-                                    ),
-                                ],
-                                'inner_html' => [
-                                    'type' => 'string',
-                                    'description' => __(
-                                        'Saved HTML for an inserted block, including its semantic wrapper (for example <h1>Title</h1> or <p>Introduction</p>).',
                                         'agent-wordpress-terminal',
                                     ),
                                 ],
@@ -121,7 +145,11 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
     /** @param array<string, mixed> $input @return array<string, mixed>|\WP_Error */
     public function execute(array $input): array|\WP_Error {
         $session_id = (int) ($input['session_id'] ?? 0);
-        $post_id = (int) ($input['post_id'] ?? 0);
+        $action_id = (int) ($input['action_id'] ?? 0);
+        $actions = new ActionRepository();
+        $existing_action = $action_id > 0 ? $actions->format_action($action_id) : null;
+        $existing_payload = is_array($existing_action['payload'] ?? null) ? $existing_action['payload'] : [];
+        $post_id = $action_id > 0 ? (int) ($existing_payload['post_id'] ?? 0) : (int) ($input['post_id'] ?? 0);
         $post = get_post($post_id);
 
         if (!$post instanceof \WP_Post) {
@@ -135,24 +163,40 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
                 'status' => 404,
             ]);
         }
+        if (
+            $action_id > 0
+            && (
+                null === $existing_action
+                || (int) ($existing_action['session_id'] ?? 0) !== $session_id
+                || !in_array((string) ($existing_action['status'] ?? ''), ['verifying', 'proposed', 'approved'], true)
+            )
+        ) {
+            return new \WP_Error(
+                'awpt_candidate_not_revisable',
+                __('The staged candidate is no longer available for revision.', 'agent-wordpress-terminal'),
+                ['status' => 409],
+            );
+        }
         $raw_changes = is_array($input['changes'] ?? null) ? array_values($input['changes']) : [];
         /** @var list<array<string, mixed>> $changes */
         $changes = array_values(array_filter($raw_changes, 'is_array'));
         $updater = new BlockBatchUpdater();
-        $update = $updater->apply($post->post_content, $changes);
+        $baseline_content = $action_id > 0 ? (string) ($existing_payload['post_content'] ?? '') : $post->post_content;
+        $update = $updater->apply($baseline_content, $changes);
 
         if (is_wp_error($update)) {
             return $update;
         }
 
         $payload = [
+            ...$existing_payload,
             'operation' => ActionOperations::CONTENT_UPDATE,
             'post_id' => $post_id,
             'post_type' => $post->post_type,
             'post_status' => $post->post_status,
-            'original_post_title' => $post->post_title,
-            'original_post_content' => $post->post_content,
-            'original_post_status' => $post->post_status,
+            'original_post_title' => (string) ($existing_payload['original_post_title'] ?? $post->post_title),
+            'original_post_content' => (string) ($existing_payload['original_post_content'] ?? $post->post_content),
+            'original_post_status' => (string) ($existing_payload['original_post_status'] ?? $post->post_status),
             'post_content' => $update['content'],
             'batch_changes' => $update['changes'],
             'presentation_requires_h1' => true === ($input['presentation_requires_h1'] ?? false),
@@ -188,15 +232,17 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             $payload['preview_autosave_id'] = (int) $preview_result['autosave_id'];
         }
 
-        $actions = new ActionRepository();
-        $action_id = $actions->create(
-            $session_id,
-            sanitize_text_field((string) ($input['title'] ?? '')),
-            $updater->describe($update['changes']),
-            $payload,
-        );
+        $title = sanitize_text_field((string) ($input['title'] ?? ''));
+        $description = $updater->describe($update['changes']);
+        if ($action_id > 0) {
+            $saved = $actions->revise($action_id, $title, $description, $payload);
+        } else {
+            $created_action_id = $actions->create($session_id, $title, $description, $payload);
+            $saved = null !== $created_action_id;
+            $action_id = $created_action_id ?? 0;
+        }
 
-        if (null === $action_id) {
+        if (!$saved || $action_id <= 0) {
             $preview->discard_preview_resources($payload);
 
             return new \WP_Error(
@@ -206,6 +252,16 @@ final class ProposeBlockBatchUpdate implements AbilityInterface {
             );
         }
 
-        return $actions->format_action($action_id) ?? [];
+        if ([] !== $existing_payload) {
+            $preview->discard_preview_resources($existing_payload);
+        }
+
+        $action = $actions->format_action($action_id) ?? [];
+        if ([] !== $existing_payload) {
+            $action['revised_action_id'] = $action_id;
+            $action['revision_kind'] = 'candidate_block_batch';
+        }
+
+        return $action;
     }
 }

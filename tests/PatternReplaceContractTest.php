@@ -159,6 +159,13 @@ function test_pattern_replace_action_applier_rebuilds_live_content(): void {
     }
 }
 
+function test_pattern_propose_auto_prepare_rejects_placeholders_and_accepts_path_intent(): void {
+    $helper = new AWPT\Support\PatternProposeAutoPrepare();
+    Assert::true($helper->looks_placeholder('<FROM_PREPARE>'), 'schema placeholders are unusable');
+    Assert::true($helper->looks_like_hash(str_repeat('a', 64)), '64-hex hashes are not receipts');
+    Assert::false($helper->looks_placeholder('prep-uuid-like'), 'ordinary ids are not placeholders');
+}
+
 function test_pattern_preparation_receipt_round_trip_and_tamper(): void {
     awpt_test_reset_state();
 
@@ -259,10 +266,10 @@ function test_pattern_replace_rejects_stale_expanded_hash(): void {
 
     if (!is_wp_error($loaded)) {
         Assert::false(
-            hash_equals(
-                (string) ($loaded['expanded_content_hash'] ?? ''),
-                hash('sha256', (string) ($loaded['pattern_content'] ?? '')),
-            ),
+            hash_equals((string) ($loaded['expanded_content_hash'] ?? ''), hash(
+                'sha256',
+                (string) ($loaded['pattern_content'] ?? ''),
+            )),
             'corrupted pattern_content must not match expanded_content_hash',
         );
     }
@@ -297,17 +304,24 @@ function test_pattern_replace_payload_sanitizer_keeps_structure(): void {
     );
     Assert::same('prep-123', $payload['preparation_id'] ?? null, 'preparation_id should be preserved');
     Assert::same(['1'], $payload['replaced_paths'] ?? null, 'invalid replaced paths should be dropped');
-    Assert::same(
-        'core/group',
-        $payload['blocks'][0]['blockName'] ?? null,
-        'outer replacement block should be stored',
-    );
+    Assert::same('core/group', $payload['blocks'][0]['blockName'] ?? null, 'outer replacement block should be stored');
 }
 
 test_block_tree_replace_preserves_non_target_sections();
 test_block_tree_replace_rejects_stale_fingerprint();
 test_block_tree_replace_expands_multi_root_in_place();
 test_pattern_replace_action_applier_rebuilds_live_content();
+test_pattern_propose_auto_prepare_rejects_placeholders_and_accepts_path_intent();
 test_pattern_preparation_receipt_round_trip_and_tamper();
 test_pattern_replace_rejects_stale_expanded_hash();
 test_pattern_replace_payload_sanitizer_keeps_structure();
+
+function test_apply_action_routes_pattern_replace(): void {
+    $source = (string) file_get_contents(dirname(__DIR__) . '/src/Abilities/ApplyAction.php');
+    Assert::true(
+        (bool) preg_match("/'pattern_insert',\\s*'pattern_replace',\\s*'template_update'/s", $source),
+        'ApplyAction must route pattern_replace with content appliers (not unsupported_action)',
+    );
+}
+
+test_apply_action_routes_pattern_replace();

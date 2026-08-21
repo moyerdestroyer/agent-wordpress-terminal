@@ -33,7 +33,7 @@ final class ReadProposal implements AbilityInterface {
             'name' => 'awpt/read-proposal',
             'label' => __('Read Proposal', 'agent-wordpress-terminal'),
             'description' => __(
-                'Returns an open AWPT proposal and its staged payload so it can be revised without reconstructing prior work.',
+                'Returns an open AWPT proposal and its staged payload. For an existing-page Improve candidate, pass action_id to read-block-tree/get-block and revise with propose-block-batch-update.',
                 'agent-wordpress-terminal',
             ),
             'input_schema' => [
@@ -62,7 +62,7 @@ final class ReadProposal implements AbilityInterface {
     public function can_read(array $input): bool {
         $row = $this->actions->get_accessible_row((int) ($input['action_id'] ?? 0));
 
-        return is_array($row) && in_array((string) ($row['status'] ?? ''), ['proposed', 'approved'], true);
+        return is_array($row) && in_array((string) ($row['status'] ?? ''), ['verifying', 'proposed', 'approved'], true);
     }
 
     /**
@@ -73,7 +73,10 @@ final class ReadProposal implements AbilityInterface {
         $action_id = (int) ($input['action_id'] ?? 0);
         $action = $this->actions->format_action($action_id);
 
-        if (null === $action || !in_array((string) ($action['status'] ?? ''), ['proposed', 'approved'], true)) {
+        if (
+            null === $action
+            || !in_array((string) ($action['status'] ?? ''), ['verifying', 'proposed', 'approved'], true)
+        ) {
             return new \WP_Error(
                 'awpt_proposal_not_found',
                 __('Open proposal not found.', 'agent-wordpress-terminal'),
@@ -114,7 +117,7 @@ final class ReadProposal implements AbilityInterface {
             'editable_slots' => new PatternEditableSlots()->from_content($content),
             'image_blocks' => $tree->flat_list('core/image', 40),
             'instruction' => __(
-                'For ordinary revisions, use awpt/propose-patterned-post with this action_id and only the path-addressed text or media changes. Do not pass this action ID to post-reading abilities. Use awpt/propose-new-post with full post_content only for an explicitly from-scratch redesign.',
+                'For a new-post proposal, use awpt/propose-patterned-post with this action_id and path-addressed changes. For an existing-page candidate, read-block-tree/get-block may target this action_id, then propose-block-batch-update can revise it in place. Use a full-document proposal only for an explicitly from-scratch redesign.',
                 'agent-wordpress-terminal',
             ),
         ];

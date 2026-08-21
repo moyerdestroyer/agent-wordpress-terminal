@@ -132,10 +132,7 @@ function test_pattern_structure_evidence_accepts_prepare_draft(): void {
         $evidence->has_read($session_id, 'fixture/section-text-one-column'),
         'prepare draft components should count as structure evidence',
     );
-    Assert::true(
-        $evidence->session_has_pattern_draft($session_id),
-        'prepare draft mode=pattern should be detected',
-    );
+    Assert::true($evidence->session_has_pattern_draft($session_id), 'prepare draft mode=pattern should be detected');
 
     TurnToolEvidence::reset($session_id);
 }

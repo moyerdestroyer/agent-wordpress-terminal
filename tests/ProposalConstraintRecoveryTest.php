@@ -196,7 +196,7 @@ function test_proposal_failure_normalizer_maps_unresolved_local_media(): void {
     Assert::same('unresolved_local_media', $constraints[0]['id'] ?? '', 'media failures map to a dedicated constraint');
     Assert::true(
         str_contains(implode(' ', $constraints[0]['hints'] ?? []), 'media_unavailable')
-            || str_contains(implode(' ', $constraints[0]['hints'] ?? []), 'Omit'),
+        || str_contains(implode(' ', $constraints[0]['hints'] ?? []), 'Omit'),
         'hints should steer omit or media_unavailable',
     );
     Assert::true(
@@ -230,8 +230,7 @@ function test_proposal_constraint_set_media_failure_avoids_recommend_thrash(): v
         'media constraint should surface in recovery',
     );
     Assert::true(
-        str_contains($guidance, 'Do not re-run recommend-patterns')
-            || str_contains($guidance, 'do not re-call them'),
+        str_contains($guidance, 'Do not re-run recommend-patterns') || str_contains($guidance, 'do not re-call them'),
         'media recovery should discourage discovery thrash',
     );
 }
@@ -249,9 +248,8 @@ function test_proposal_failure_normalizer_maps_replace_position_and_domain(): vo
     );
     Assert::same('pattern_insert_position', $replace[0]['id'] ?? '', 'replace maps to insert-position constraint');
     Assert::true(
-        str_contains(implode(' ', $replace[0]['hints'] ?? []), 'propose-pattern-replace')
-        || str_contains(implode(' ', $replace[0]['hints'] ?? []), 'prepare-pattern-change'),
-        'replace recovery should point at prepare/propose pattern replace',
+        str_contains(implode(' ', $replace[0]['hints'] ?? []), 'propose-pattern-replace'),
+        'replace recovery should point at propose-pattern-replace with path and intent',
     );
 
     $domain = ProposalFailureNormalizer::normalize(
@@ -269,7 +267,7 @@ function test_proposal_failure_normalizer_maps_replace_position_and_domain(): vo
     Assert::same('domain_validation', $domain[0]['id'] ?? '', 'domain failures map to domain_validation');
     Assert::true(
         str_contains(implode(' ', $domain[0]['hints'] ?? []), 'blocking_findings')
-            || str_contains(implode(' ', $domain[0]['hints'] ?? []), 'Inherited'),
+        || str_contains(implode(' ', $domain[0]['hints'] ?? []), 'Inherited'),
         'domain recovery should mention blocking vs inherited',
     );
 
@@ -277,7 +275,7 @@ function test_proposal_failure_normalizer_maps_replace_position_and_domain(): vo
     Assert::same('provider_timeout', $timeout[0]['id'] ?? '', 'timeouts map to provider_timeout');
     Assert::true(
         str_contains(implode(' ', $timeout[0]['hints'] ?? []), 'Shrink')
-            || str_contains(implode(' ', $timeout[0]['hints'] ?? []), 'full'),
+        || str_contains(implode(' ', $timeout[0]['hints'] ?? []), 'full'),
         'timeout recovery should ask for a smaller propose',
     );
 }

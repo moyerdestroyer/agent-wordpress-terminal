@@ -79,7 +79,7 @@ function test_post_content_media_integrity_blocks_ambiguous_local_upload_urls_wi
     );
     Assert::true(
         str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'omit')
-            || str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'optional'),
+        || str_contains((string) ($ambiguous_data['recovery'] ?? ''), 'optional'),
         'recovery should allow omitting optional media',
     );
 

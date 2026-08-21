@@ -74,6 +74,44 @@ final class PatternMetadataCatalog {
         return $this->all()[sanitize_text_field($pattern_name)] ?? [];
     }
 
+    public function hash(): string {
+        $items = $this->all();
+        ksort($items);
+
+        return hash('sha256', (string) wp_json_encode($items));
+    }
+
+    /** @return array{count: int, namespaces: list<string>, roles: list<string>, hash: string} */
+    public function index(): array {
+        $namespaces = [];
+        $roles = [];
+
+        foreach ($this->all() as $name => $metadata) {
+            $parts = explode('/', $name, 2);
+            $namespace = sanitize_key($parts[0]);
+            $role = sanitize_key((string) ($metadata['role'] ?? ''));
+
+            if ('' !== $namespace) {
+                $namespaces[] = $namespace;
+            }
+            if ('' !== $role) {
+                $roles[] = $role;
+            }
+        }
+
+        $namespaces = array_values(array_unique($namespaces));
+        $roles = array_values(array_unique($roles));
+        sort($namespaces);
+        sort($roles);
+
+        return [
+            'count' => count($this->all()),
+            'namespaces' => $namespaces,
+            'roles' => $roles,
+            'hash' => $this->hash(),
+        ];
+    }
+
     /**
      * @param array<string, mixed> $metadata
      * @return array<string, mixed>

@@ -104,17 +104,65 @@ final class ToolRegistry {
             }
 
             $seen_functions[$function_name] = true;
+            $parameters = $this->without_runtime_owned_parameters($tool['name'], $tool['parameters']);
             $tools[] = [
                 'type' => 'function',
                 'function' => [
                     'name' => $function_name,
                     'description' => $tool['description'],
-                    'parameters' => $tool['parameters'],
+                    'parameters' => $parameters,
+                    'strict' => true,
                 ],
             ];
         }
 
         return $tools;
+    }
+
+    /**
+     * Values supplied from trusted turn state must not be requested from the
+     * model merely to satisfy a strict provider schema.
+     *
+     * @param array<string, mixed> $parameters
+     * @return array<string, mixed>
+     */
+    private function without_runtime_owned_parameters(string $tool_name, array $parameters): array {
+        $remove = [];
+
+        if (ProposalAbilities::requires_session_id($tool_name)) {
+            $remove[] = 'session_id';
+        }
+
+        if (in_array($tool_name, ['awpt/prepare-pattern-change', 'awpt/prepare-pattern-draft'], true)) {
+            $remove[] = 'session_id';
+        }
+
+        if ('awpt/search-knowledge' === $tool_name) {
+            $remove = [...$remove, 'session_id', 'seen_chunk_ids', 'seen_query_fingerprints', 'seen_queries'];
+        }
+
+        if ('awpt/finalize-proposal-review' === $tool_name) {
+            $remove = [...$remove, 'action_id', 'review_token'];
+        }
+
+        if ([] === $remove || !is_array($parameters['properties'] ?? null)) {
+            return $parameters;
+        }
+
+        foreach (array_unique($remove) as $name) {
+            unset($parameters['properties'][$name]);
+        }
+
+        if ([] === $parameters['properties']) {
+            $parameters['properties'] = new \stdClass();
+        }
+
+        $parameters['required'] = array_values(array_filter(
+            is_array($parameters['required'] ?? null) ? $parameters['required'] : [],
+            static fn(mixed $name): bool => is_string($name) && !in_array($name, $remove, true),
+        ));
+
+        return $parameters;
     }
 
     /**
@@ -126,6 +174,10 @@ final class ToolRegistry {
     public function get_chat_completion_tools_for_profile(TurnProfile $profile): array {
         $allow = $profile->tool_allowlist();
 
+        if ($profile->is_improve_evaluate()) {
+            return $this->get_chat_completion_tools($allow);
+        }
+
         return $this->get_chat_completion_tools_for_allowlist($allow);
     }
 
@@ -136,21 +188,21 @@ final class ToolRegistry {
      * @param list<string> $preferred
      * @return array<int, array<string, mixed>>
      */
-    public function get_exploration_tools(array $preferred = []): array {
-        return $this->get_chat_completion_tools_for_allowlist($preferred);
+    public function get_exploration_tools(array $preferred = [], bool $include_finder = true): array {
+        return $this->get_chat_completion_tools_for_allowlist($preferred, $include_finder);
     }
 
     /**
      * @param list<string> $allow Ability allow-list; empty means discovery only.
      * @return array<int, array<string, mixed>>
      */
-    public function get_chat_completion_tools_for_allowlist(array $allow): array {
+    public function get_chat_completion_tools_for_allowlist(array $allow, bool $include_finder = true): array {
         if ([] === $allow) {
-            $allow = ['awpt/find-abilities'];
+            $allow = $include_finder ? ['awpt/find-abilities'] : [];
         }
 
         $replacements = new AbilityReplacementRegistry();
-        $resolved = ['awpt/find-abilities'];
+        $resolved = $include_finder ? ['awpt/find-abilities'] : [];
 
         foreach ($allow as $name) {
             $resolved[] = $replacements->preferred($name);
@@ -221,6 +273,13 @@ final class ToolRegistry {
             return false;
         }
 
+        // This mutation is a phase-scoped agent decision, not a site write.
+        // ProviderToolCallExecutor supplies an unforgeable per-loop token and
+        // only the Improve review surface ever declares the tool.
+        if ('awpt/finalize-proposal-review' === $tool_name) {
+            return true;
+        }
+
         $annotations = $this->annotations_for($tool_name);
 
         if (true === ($annotations['readonly'] ?? null) || self::is_proposal_ability($tool_name)) {
@@ -231,7 +290,7 @@ final class ToolRegistry {
     }
 
     public function requires_explicit_trust(string $tool_name): bool {
-        if (self::is_proposal_ability($tool_name)) {
+        if (self::is_proposal_ability($tool_name) || 'awpt/finalize-proposal-review' === $tool_name) {
             return false;
         }
 
@@ -261,6 +320,42 @@ final class ToolRegistry {
 
     public function is_ability(string $tool_name): bool {
         return $this->abilities->is_ability($tool_name);
+    }
+
+    /** Convert strict provider arguments back to the registered native input. */
+    public function native_input(string $tool_name, array $provider_input): mixed {
+        if ($this->is_ability($tool_name) && function_exists('wp_get_ability')) {
+            $ability = wp_get_ability($tool_name);
+
+            if (null !== $ability && method_exists($ability, 'get_input_schema')) {
+                $schema = $ability->get_input_schema();
+
+                return new AbilityTransportCodec()->ability_input($schema, $provider_input);
+            }
+        }
+
+        $schema = $this->mcp->input_schema($tool_name);
+
+        return null === $schema
+            ? $provider_input
+            : new AbilityTransportCodec()->ability_input($schema, $provider_input);
+    }
+
+    /** Encode native input snippets for a strict provider declaration. */
+    public function provider_input(string $tool_name, array $native_input): mixed {
+        if ($this->is_ability($tool_name) && function_exists('wp_get_ability')) {
+            $ability = wp_get_ability($tool_name);
+
+            if (null !== $ability && method_exists($ability, 'get_input_schema')) {
+                $schema = $ability->get_input_schema();
+
+                return new AbilityTransportCodec()->provider_input($schema, $native_input);
+            }
+        }
+
+        $schema = $this->mcp->input_schema($tool_name);
+
+        return null === $schema ? $native_input : new AbilityTransportCodec()->provider_input($schema, $native_input);
     }
 
     /**

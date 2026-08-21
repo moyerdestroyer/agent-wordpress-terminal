@@ -4,9 +4,15 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import { createSession, getChatProgress, getSession, sendMessage, updateAction } from './api';
 import { AgentTurnStatus } from './components/AgentTurnStatus';
 import { improvePageActPrompt, improvePageReviewEvaluatePrompt } from './improvePagePrompt';
-import { runImproveWorkflow } from './improveWorkflow';
+import { improveWorkflowHasRemainingUnits, runImproveWorkflow } from './improveWorkflow';
 import { buildReviewChangeSummary } from './reviewChangeSummary';
-import type { ActionPayload, ChatProgress, ProposedAction, ToolCall } from './types';
+import type {
+	ActionPayload,
+	ChatProgress,
+	ImproveWorkflow,
+	ProposedAction,
+	ToolCall,
+} from './types';
 import './reviewBridge.css';
 
 interface MountOptions {
@@ -27,7 +33,7 @@ declare global {
 }
 
 /** Must stay aligned with AWPT\Admin\Page::REVIEW_BRIDGE_VERSION. */
-const REVIEW_BRIDGE_VERSION = 1;
+const REVIEW_BRIDGE_VERSION = 2;
 
 const REVIEW_SAFE_OPERATIONS = new Set([
 	'content_update',
@@ -140,6 +146,7 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 	const [reviewOutcome, setReviewOutcome] = useState<ReviewOutcome | null>(null);
 	const [contextTurnCount, setContextTurnCount] = useState(0);
 	const [reviewerNotes, setReviewerNotes] = useState('');
+	const [improveWorkflow, setImproveWorkflow] = useState<ImproveWorkflow | null>(null);
 	const latestTurnId = useRef<string | null>(null);
 	const isWorking = isSending || isApplying || isResetting;
 	const latestAction = useMemo(() => pickLatestReviewAction(actions, postId), [actions, postId]);
@@ -156,6 +163,7 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 				if (!active) return;
 				setSessionId(session.id);
 				setActions(detail.actions);
+				setImproveWorkflow(detail.improve_workflow ?? null);
 				setContextTurnCount(
 					detail.messages.filter((message) => message.role === 'assistant').length,
 				);
@@ -233,6 +241,14 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 		try {
 			const updated = await updateAction(action.id, 'apply');
 			setActions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+			if (sessionId) {
+				try {
+					const detail = await getSession(sessionId);
+					setImproveWorkflow(detail.improve_workflow ?? null);
+				} catch {
+					// The applied action is still shown if workflow refresh fails.
+				}
+			}
 			onApplied?.();
 			setReviewOutcome({
 				state: verification,
@@ -263,6 +279,136 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 			setIsApplying(false);
 			setProgress(null);
 		}
+	};
+
+	/** After a successful apply, stage+apply remaining Improve units until the plan is done. */
+	const afterApplyContinueIfNeeded = async (
+		options: { manageSending?: boolean } = {},
+	): Promise<void> => {
+		if (!sessionId) return;
+		const manageSending = options.manageSending !== false;
+
+		const maxTurns = 8;
+		for (let turn = 0; turn < maxTurns; turn += 1) {
+			let workflow: ImproveWorkflow | null = null;
+			try {
+				const detail = await getSession(sessionId);
+				workflow = detail.improve_workflow ?? null;
+				setImproveWorkflow(workflow);
+			} catch {
+				return;
+			}
+
+			if (!improveWorkflowHasRemainingUnits(workflow) || !workflow) {
+				return;
+			}
+
+			if (manageSending) {
+				setIsSending(true);
+			}
+			setProgress({
+				state: 'pending',
+				phase: 'starting',
+				label: __('Continuing the plan', 'agent-wordpress-terminal'),
+				detail: __(
+					'Staging the next focused page change from the evaluation plan.',
+					'agent-wordpress-terminal',
+				),
+				completed: 0,
+				total: 0,
+				sequence: Date.now(),
+				updated_at: new Date().toISOString(),
+			});
+
+			try {
+				const actTurnId = newTurnId();
+				const response = await sendMessage(sessionId, improvePageActPrompt(), [], actTurnId, {
+					id: workflow.id,
+					type: 'improve',
+					phase: 'act',
+				});
+				if (response.improve_workflow) {
+					setImproveWorkflow(response.improve_workflow);
+				}
+				setContextTurnCount((count) => count + 1);
+
+				const incoming = response.actions ?? [];
+				if (response.turn_outcome?.status === 'failed') {
+					setProgress(null);
+					setReviewOutcome({
+						state: 'failed',
+						message: response.turn_outcome.message,
+						errorCode: response.turn_outcome.error_code,
+					});
+					return;
+				}
+
+				if (!incoming.length) {
+					setProgress(null);
+					setReviewOutcome({
+						state: 'no-change',
+						message:
+							response.content ||
+							__(
+								'AWPT completed this unit without proposing a page change.',
+								'agent-wordpress-terminal',
+							),
+					});
+					return;
+				}
+
+				setActions((current) => mergeActions(current, incoming));
+				const pending = incoming
+					.filter(
+						(action) =>
+							isReviewSafeAction(action, postId) &&
+							(action.status === 'proposed' || action.status === 'approved'),
+					)
+					.sort(byNewestId);
+				if (pending.length !== 1) {
+					setProgress(null);
+					setReviewOutcome({
+						state: 'failed',
+						message: __(
+							'AWPT proposed a change outside this page’s safe review scope, so it was not applied.',
+							'agent-wordpress-terminal',
+						),
+						errorCode: 'awpt_review_action_not_safe',
+					});
+					return;
+				}
+
+				const applied = await applyReviewAction(
+					pending[0],
+					visualVerification(response.tool_calls, incoming),
+				);
+				if (!applied) {
+					return;
+				}
+				setReviewerNotes('');
+			} catch (reason) {
+				setProgress(null);
+				setError(
+					errorText(reason, __('The agent request failed. Try again.', 'agent-wordpress-terminal')),
+				);
+				return;
+			} finally {
+				if (manageSending) {
+					setIsSending(false);
+				}
+			}
+		}
+	};
+
+	const applyReviewActionThenContinue = async (
+		action: ProposedAction,
+		verification: 'verified' | 'unverified' = 'unverified',
+	): Promise<void> => {
+		const applied = await applyReviewAction(action, verification);
+		if (!applied) {
+			return;
+		}
+		await afterApplyContinueIfNeeded();
 	};
 
 	const startFreshContext = async () => {
@@ -367,6 +513,31 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 
 		try {
 			let evalResponse: import('./types').ChatResponse | null = null;
+			const stageAndApplyUnit = async (
+				workflow: import('./types').ImproveWorkflow,
+				label: string,
+				detail: string,
+			) => {
+				setImproveWorkflow(workflow);
+				const actTurnId = newTurnId();
+				setProgress({
+					state: 'pending',
+					phase: 'starting',
+					label,
+					detail,
+					completed: 0,
+					total: 0,
+					sequence: Date.now(),
+					updated_at: new Date().toISOString(),
+				});
+				startPolling(actTurnId);
+				return sendMessage(sessionId, improvePageActPrompt(), [], actTurnId, {
+					id: workflow.id,
+					type: 'improve',
+					phase: 'act',
+				});
+			};
+
 			const workflowResult = await runImproveWorkflow({
 				evaluate: async () => {
 					evalResponse = await sendMessage(
@@ -381,54 +552,106 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 					);
 					return evalResponse;
 				},
-				act: async (workflow) => {
-					const actTurnId = newTurnId();
-					setProgress({
-						state: 'pending',
-						phase: 'starting',
-						label: __('Staging the plan', 'agent-wordpress-terminal'),
-						detail: __(
+				act: (workflow) =>
+					stageAndApplyUnit(
+						workflow,
+						__('Staging the plan', 'agent-wordpress-terminal'),
+						__(
 							'Staging pattern-native or surgical improvements from the evaluation plan.',
 							'agent-wordpress-terminal',
 						),
-						completed: 0,
-						total: 0,
-						sequence: Date.now(),
-						updated_at: new Date().toISOString(),
-					});
-					startPolling(actTurnId);
-					return sendMessage(sessionId, improvePageActPrompt(), [], actTurnId, {
-						id: workflow.id,
-						type: 'improve',
-						phase: 'act',
-					});
+					),
+				continueAfterAct: async (response) => {
+					if (response.improve_workflow) {
+						setImproveWorkflow(response.improve_workflow);
+					}
+					const incoming = response.actions ?? [];
+					if (response.turn_outcome?.status === 'failed') {
+						setProgress(null);
+						setReviewOutcome({
+							state: 'failed',
+							message: response.turn_outcome.message,
+							errorCode: response.turn_outcome.error_code,
+						});
+						return null;
+					}
+					if (!incoming.length) {
+						return null;
+					}
+					setActions((current) => mergeActions(current, incoming));
+					const actionable = incoming.filter(
+						(action) => action.status === 'proposed' || action.status === 'approved',
+					);
+					const pending = incoming
+						.filter(
+							(action) =>
+								isReviewSafeAction(action, postId) &&
+								(action.status === 'proposed' || action.status === 'approved'),
+						)
+						.sort(byNewestId);
+					if (actionable.length !== 1 || pending.length !== 1) {
+						setProgress(null);
+						setReviewOutcome({
+							state: 'failed',
+							message: __(
+								'AWPT proposed a change outside this page’s safe review scope, so it was not applied.',
+								'agent-wordpress-terminal',
+							),
+							errorCode: 'awpt_review_action_not_safe',
+						});
+						return null;
+					}
+					const applied = await applyReviewAction(
+						pending[0],
+						visualVerification(response.tool_calls, incoming),
+					);
+					if (!applied) {
+						return null;
+					}
+					setReviewerNotes('');
+					await afterApplyContinueIfNeeded({ manageSending: false });
+					return null;
 				},
 			});
 			if (settled) return;
-			if (!workflowResult?.act) {
+			if (!workflowResult?.acts.length) {
 				if (evalResponse) setContextTurnCount((count) => count + 1);
 				if (finish()) {
 					setProgress(null);
-					setReviewOutcome({
-						state: 'failed',
-						message:
-							evalResponse?.turn_outcome?.message ||
-							__(
-								'The page evaluation did not produce an executable plan.',
-								'agent-wordpress-terminal',
-							),
-						errorCode: evalResponse?.turn_outcome?.error_code || 'awpt_improve_plan_missing',
-					});
+					if (workflowResult?.evaluate.improve_workflow?.state === 'no_change') {
+						setReviewOutcome({
+							state: 'no-change',
+							message:
+								workflowResult.evaluate.content ||
+								__(
+									'AWPT completed its review without proposing a page change.',
+									'agent-wordpress-terminal',
+								),
+						});
+					} else {
+						setReviewOutcome({
+							state: 'failed',
+							message:
+								evalResponse?.turn_outcome?.message ||
+								__(
+									'The page evaluation did not produce an executable plan.',
+									'agent-wordpress-terminal',
+								),
+							errorCode: evalResponse?.turn_outcome?.error_code || 'awpt_improve_plan_missing',
+						});
+					}
 				}
 				return;
 			}
 
 			const plan = workflowResult.evaluate.content.trim();
-			const response = workflowResult.act;
-			setContextTurnCount((count) => count + 2);
+			const response = workflowResult.acts[workflowResult.acts.length - 1];
+			if (response.improve_workflow) {
+				setImproveWorkflow(response.improve_workflow);
+			}
+			setContextTurnCount((count) => count + 1 + workflowResult.acts.length);
 			if (!finish()) return;
 
-			const incoming = response.actions ?? [];
 			if (response.turn_outcome?.status === 'failed') {
 				setProgress(null);
 				setReviewOutcome({
@@ -438,36 +661,10 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 				});
 				return;
 			}
-			if (incoming.length) {
-				setActions((current) => mergeActions(current, incoming));
-				const actionable = incoming.filter(
-					(action) => action.status === 'proposed' || action.status === 'approved',
-				);
-				const pending = incoming
-					.filter(
-						(action) =>
-							isReviewSafeAction(action, postId) &&
-							(action.status === 'proposed' || action.status === 'approved'),
-					)
-					.sort(byNewestId);
-				if (actionable.length !== 1 || pending.length !== 1) {
-					setProgress(null);
-					setReviewOutcome({
-						state: 'failed',
-						message: __(
-							'AWPT proposed a change outside this page’s safe review scope, so it was not applied.',
-							'agent-wordpress-terminal',
-						),
-						errorCode: 'awpt_review_action_not_safe',
-					});
-					return;
-				}
-				const applied = await applyReviewAction(
-					pending[0],
-					visualVerification(response.tool_calls, incoming),
-				);
-				if (applied) setReviewerNotes('');
-			} else {
+			if (
+				!response.actions?.length &&
+				workflowResult.acts.every((act) => !(act.actions ?? []).length)
+			) {
 				setProgress(null);
 				setReviewOutcome({
 					state: 'no-change',
@@ -493,6 +690,13 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 	};
 
 	const improvePage = () => void runImprove();
+	const canContinueImprove = improveWorkflowHasRemainingUnits(improveWorkflow);
+	const continueImprove = async () => {
+		if (!sessionId || !improveWorkflow || !canContinueImprove || isWorking) return;
+		setError('');
+		setReviewOutcome(null);
+		await afterApplyContinueIfNeeded();
+	};
 	const contextLabel =
 		contextTurnCount > 0
 			? sprintf(
@@ -598,6 +802,18 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 						? __('Working…', 'agent-wordpress-terminal')
 						: __('Improve', 'agent-wordpress-terminal')}
 				</Button>
+				{canContinueImprove ? (
+					<Button
+						className="awpt-review-bridge__continue"
+						variant="secondary"
+						type="button"
+						onClick={() => void continueImprove()}
+						isBusy={isSending}
+						disabled={isWorking}
+					>
+						{__('Continue improve', 'agent-wordpress-terminal')}
+					</Button>
+				) : null}
 			</form>
 			{error ? (
 				<Notice status="error" isDismissible onRemove={() => setError('')}>
@@ -671,7 +887,7 @@ function ReviewAssistant({ postId, title, onActionState, onApplied }: MountOptio
 						) : (
 							<Button
 								variant="secondary"
-								onClick={() => void applyReviewAction(latestAction)}
+								onClick={() => void applyReviewActionThenContinue(latestAction)}
 								disabled={isWorking}
 							>
 								{__('Apply now', 'agent-wordpress-terminal')}

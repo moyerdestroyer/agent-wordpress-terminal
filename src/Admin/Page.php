@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Admin;
 
 use AWPT\Agent\ConnectorToolSupportChecker;
+use AWPT\Agent\OpenAIProvider;
 use AWPT\Support\ConnectorCatalog;
 use AWPT\Support\ConnectorInspector;
 use AWPT\Support\ConnectorSelection;
@@ -56,7 +57,7 @@ final class Page {
     /**
      * Review bridge protocol version (must match assets/reviewBridge.tsx).
      */
-    public const REVIEW_BRIDGE_VERSION = 1;
+    public const REVIEW_BRIDGE_VERSION = 2;
 
     /**
      * Hook admin integration.
@@ -100,6 +101,11 @@ final class Page {
             'type' => 'string',
             'sanitize_callback' => [$this, 'sanitize_openrouter_model'],
             'default' => 'deepseek/deepseek-v4-pro',
+        ]);
+        register_setting('awpt_settings', 'awpt_openai_model', [
+            'type' => 'string',
+            'sanitize_callback' => [$this, 'sanitize_openai_model'],
+            'default' => OpenAIProvider::DEFAULT_MODEL,
         ]);
     }
 
@@ -161,6 +167,7 @@ final class Page {
             'improvePagePrompt' => \AWPT\Support\ImprovePagePrompt::text(),
             'improvePageEvaluatePrompt' => \AWPT\Support\ImprovePagePrompt::evaluate_text(),
             'improvePageActPrompt' => \AWPT\Support\ImprovePagePrompt::act_text(),
+            'improvePageReviewBrief' => \AWPT\Support\ImprovePagePrompt::review_brief(),
         ]);
     }
 
@@ -201,6 +208,7 @@ final class Page {
             'improvePagePrompt' => \AWPT\Support\ImprovePagePrompt::text(),
             'improvePageEvaluatePrompt' => \AWPT\Support\ImprovePagePrompt::evaluate_text(),
             'improvePageActPrompt' => \AWPT\Support\ImprovePagePrompt::act_text(),
+            'improvePageReviewBrief' => \AWPT\Support\ImprovePagePrompt::review_brief(),
             'hasActiveDomainPack' => [] !== \AWPT\Domain\DomainPackRegistry::instance()->active(),
         ]);
     }
@@ -421,6 +429,9 @@ final class Page {
         <?php if ('openrouter' === $provider_id): ?>
             <?php $this->render_openrouter_model_field(); ?>
         <?php endif; ?>
+        <?php if ('openai' === $provider_id): ?>
+            <?php $this->render_openai_model_field(); ?>
+        <?php endif; ?>
         <?php
     }
 
@@ -452,6 +463,42 @@ final class Page {
                     <?php echo
                         esc_html(__(
                             'Defaults to DeepSeek V4 Pro (deepseek/deepseek-v4-pro) for multi-step tool loops and page composition. When this model cannot read images, AWPT automatically uses an OpenRouter vision model once to describe them, then returns control to DeepSeek. Image-bearing turns therefore include an additional, variably priced request. Override the primary model with deepseek/deepseek-v4-flash for lower cost, or any exact OpenRouter model ID.',
+                            'agent-wordpress-terminal',
+                        ))
+                    ; ?>
+                </p>
+            </td>
+        </tr>
+        <?php }
+
+    /**
+     * Render the OpenAI chat model setting.
+     */
+    private function render_openai_model_field(): void { ?>
+        <tr>
+            <th scope="row">
+                <label for="awpt_openai_model">
+                    <?php echo esc_html(__('OpenAI chat model', 'agent-wordpress-terminal')); ?>
+                </label>
+            </th>
+            <td>
+                <input
+                    id="awpt_openai_model"
+                    class="regular-text"
+                    type="text"
+                    name="awpt_openai_model"
+                    value="<?php echo
+                        esc_attr($this->sanitize_openai_model(get_option(
+                            'awpt_openai_model',
+                            OpenAIProvider::DEFAULT_MODEL,
+                        )))
+                    ; ?>"
+                    placeholder="<?php echo esc_attr(OpenAIProvider::DEFAULT_MODEL); ?>"
+                />
+                <p class="description">
+                    <?php echo
+                        esc_html(__(
+                            'Defaults to gpt-5.6-luna for Improve / tool loops via Chat Completions. GPT-5.6 models require reasoning_effort=none when tools are present (handled automatically). Alternatives: gpt-5.6-terra, chat-latest.',
                             'agent-wordpress-terminal',
                         ))
                     ; ?>
@@ -517,6 +564,21 @@ final class Page {
         }
 
         return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : 'deepseek/deepseek-v4-pro';
+    }
+
+    /**
+     * Sanitize an OpenAI model ID.
+     *
+     * @param mixed $value Raw model ID.
+     */
+    public function sanitize_openai_model(mixed $value): string {
+        $model = trim(sanitize_text_field((string) $value));
+
+        if ('' === $model) {
+            return OpenAIProvider::DEFAULT_MODEL;
+        }
+
+        return preg_match('/^[A-Za-z0-9._:\/-]{1,191}$/', $model) ? $model : OpenAIProvider::DEFAULT_MODEL;
     }
 
     /**

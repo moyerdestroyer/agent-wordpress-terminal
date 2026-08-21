@@ -364,26 +364,52 @@ export function KnowledgePanel(): JSX.Element {
 									onChange={(enabled) => void handlePackToggle(pack.id, enabled)}
 								/>
 								{domainPacks.health.find((health) => health.pack_id === pack.id) ? (
-									<p className="awpt-empty">
+									<div className="awpt-empty">
 										{(() => {
 											const health = domainPacks.health.find((item) => item.pack_id === pack.id);
 											if (!health) {
 												return '';
 											}
 											const coverage = health.pattern_coverage;
+											const design = health.design_coverage;
 											const detail = sprintf(
-												/* translators: 1: health status, 2: enriched pattern count, 3: registered pattern count */
-												__('%1$s · %2$d/%3$d patterns enriched', 'agent-wordpress-terminal'),
+												/* translators: 1: health status, 2: enriched pattern count, 3: registered pattern count, 4: design component count, 5: token role count */
+												__(
+													'%1$s · %2$d/%3$d patterns enriched · %4$d components · %5$d token roles',
+													'agent-wordpress-terminal',
+												),
 												health.status,
 												coverage.enriched,
 												coverage.registered,
+												design?.components ?? 0,
+												design?.token_roles ?? 0,
 											);
-											const issue = health.issues.find(
-												(item) => item.severity === 'error' || item.severity === 'warning',
+											return (
+												<>
+													<p>{detail}</p>
+													{health.issues.length > 0 ? (
+														<details>
+															<summary>
+																{sprintf(
+																	/* translators: %d: Domain Pack issue count */
+																	__('%d health notices', 'agent-wordpress-terminal'),
+																	health.issues.length,
+																)}
+															</summary>
+															<ul>
+																{health.issues.map((issue) => (
+																	<li key={`${issue.code}-${issue.message}`}>
+																		<strong>{issue.severity}</strong>: {issue.message}
+																		{issue.pointer ? ` (${issue.pointer})` : ''}
+																	</li>
+																))}
+															</ul>
+														</details>
+													) : null}
+												</>
 											);
-											return issue ? `${detail} · ${issue.message}` : detail;
 										})()}
-									</p>
+									</div>
 								) : null}
 							</div>
 						))}

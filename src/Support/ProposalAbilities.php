@@ -52,6 +52,7 @@ final class ProposalAbilities {
     public const SESSION_SCOPED = [
         ...self::NAMES,
         'awpt/diagnose-error',
+        'awpt/finalize-proposal-review',
     ];
 
     /**

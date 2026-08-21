@@ -51,7 +51,8 @@ final class ValidateComposition implements AbilityInterface {
                 'work_type' => sanitize_key((string) ($input['work_type'] ?? 'compose')),
                 'phase' => 'validate',
             ],
-            !array_key_exists('apply_safe_fixes', $input) || (bool) $input['apply_safe_fixes'],
+            !array_key_exists('apply_safe_fixes', $input)
+            || \AWPT\Support\ArrayKey::rest_bool($input['apply_safe_fixes']),
         );
         $findings = $result['findings'];
 

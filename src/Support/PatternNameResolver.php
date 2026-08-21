@@ -101,9 +101,13 @@ final class PatternNameResolver {
         if (!str_contains($normalized, '/')) {
             foreach ($this->namespace_list() as $namespace) {
                 $candidates[] = $namespace . '/' . $normalized;
-                $candidates[] = $namespace . '/header-' . preg_replace('/^header-/', '', $normalized);
-                $candidates[] = $namespace . '/layout-page-' . preg_replace('/^(layout-page-|page-)/', '', $normalized);
-                $candidates[] = $namespace . '/section-' . preg_replace('/^section-/', '', $normalized);
+                $candidates[] = $namespace . '/header-' . (preg_replace('/^header-/', '', $normalized) ?? $normalized);
+                $candidates[] =
+                    $namespace
+                    . '/layout-page-'
+                    . (preg_replace('/^(layout-page-|page-)/', '', $normalized) ?? $normalized);
+                $candidates[] =
+                    $namespace . '/section-' . (preg_replace('/^section-/', '', $normalized) ?? $normalized);
 
                 if (in_array($normalized, ['page-header', 'header-page'], true)) {
                     $candidates[] = $namespace . '/header-page';

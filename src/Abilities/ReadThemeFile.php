@@ -186,7 +186,8 @@ final class ReadThemeFile implements AbilityInterface {
      * @return list<array{offset: int, term: string, excerpt: string}>
      */
     private function extract_matches(string $content, string $query): array {
-        $terms = array_values(array_filter(preg_split('/\s+/', mb_strtolower($query)) ?: []));
+        $split = preg_split('/\s+/', mb_strtolower($query));
+        $terms = array_values(array_filter(false === $split ? [] : $split));
         $terms = array_slice(array_unique($terms), 0, 8);
         $matches = [];
         $seen = [];

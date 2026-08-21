@@ -120,7 +120,7 @@ final class RecommendPatterns implements AbilityInterface {
         }
 
         $prefer_section_scope = array_key_exists('prefer_section_scope', $input)
-            ? (bool) $input['prefer_section_scope']
+            ? ArrayKey::rest_bool($input['prefer_section_scope'])
             : '' !== $target_role;
 
         $ranked = [];
@@ -193,6 +193,7 @@ final class RecommendPatterns implements AbilityInterface {
             $ranked[] = [
                 'score' => $score,
                 'pattern' => $pattern,
+                'matched_terms' => array_values(array_unique($matched)),
                 'rationale' => implode(' ', $rationale_parts),
             ];
         }
@@ -211,7 +212,7 @@ final class RecommendPatterns implements AbilityInterface {
             }
         }
 
-        $semantic = !array_key_exists('semantic', $input) || (bool) $input['semantic'];
+        $semantic = !array_key_exists('semantic', $input) || ArrayKey::rest_bool($input['semantic']);
         $reranked = $semantic
             ? new PatternSemanticReranker()->rerank($ranked, $intent)
             : ['ranked' => $ranked, 'mode' => 'deterministic'];

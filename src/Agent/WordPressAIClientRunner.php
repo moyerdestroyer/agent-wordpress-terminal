@@ -125,13 +125,21 @@ final class WordPressAIClientRunner {
      * @param array<int, array<string, mixed>> $messages
      */
     private function extract_system_instruction(array $messages): string {
+        $instructions = [];
+
         foreach ($messages as $message) {
-            if ('system' === (string) ($message['role'] ?? '')) {
-                return $this->stringify_content($message['content'] ?? '');
+            if ('system' !== (string) ($message['role'] ?? '')) {
+                continue;
+            }
+
+            $content = $this->stringify_content($message['content'] ?? '');
+
+            if ('' !== $content) {
+                $instructions[] = $content;
             }
         }
 
-        return '';
+        return str_replace(ProviderCacheAffinity::STABLE_BOUNDARY, "\n", implode("\n\n", $instructions));
     }
 
     /**

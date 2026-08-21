@@ -52,7 +52,7 @@ final class ProposeGlobalStylesPatch implements AbilityInterface {
             );
         }
 
-        $current = new ReadGlobalStyles()->execute([]);
+        $current = new ReadGlobalStyles()->execute(['sections' => ['saved_content']]);
 
         if (is_wp_error($current)) {
             return $current;

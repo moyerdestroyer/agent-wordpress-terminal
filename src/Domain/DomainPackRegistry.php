@@ -202,9 +202,11 @@ final class DomainPackRegistry {
             'version' => (string) $pack['version'],
             'schema_version' => (int) ($pack['schema_version'] ?? 1),
             'source' => (string) ($pack['_source'] ?? 'theme'),
-            'enabled' => (bool) ($pack['enabled'] ?? false),
+            'enabled' => ArrayKey::rest_bool($pack['enabled'] ?? false),
             'guidance_count' => count(is_array($pack['guidance'] ?? null) ? $pack['guidance'] : []),
             'pattern_catalog' => (string) ($pack['patterns']['catalog'] ?? ''),
+            'design_catalog' => (string) ($pack['design']['catalog'] ?? ''),
+            'diagnostic_count' => count(ArrayKey::list_of_maps($pack['_diagnostics'] ?? null)),
             'rules' => (string) ($pack['rules']['path'] ?? ''),
         ], $this->all());
     }
@@ -529,12 +531,27 @@ final class DomainPackRegistry {
         $manifest['id'] = $id;
         $manifest['label'] = $label;
         $manifest['version'] = $version;
-        $manifest['guidance'] = $this->validate_guidance($manifest['guidance'] ?? [], $root);
+        $diagnostics = [];
+        $manifest['guidance'] = $this->validate_guidance($manifest['guidance'] ?? [], $root, $diagnostics);
         $patterns = ArrayKey::as_map($manifest['patterns'] ?? null);
         $patterns['_root'] = $root;
 
         if (array_key_exists('catalog', $patterns)) {
-            $patterns['catalog'] = $this->safe_relative_path((string) $patterns['catalog'], $root);
+            $catalog = $this->safe_relative_path((string) $patterns['catalog'], $root);
+
+            if ('' === $catalog) {
+                $diagnostics[] = $this->diagnostic(
+                    '/patterns/catalog',
+                    'invalid-pattern-catalog-path',
+                    __(
+                        'The optional pattern catalog path was dropped because it is invalid or unreadable.',
+                        'agent-wordpress-terminal',
+                    ),
+                );
+                unset($patterns['catalog']);
+            } else {
+                $patterns['catalog'] = $catalog;
+            }
         }
 
         if (array_key_exists('namespace', $patterns)) {
@@ -548,10 +565,46 @@ final class DomainPackRegistry {
         $rules['_root'] = $root;
 
         if (array_key_exists('path', $rules)) {
-            $rules['path'] = $this->safe_relative_path((string) $rules['path'], $root);
+            $path = $this->safe_relative_path((string) $rules['path'], $root);
+
+            if ('' === $path) {
+                $diagnostics[] = $this->diagnostic(
+                    '/rules/path',
+                    'invalid-rules-path',
+                    __(
+                        'The optional declarative rules path was dropped because it is invalid or unreadable.',
+                        'agent-wordpress-terminal',
+                    ),
+                );
+                unset($rules['path']);
+            } else {
+                $rules['path'] = $path;
+            }
         }
 
         $manifest['rules'] = $rules;
+        $design = ArrayKey::as_map($manifest['design'] ?? null);
+        $design['_root'] = $root;
+        if (array_key_exists('catalog', $design)) {
+            $catalog = $this->safe_relative_path((string) $design['catalog'], $root);
+
+            if ('' === $catalog) {
+                $diagnostics[] = $this->diagnostic(
+                    '/design/catalog',
+                    'invalid-design-catalog-path',
+                    __(
+                        'The optional design catalog path was dropped because it is invalid or unreadable.',
+                        'agent-wordpress-terminal',
+                    ),
+                );
+                unset($design['catalog']);
+            } else {
+                $design['catalog'] = $catalog;
+            }
+        }
+
+        $manifest['design'] = $design;
+        $manifest['_diagnostics'] = $diagnostics;
 
         foreach (['validators', 'recommenders', 'materializers', 'proposal_operations'] as $key) {
             $values = is_array($manifest[$key] ?? null) ? $manifest[$key] : [];
@@ -566,15 +619,25 @@ final class DomainPackRegistry {
     /**
      * @return list<array<string, mixed>>
      */
-    private function validate_guidance(mixed $guidance, string $root): array {
+    private function validate_guidance(mixed $guidance, string $root, array &$diagnostics = []): array {
         if (!is_array($guidance)) {
+            $diagnostics[] = $this->diagnostic(
+                '/guidance',
+                'invalid-guidance-list',
+                __('The optional guidance list was dropped because it is not an array.', 'agent-wordpress-terminal'),
+            );
             return [];
         }
 
         $clean = [];
 
-        foreach ($guidance as $item) {
+        foreach ($guidance as $index => $item) {
             if (!is_array($item)) {
+                $diagnostics[] = $this->diagnostic(
+                    '/guidance/' . $index,
+                    'invalid-guidance-record',
+                    __('A malformed optional guidance record was dropped.', 'agent-wordpress-terminal'),
+                );
                 continue;
             }
 
@@ -582,6 +645,14 @@ final class DomainPackRegistry {
             $path = $this->safe_relative_path((string) ($item['path'] ?? ''), $root);
 
             if ('' === $id || '' === $path) {
+                $diagnostics[] = $this->diagnostic(
+                    '/guidance/' . $index,
+                    'invalid-guidance-record',
+                    __(
+                        'An optional guidance record without a valid id and readable path was dropped.',
+                        'agent-wordpress-terminal',
+                    ),
+                );
                 continue;
             }
 
@@ -605,6 +676,16 @@ final class DomainPackRegistry {
         }
 
         return $clean;
+    }
+
+    /** @return array{severity: string, code: string, pointer: string, message: string} */
+    private function diagnostic(string $pointer, string $code, string $message): array {
+        return [
+            'severity' => 'warning',
+            'code' => $code,
+            'pointer' => $pointer,
+            'message' => $message,
+        ];
     }
 
     private function safe_relative_path(string $relative, string $root): string {
@@ -660,8 +741,11 @@ final class DomainPackRegistry {
         $merged = array_replace_recursive($parent, $child);
         $guidance = [];
 
-        foreach ([...((array) ($parent['guidance'] ?? [])), ...((array) ($child['guidance'] ?? []))] as $item) {
-            if (!(is_array($item) && '' !== (string) ($item['id'] ?? ''))) {
+        foreach ([
+            ...ArrayKey::list_of_maps($parent['guidance'] ?? null),
+            ...ArrayKey::list_of_maps($child['guidance'] ?? null),
+        ] as $item) {
+            if ('' === (string) ($item['id'] ?? '')) {
                 continue;
             }
 

@@ -78,7 +78,11 @@ function test_pattern_name_resolver_uses_injected_namespace_not_hardcoded_theme(
     $resolved = $resolver->resolve('page-header');
 
     Assert::true(null !== $resolved, 'bare page-header should resolve under injected namespace');
-    Assert::same('fixture-theme/header-page', $resolved['resolved_name'] ?? '', 'namespace comes from pack, not civicpress');
+    Assert::same(
+        'fixture-theme/header-page',
+        $resolved['resolved_name'] ?? '',
+        'namespace comes from pack, not civicpress',
+    );
 }
 
 test_pattern_name_resolver_aliases_page_header_and_documentation();

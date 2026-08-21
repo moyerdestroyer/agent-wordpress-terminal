@@ -210,10 +210,11 @@ final class PageSectionModel {
             }
         }
 
-        usort(
-            $scored,
-            static fn(array $a, array $b): int => $b['score'] <=> $a['score'] ?: strcmp($a['path'], $b['path']),
-        );
+        usort($scored, static function (array $a, array $b): int {
+            $score_order = $b['score'] <=> $a['score'];
+
+            return 0 !== $score_order ? $score_order : strcmp($a['path'], $b['path']);
+        });
 
         return $scored;
     }
@@ -252,11 +253,11 @@ final class PageSectionModel {
         if ('insert' === $mode || preg_match('/\b(add|insert|append|new section|new block)\b/', $intent_l)) {
             return [
                 'operation' => 'pattern_insert',
-                'reason' => 'Intent is additive; prefer prepare-pattern-change mode=insert / propose-pattern-insert.',
+                'reason' => 'Intent is additive; prefer propose-pattern-insert with path and intent.',
             ];
         }
 
-        if (is_array($target_section) && !empty($target_section['preserve_by_default'])) {
+        if (is_array($target_section) && true === ($target_section['preserve_by_default'] ?? false)) {
             return [
                 'operation' => 'pattern_replace_with_preserve_warning',
                 'reason' => 'Target has dynamic blocks; preserve by default unless intent explicitly replaces them.',
@@ -266,13 +267,13 @@ final class PageSectionModel {
         if ('replace' === $mode || preg_match('/\b(replace|swap|redesign section|new layout for)\b/', $intent_l)) {
             return [
                 'operation' => 'pattern_replace',
-                'reason' => 'Structural section change; prefer prepare-pattern-change mode=replace → propose-pattern-replace.',
+                'reason' => 'Structural section change; prefer propose-pattern-replace with path and intent.',
             ];
         }
 
         return [
             'operation' => 'pattern_replace_or_surgical',
-            'reason' => 'Default: try section prepare/replace when structure changes; freehand remains available when no pattern fits.',
+            'reason' => 'Default: try section replace/insert with path and intent when structure changes; freehand remains available when no pattern fits.',
         ];
     }
 
@@ -477,7 +478,8 @@ final class PageSectionModel {
         }
 
         // First non-empty line of plain text as weak heading.
-        $lines = preg_split('/\R+/', $plain_fallback) ?: [];
+        $split = preg_split('/\R+/', $plain_fallback);
+        $lines = false === $split ? [] : $split;
 
         foreach ($lines as $line) {
             $line = trim($line);
@@ -541,7 +543,8 @@ final class PageSectionModel {
         $links = [];
 
         foreach (array_keys($matches[0] ?? []) as $index) {
-            $url = html_entity_decode($matches[1][$index] ?? '' ?: $matches[2][$index] ?? '');
+            $double_quoted = $matches[1][$index] ?? '';
+            $url = html_entity_decode('' !== $double_quoted ? $double_quoted : $matches[2][$index] ?? '');
 
             if ('' !== $url) {
                 $links[] = $url;

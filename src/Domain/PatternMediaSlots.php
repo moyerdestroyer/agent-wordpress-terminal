@@ -52,7 +52,7 @@ final class PatternMediaSlots {
                     'block_name' => $name,
                     'slot' => 'cover_background',
                     'occupied' =>
-                        (bool) ($attrs['useFeaturedImage'] ?? false)
+                        ArrayKey::rest_bool($attrs['useFeaturedImage'] ?? false)
                             || (int) ($attrs['id'] ?? 0) > 0
                             || '' !== (string) ($attrs['url'] ?? ''),
                     'recommended_placement' => 'featured_cover',

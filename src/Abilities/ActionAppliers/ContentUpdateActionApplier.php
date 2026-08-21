@@ -120,13 +120,25 @@ final class ContentUpdateActionApplier {
             ],
             true,
         )) {
-            $rebuilt = $this->block_structure->content_from_payload($post_id, $payload);
+            // Pattern propose already materializes + validates post_content (including
+            // whole-document replaces whose expected_fingerprint is a document hash).
+            // Re-running replace_blocks at apply would compare that hash to section 0 and fail.
+            if (
+                in_array($operation, [ActionOperations::PATTERN_REPLACE, ActionOperations::PATTERN_INSERT], true)
+                && array_key_exists('post_content', $payload)
+                && is_string($payload['post_content'])
+                && '' !== $payload['post_content']
+            ) {
+                $update['post_content'] = PostContentSanitizer::for_staged_update($payload['post_content']);
+            } else {
+                $rebuilt = $this->block_structure->content_from_payload($post_id, $payload);
 
-            if (is_wp_error($rebuilt)) {
-                return $rebuilt;
+                if (is_wp_error($rebuilt)) {
+                    return $rebuilt;
+                }
+
+                $update['post_content'] = $rebuilt;
             }
-
-            $update['post_content'] = $rebuilt;
         } elseif (array_key_exists('post_content', $payload)) {
             $update['post_content'] = PostContentSanitizer::for_staged_update((string) $payload['post_content']);
         }

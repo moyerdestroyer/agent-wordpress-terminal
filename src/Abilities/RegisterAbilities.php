@@ -71,6 +71,7 @@ final class RegisterAbilities {
         new ReadWordPressResource()->register();
         new ReadThemes()->register();
         new ReadThemeJson()->register();
+        new ReadDesignSystem()->register();
         new ReadThemeFile()->register();
         new ReadBlockTree()->register();
         new GetBlock()->register();
@@ -113,6 +114,7 @@ final class RegisterAbilities {
         new ProposePluginDeactivate()->register();
         new ProposeCustomCssUpdate()->register();
         new ProposeResourceChange()->register();
+        new FinalizeProposalReview()->register();
         new ApplyAction()->register();
         new SideloadMedia()->register();
         new ReadErrorLog()->register();

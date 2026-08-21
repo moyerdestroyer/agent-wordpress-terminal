@@ -1,0 +1,72 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://awpt.dev/schemas/awpt-design-v1.json",
+	"title": "AWPT Design Catalog v1",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schema_version"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"schema_version": { "const": 1 },
+		"token_roles": { "type": "object", "additionalProperties": { "$ref": "#/$defs/tokenRole" } },
+		"components": { "type": "object", "additionalProperties": { "$ref": "#/$defs/component" } },
+		"style_variations": {
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/styleVariation" }
+		},
+		"archetypes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/archetype" } },
+		"guidance_sets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/stringList" } }
+	},
+	"$defs": {
+		"stringList": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+		"tokenRole": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["domain", "slugs"],
+			"properties": {
+				"domain": { "enum": ["color", "typography", "spacing", "border", "shadow"] },
+				"slugs": { "$ref": "#/$defs/stringList" },
+				"pairs_with": { "$ref": "#/$defs/stringList" },
+				"description": { "type": "string" },
+				"use_when": { "$ref": "#/$defs/stringList" },
+				"avoid_when": { "$ref": "#/$defs/stringList" }
+			}
+		},
+		"component": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["label", "block", "kind", "name"],
+			"properties": {
+				"label": { "type": "string" },
+				"block": { "type": "string" },
+				"kind": { "enum": ["style", "variation"] },
+				"name": { "type": "string" },
+				"class_names": { "$ref": "#/$defs/stringList" },
+				"description": { "type": "string" },
+				"use_when": { "$ref": "#/$defs/stringList" },
+				"avoid_when": { "$ref": "#/$defs/stringList" }
+			}
+		},
+		"styleVariation": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["label", "slug"],
+			"properties": {
+				"label": { "type": "string" },
+				"slug": { "type": "string" },
+				"description": { "type": "string" }
+			}
+		},
+		"archetype": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["label"],
+			"properties": {
+				"label": { "type": "string" },
+				"description": { "type": "string" },
+				"pattern_roles": { "$ref": "#/$defs/stringList" },
+				"guidance": { "$ref": "#/$defs/stringList" }
+			}
+		}
+	}
+}

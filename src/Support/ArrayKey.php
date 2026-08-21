@@ -96,6 +96,10 @@ final class ArrayKey {
         return absint(is_scalar($value) ? $value : 0);
     }
 
+    public static function as_float(mixed $value, float $default = 0.0): float {
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
     /**
      * WordPress REST-style boolean coercion for mixed request params.
      */

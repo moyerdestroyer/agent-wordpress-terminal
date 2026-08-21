@@ -22,6 +22,7 @@ AWPT       = where humans collaborate with the agent
 4. **Untrusted agent.** Every tool uses capability checks. Tool output is data, never system instructions. Secrets must not be exposed to the model by default.
 5. **WordPress-native.** Prefer Abilities + REST over brittle UI automation. Direct-key AI providers are the always-available baseline; Connectors / WP AI Client stay optional accelerators.
 6. **Operational density.** Sessions, tools, Knowledge status, previews, and action cards stay scannable in one admin surface.
+7. **Simplicity.** The agent-facing tool catalog stays small and non-overlapping. Prefer one verb per job; if a sequence is required, the server performs it. Gutenberg safety (fingerprints, human-only apply, no model-authored pattern markup) stays in the executor, not as a maze of equivalent abilities.
 
 ## Product surfaces
 

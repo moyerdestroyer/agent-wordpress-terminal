@@ -41,7 +41,7 @@ final class McpOnlyToolDiscovery {
             $tools[] = [
                 'name' => $name,
                 'description' => (string) ($tool['description'] ?? $name),
-                'parameters' => AbilitySchemas::normalize_for_provider($schema),
+                'parameters' => new AbilityTransportCodec()->provider_schema($schema),
                 'annotations' => [
                     'readonly' => array_key_exists('readonly', $tool) ? (bool) $tool['readonly'] : null,
                     'destructive' => array_key_exists('destructive', $tool) ? (bool) $tool['destructive'] : null,
@@ -53,6 +53,21 @@ final class McpOnlyToolDiscovery {
         }
 
         return $tools;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function input_schema(string $tool_name): ?array {
+        foreach (new Adapter()->list_tools() as $tool) {
+            if ($tool_name !== (string) ($tool['name'] ?? '')) {
+                continue;
+            }
+
+            $raw_schema = $tool['input_schema'] ?? null;
+
+            return is_array($raw_schema) ? $this->string_keyed($raw_schema) : AbilitySchemas::empty_object_input();
+        }
+
+        return null;
     }
 
     /**

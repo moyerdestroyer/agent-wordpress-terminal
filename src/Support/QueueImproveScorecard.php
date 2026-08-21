@@ -58,7 +58,7 @@ final class QueueImproveScorecard {
     public function from_run_summary(array $summary): array {
         $tools = $this->tool_lines($summary);
         $path = sanitize_key((string) ($summary['path_used'] ?? ''));
-        $server_materialized = (bool) ($summary['server_materialized'] ?? false);
+        $server_materialized = ArrayKey::rest_bool($summary['server_materialized'] ?? false);
         $post_id = (int) ($summary['post_id'] ?? 0);
 
         $prepare_attempted = $this->count_tool_prefix($tools, 'awpt/prepare-pattern-change:');
@@ -86,7 +86,7 @@ final class QueueImproveScorecard {
 
         $first_valid = $summary['first_proposal_valid'] ?? null;
         if (null !== $first_valid) {
-            $first_valid = (bool) $first_valid;
+            $first_valid = ArrayKey::rest_bool($first_valid);
         }
 
         $wall = $summary['elapsed_s'] ?? $summary['wall_s'] ?? null;
@@ -156,35 +156,31 @@ final class QueueImproveScorecard {
         $errors = 0;
 
         foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
             $path = (string) ($row['path_used'] ?? '');
             $all_paths[$path] = ($all_paths[$path] ?? 0) + 1;
             $scenario_class = (string) ($row['scenario_class'] ?? 'unclassified');
             $scenario_counts[$scenario_class] = ($scenario_counts[$scenario_class] ?? 0) + 1;
 
-            if (!empty($row['server_materialized'])) {
+            if (true === ($row['server_materialized'] ?? false)) {
                 ++$server_mat;
             }
 
-            if (!empty($row['prepare_change_success'])) {
+            if (ArrayKey::as_int($row['prepare_change_success'] ?? null) > 0) {
                 ++$prepare_ok;
             }
 
-            if (!empty($row['prepare_change_attempted'])) {
+            if (ArrayKey::as_int($row['prepare_change_attempted'] ?? null) > 0) {
                 ++$prepare_attempted;
             }
 
-            if (!empty($row['propose_replace_success'])) {
+            if (ArrayKey::as_int($row['propose_replace_success'] ?? null) > 0) {
                 ++$replace_ok;
             }
-            if (!empty($row['propose_insert_success'])) {
+            if (ArrayKey::as_int($row['propose_insert_success'] ?? null) > 0) {
                 ++$insert_ok;
             }
 
-            if (!empty($row['freehand_provenance'])) {
+            if (true === ($row['freehand_provenance'] ?? false)) {
                 ++$freehand;
             }
 
@@ -204,7 +200,7 @@ final class QueueImproveScorecard {
                 ++$errors;
             }
 
-            if (!empty($row['eligible_structural'])) {
+            if (true === ($row['eligible_structural'] ?? false)) {
                 $structural[] = $row;
             }
         }
@@ -222,26 +218,26 @@ final class QueueImproveScorecard {
             $path = (string) ($row['path_used'] ?? '');
             $s_paths[$path] = ($s_paths[$path] ?? 0) + 1;
 
-            if (!empty($row['server_materialized'])) {
+            if (true === ($row['server_materialized'] ?? false)) {
                 ++$s_server;
             }
 
-            if (!empty($row['prepare_change_success'])) {
+            if (ArrayKey::as_int($row['prepare_change_success'] ?? null) > 0) {
                 ++$s_prepare;
             }
 
-            if (!empty($row['prepare_change_attempted'])) {
+            if (ArrayKey::as_int($row['prepare_change_attempted'] ?? null) > 0) {
                 ++$s_prepare_attempted;
             }
 
-            if (!empty($row['propose_replace_success'])) {
+            if (ArrayKey::as_int($row['propose_replace_success'] ?? null) > 0) {
                 ++$s_replace;
             }
-            if (!empty($row['propose_insert_success'])) {
+            if (ArrayKey::as_int($row['propose_insert_success'] ?? null) > 0) {
                 ++$s_insert;
             }
 
-            if (!empty($row['freehand_provenance'])) {
+            if (true === ($row['freehand_provenance'] ?? false)) {
                 ++$s_freehand;
             }
         }
@@ -304,15 +300,15 @@ final class QueueImproveScorecard {
                 'post_id' => (int) ($row['post_id'] ?? 0),
                 'run_id' => (string) ($row['run_id'] ?? ''),
                 'scenario_class' => (string) ($row['scenario_class'] ?? ''),
-                'eligible_structural' => (bool) ($row['eligible_structural'] ?? false),
+                'eligible_structural' => ArrayKey::rest_bool($row['eligible_structural'] ?? false),
                 'path_used' => (string) ($row['path_used'] ?? ''),
-                'server_materialized' => (bool) ($row['server_materialized'] ?? false),
+                'server_materialized' => ArrayKey::rest_bool($row['server_materialized'] ?? false),
                 'prepare_change_success' => (int) ($row['prepare_change_success'] ?? 0),
                 'propose_replace_success' => (int) ($row['propose_replace_success'] ?? 0),
                 'propose_insert_success' => (int) ($row['propose_insert_success'] ?? 0),
                 'funnel_stage' => (string) ($row['funnel_stage'] ?? ''),
                 'correction_count' => (int) ($row['correction_count'] ?? 0),
-                'freehand_provenance' => (bool) ($row['freehand_provenance'] ?? false),
+                'freehand_provenance' => ArrayKey::rest_bool($row['freehand_provenance'] ?? false),
                 'wall_s' => $row['wall_s'] ?? null,
                 'first_proposal_valid' => $row['first_proposal_valid'] ?? null,
                 'turn_outcome_status' => (string) ($row['turn_outcome_status'] ?? ''),
@@ -332,8 +328,6 @@ final class QueueImproveScorecard {
         $rows = [];
 
         foreach ($paths as $path) {
-            $path = $path;
-
             if (!is_readable($path)) {
                 continue;
             }
@@ -371,10 +365,9 @@ final class QueueImproveScorecard {
         $files = [];
 
         foreach ($inputs as $input) {
-            $input = $input;
-
             if (is_dir($input)) {
-                $globbed = glob(rtrim($input, '/') . '/awpt-queue-*.json') ?: [];
+                $matches = glob(rtrim($input, '/') . '/awpt-queue-*.json');
+                $globbed = false === $matches ? [] : $matches;
                 foreach ($globbed as $file) {
                     $files[] = $file;
                 }
@@ -382,7 +375,8 @@ final class QueueImproveScorecard {
             }
 
             if (str_contains($input, '*') || str_contains($input, '?')) {
-                $globbed = glob($input) ?: [];
+                $matches = glob($input);
+                $globbed = false === $matches ? [] : $matches;
                 foreach ($globbed as $file) {
                     $files[] = $file;
                 }

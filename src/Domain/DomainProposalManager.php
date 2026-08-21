@@ -170,7 +170,7 @@ final class DomainProposalManager {
 
         return [
             'domain_result' => $this->sanitize_value($result),
-            'domain_rollback_token' => $this->sanitize_value((array) ($result['rollback_token'] ?? [])),
+            'domain_rollback_token' => $this->sanitize_value(ArrayKey::as_map($result['rollback_token'] ?? null)),
             'domain_applied_fingerprint' => sanitize_text_field($applied_fingerprint),
             'validation_findings' => $validation,
         ];

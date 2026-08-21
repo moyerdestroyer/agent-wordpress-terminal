@@ -33,7 +33,6 @@ final class ActionContentPayloadSanitizer {
         $clean = $this->copy_preview_fields($clean, $payload);
         $clean = $this->copy_meta_fields($clean, $payload);
         $clean = $this->copy_review_undo_fields($clean, $payload);
-        /** @var array<string, mixed> $clean */
         $clean = $this->copy_agent_rationale($clean, $payload);
         /** @var array<string, mixed> $clean */
 
@@ -131,6 +130,16 @@ final class ActionContentPayloadSanitizer {
             'pattern_owner' => sanitize_key((string) ($context['pattern_owner'] ?? '')),
             'fallback_used' => filter_var($context['fallback_used'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'fallback_reason' => sanitize_textarea_field((string) ($context['fallback_reason'] ?? '')),
+            'design_context_hash' => sanitize_text_field((string) ($context['design_context_hash'] ?? '')),
+            'design_catalog_hash' => sanitize_text_field((string) ($context['design_catalog_hash'] ?? '')),
+            'pattern_catalog_hash' => sanitize_text_field((string) ($context['pattern_catalog_hash'] ?? '')),
+            'design_sources' => new ResourceValueSanitizer()->sanitize_object(
+                is_array($context['design_sources'] ?? null) ? $context['design_sources'] : [],
+            ),
+            'guidance_ids' => array_values(array_filter(array_map(
+                static fn(mixed $id): string => sanitize_key(is_scalar($id) ? (string) $id : ''),
+                is_array($context['guidance_ids'] ?? null) ? $context['guidance_ids'] : [],
+            ))),
         ];
 
         return $clean;
@@ -433,7 +442,11 @@ final class ActionContentPayloadSanitizer {
                 $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
 
                 if (
-                    !in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true)
+                    !in_array(
+                        $kind,
+                        ['update_attrs', 'replace_text', 'replace_inner_html', 'update_block', 'remove', 'insert'],
+                        true,
+                    )
                     || '' === $path
                 ) {
                     return null;
@@ -454,9 +467,12 @@ final class ActionContentPayloadSanitizer {
                     $item['content'] = wp_kses_post((string) $change['content']);
                 }
 
+                if (in_array($kind, ['replace_inner_html', 'insert'], true)) {
+                    $item['inner_html'] = wp_kses_post((string) ($change['inner_html'] ?? ''));
+                }
+
                 if ('insert' === $kind) {
                     $item['position'] = sanitize_key((string) ($change['position'] ?? 'before'));
-                    $item['inner_html'] = wp_kses_post((string) ($change['inner_html'] ?? ''));
                 }
 
                 return $item;

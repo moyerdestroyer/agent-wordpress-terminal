@@ -74,6 +74,17 @@ function test_compact_pattern_schema_supports_unbounded_creation_and_in_place_re
     );
 }
 
+function test_pattern_draft_schema_accepts_explicit_agent_selection(): void {
+    awpt_test_reset_state();
+    new PreparePatternDraft()->register();
+    $ability = wp_get_ability('awpt/prepare-pattern-draft');
+    $schema = $ability?->get_input_schema();
+    $properties = is_array($schema) ? $schema['properties'] ?? [] : [];
+
+    Assert::same('string', $properties['pattern_name']['type'] ?? '', 'agent can bind the shortlisted pattern');
+    Assert::same('string', $properties['selection_reason']['type'] ?? '', 'agent records its fit judgment');
+}
+
 function test_custom_pattern_fallback_preserves_requested_media_inventory(): void {
     awpt_test_reset_state();
     awpt_test_list_post(88, 'image', 'image', 'attachment', 'inherit');
@@ -98,6 +109,7 @@ function test_custom_pattern_fallback_preserves_requested_media_inventory(): voi
 test_pattern_draft_extracts_general_structural_requirements_from_specific_prompt();
 test_pattern_draft_does_not_invent_structural_facets_for_vague_polish_prompt();
 test_compact_pattern_schema_supports_unbounded_creation_and_in_place_revision();
+test_pattern_draft_schema_accepts_explicit_agent_selection();
 test_custom_pattern_fallback_preserves_requested_media_inventory();
 
 function test_pattern_draft_does_not_treat_template_layout_as_page_content_root(): void {

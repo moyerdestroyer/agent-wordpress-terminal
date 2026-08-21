@@ -47,6 +47,8 @@ function test_evidence_pack_includes_patterns_and_media(): void {
         'pattern body kept for adapted mode',
     );
     Assert::same('ready', $pack['reason'], 'reason should be preserved');
+    Assert::same('compose_evidence_v1', $pack['checkpoint']['kind'] ?? '', 'pack is an explicit phase checkpoint');
+    Assert::same(64, strlen((string) ($pack['checkpoint']['sha256'] ?? '')), 'checkpoint is fingerprinted');
 }
 
 function test_evidence_pack_provider_messages_are_compact(): void {
@@ -248,56 +250,60 @@ function test_evidence_pack_includes_inspect_heading_brief_and_compacts_trees():
         $fingerprints[] = hash('sha256', 'inner-' . $i);
     }
 
-    $pack = new EvidencePackBuilder()->pack([
+    $pack = new EvidencePackBuilder()->pack(
         [
-            'tool' => 'awpt/analyze-page',
-            'status' => 'success',
-            'input' => ['id' => 550],
-            'output' => [
-                'title' => 'SLIP',
-                'headings' => ['How do I create a renewal?'],
-                'risk_level' => 'low',
-                'plain_text' => str_repeat('faq ', 500),
-                'block_tree' => $deep,
+            [
+                'tool' => 'awpt/analyze-page',
+                'status' => 'success',
+                'input' => ['id' => 550],
+                'output' => [
+                    'title' => 'SLIP',
+                    'headings' => ['How do I create a renewal?'],
+                    'risk_level' => 'low',
+                    'plain_text' => str_repeat('faq ', 500),
+                    'block_tree' => $deep,
+                ],
+            ],
+            [
+                'tool' => 'awpt/read-block-tree',
+                'status' => 'success',
+                'input' => ['id' => 550],
+                'output' => [
+                    'blocks' => $deep,
+                    'count' => 160,
+                    'path_format' => 'Dotted zero-based visible block path.',
+                ],
+            ],
+            [
+                'tool' => 'awpt/read-content',
+                'status' => 'success',
+                'input' => ['id' => 550],
+                'output' => [
+                    'id' => 550,
+                    'title' => 'SLIP',
+                    'type' => 'page',
+                    'status' => 'publish',
+                    'url' => 'http://example.test/slip/',
+                    'content' => str_repeat('<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->', 200),
+                    'plain_text' => str_repeat('faq body ', 300),
+                ],
+            ],
+            [
+                'tool' => 'awpt/inspect-rendered-element',
+                'status' => 'success',
+                'input' => ['post_id' => 550],
+                'output' => [
+                    'rendered' => false,
+                    'warning' => 'headless_browser_unavailable',
+                    'main_h1_count' => 0,
+                    'main_heading_outline' => [['level' => 4, 'text' => 'How do I create a renewal?']],
+                    'url' => 'http://example.test/slip/',
+                ],
             ],
         ],
-        [
-            'tool' => 'awpt/read-block-tree',
-            'status' => 'success',
-            'input' => ['id' => 550],
-            'output' => [
-                'blocks' => $deep,
-                'count' => 160,
-                'path_format' => 'Dotted zero-based visible block path.',
-            ],
-        ],
-        [
-            'tool' => 'awpt/read-content',
-            'status' => 'success',
-            'input' => ['id' => 550],
-            'output' => [
-                'id' => 550,
-                'title' => 'SLIP',
-                'type' => 'page',
-                'status' => 'publish',
-                'url' => 'http://example.test/slip/',
-                'content' => str_repeat('<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->', 200),
-                'plain_text' => str_repeat('faq body ', 300),
-            ],
-        ],
-        [
-            'tool' => 'awpt/inspect-rendered-element',
-            'status' => 'success',
-            'input' => ['post_id' => 550],
-            'output' => [
-                'rendered' => false,
-                'warning' => 'headless_browser_unavailable',
-                'main_h1_count' => 0,
-                'main_heading_outline' => [['level' => 4, 'text' => 'How do I create a renewal?']],
-                'url' => 'http://example.test/slip/',
-            ],
-        ],
-    ], ['page_analysis', 'rendered_inspection'], 'ready');
+        ['page_analysis', 'rendered_inspection'],
+        'ready',
+    );
 
     Assert::same(0, $pack['page_brief']['main_h1_count'] ?? -1, 'inspect main_h1_count must survive packing');
     Assert::same('low', $pack['page_brief']['risk_level'] ?? '', 'analyze risk must survive packing');
@@ -356,7 +362,8 @@ function test_evidence_pack_synthesizes_fingerprints_when_analyze_tree_was_trunc
     $post = new WP_Post();
     $post->ID = $post_id;
     $post->post_title = 'SLIP';
-    $post->post_content = '<!-- wp:heading {"level":4} --><h4>How do I create a renewal?</h4><!-- /wp:heading -->'
+    $post->post_content =
+        '<!-- wp:heading {"level":4} --><h4>How do I create a renewal?</h4><!-- /wp:heading -->'
         . '<!-- wp:paragraph --><p>You can create a renewal from an existing policy.</p><!-- /wp:paragraph -->';
     $GLOBALS['awpt_test_posts'][$post_id] = $post;
 
@@ -402,33 +409,41 @@ function test_evidence_pack_synthesizes_fingerprints_when_analyze_tree_was_trunc
     ));
     Assert::same(1, count($tree_reads), 'one synthesized tree entry');
     Assert::same('compose-synthesis', $tree_reads[0]['input']['source'] ?? '', 'source labels synthesis');
-    Assert::same(64, strlen((string) ($tree_reads[0]['output']['blocks'][0]['fingerprint'] ?? '')), 'synthesized fingerprint length');
+    Assert::same(
+        64,
+        strlen((string) ($tree_reads[0]['output']['blocks'][0]['fingerprint'] ?? '')),
+        'synthesized fingerprint length',
+    );
 }
 
 function test_evidence_pack_reuses_storage_compacted_analyze_tree(): void {
     $fp = hash('sha256', 'stored-root');
-    $pack = new EvidencePackBuilder()->pack([
+    $pack = new EvidencePackBuilder()->pack(
         [
-            'tool' => 'awpt/analyze-page',
-            'status' => 'success',
-            'input' => ['id' => 12],
-            'output' => [
-                'title' => 'Page',
-                'block_tree' => [[
-                    'path' => '0',
-                    'name' => 'core/paragraph',
-                    'fingerprint' => $fp,
-                    'inner' => [],
-                ]],
+            [
+                'tool' => 'awpt/analyze-page',
+                'status' => 'success',
+                'input' => ['id' => 12],
+                'output' => [
+                    'title' => 'Page',
+                    'block_tree' => [[
+                        'path' => '0',
+                        'name' => 'core/paragraph',
+                        'fingerprint' => $fp,
+                        'inner' => [],
+                    ]],
+                ],
+            ],
+            [
+                'tool' => 'awpt/inspect-rendered-element',
+                'status' => 'success',
+                'input' => ['post_id' => 12],
+                'output' => ['main_h1_count' => 1],
             ],
         ],
-        [
-            'tool' => 'awpt/inspect-rendered-element',
-            'status' => 'success',
-            'input' => ['post_id' => 12],
-            'output' => ['main_h1_count' => 1],
-        ],
-    ], ['page_analysis', 'rendered_inspection'], 'ready');
+        ['page_analysis', 'rendered_inspection'],
+        'ready',
+    );
 
     $tree_reads = array_values(array_filter(
         $pack['content_reads'],
@@ -439,5 +454,43 @@ function test_evidence_pack_reuses_storage_compacted_analyze_tree(): void {
     Assert::same($fp, $tree_reads[0]['output']['blocks'][0]['fingerprint'] ?? '', 'stored fingerprint reused');
 }
 
+function test_evidence_pack_retains_targeted_get_block_markup(): void {
+    $fingerprint = hash('sha256', 'target-list');
+    $pack = new EvidencePackBuilder()->pack(
+        [[
+            'tool' => 'awpt/get-block',
+            'status' => 'success',
+            'input' => ['id' => 843, 'path' => '1.1.3'],
+            'output' => [
+                'id' => 843,
+                'path' => '1.1.3',
+                'name' => 'core/list',
+                'attrs' => ['ordered' => true],
+                'fingerprint' => $fingerprint,
+                'inner_count' => 0,
+                'inner_html' => '<ol><li>Keep <a href="https://example.test">this link</a>.</li></ol>',
+                'inner_html_editable' => true,
+                'inner_html_truncated' => false,
+                'inner_html_editability_reason' => '',
+            ],
+        ]],
+        [],
+        'targeted recovery',
+    );
+
+    Assert::same(1, count($pack['target_blocks'] ?? []), 'targeted block evidence is retained');
+    Assert::same(
+        $fingerprint,
+        $pack['target_blocks'][0]['fingerprint'] ?? '',
+        'target fingerprint survives compaction',
+    );
+    Assert::true(
+        str_contains((string) ($pack['target_blocks'][0]['inner_html'] ?? ''), 'https://example.test'),
+        'exact target markup survives compaction',
+    );
+    Assert::same(true, $pack['target_blocks'][0]['inner_html_editable'] ?? false, 'eligibility survives compaction');
+}
+
 test_evidence_pack_synthesizes_fingerprints_when_analyze_tree_was_truncated();
 test_evidence_pack_reuses_storage_compacted_analyze_tree();
+test_evidence_pack_retains_targeted_get_block_markup();

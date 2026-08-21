@@ -21,10 +21,31 @@ $cli_args = array_values(array_filter(
 $post_id = 0;
 $reuse_session = false;
 $one_shot = false;
+$rollback_after = false;
+$notes = '';
+$model_override = '';
+$provider_override = '';
+$prompt_variant = 'default';
 $scenario_class = 'unclassified';
 foreach ($cli_args as $arg) {
     if (str_starts_with((string) $arg, 'class=')) {
         $scenario_class = sanitize_key(substr((string) $arg, 6));
+        continue;
+    }
+    if (str_starts_with((string) $arg, 'notes=')) {
+        $notes = trim(substr((string) $arg, 6));
+        continue;
+    }
+    if (str_starts_with((string) $arg, 'model=')) {
+        $model_override = trim(substr((string) $arg, 6));
+        continue;
+    }
+    if (str_starts_with((string) $arg, 'provider=')) {
+        $provider_override = sanitize_key(substr((string) $arg, 9));
+        continue;
+    }
+    if (str_starts_with((string) $arg, 'prompt=')) {
+        $prompt_variant = sanitize_key(substr((string) $arg, 7));
         continue;
     }
     if (in_array($arg, ['reuse-session', '--reuse-session'], true)) {
@@ -35,11 +56,64 @@ foreach ($cli_args as $arg) {
         $one_shot = true;
         continue;
     }
+    if (in_array($arg, ['rollback', '--rollback', 'rollback-after'], true)) {
+        $rollback_after = true;
+        continue;
+    }
     if (str_starts_with((string) $arg, '--')) {
         continue;
     }
     if ($post_id <= 0 && is_numeric($arg)) {
         $post_id = (int) $arg;
+    }
+}
+
+$prompt_packs = [
+    'default' => '',
+    'strict_docs' =>
+        "Hard constraints:\n"
+        . "- This is a whole-document documentation-page replace "
+        . "(op=pattern_replace, paths=[\"*\"], pattern_name=civicpress/layout-page-documentation).\n"
+        . "- Do not choose op=batch or op=none for a documentation-page request.\n"
+        . "- Do not use section-only patterns (TOC, cards, headers) as the page layout.\n"
+        . "- After staging, zero instructional filler may remain "
+        . "(no “Section heading”, “side navigation”, “component page”, “Read the full documentation”).\n"
+        . "- Do not paste the same paragraph into multiple slots; map distinct page facts once.",
+    'surgical_only' =>
+        "Hard constraints:\n"
+        . "- Use only awpt/propose-block-batch-update (set/remove/insert). No pattern-replace or pattern-insert.\n"
+        . "- Prefer ≤3 changes per batch. Do not set heading `level` on core/paragraph.\n"
+        . "- For rich text use html/text fields, not attrs.content.",
+    'minimal_brief' =>
+        "Keep the plan to one unit and one propose call. Prefer the smallest valid mutation.",
+];
+if (!isset($prompt_packs[$prompt_variant])) {
+    fwrite(STDERR, "Unknown prompt= variant. Use: default, strict_docs, surgical_only, minimal_brief\n");
+    exit(1);
+}
+$extra_prompt = trim($prompt_packs[$prompt_variant]);
+if ('' !== $extra_prompt) {
+    $notes = trim($notes . ('' !== $notes ? "\n\n" : '') . $extra_prompt);
+}
+
+$previous_model = null;
+$previous_openai_model = null;
+$previous_provider = null;
+if ('' !== $provider_override) {
+    if (!in_array($provider_override, ['openrouter', 'openai'], true)) {
+        fwrite(STDERR, "Invalid provider. Use openrouter or openai.\n");
+        exit(1);
+    }
+    $previous_provider = (string) get_option('awpt_provider', '');
+    update_option('awpt_provider', $provider_override, false);
+}
+if ('' !== $model_override) {
+    if ('openai' === $provider_override || 'openai' === (string) get_option('awpt_provider', '')) {
+        $previous_openai_model = (string) get_option('awpt_openai_model', '');
+        update_option('awpt_openai_model', $model_override, false);
+    } else {
+        $previous_model = (string) get_option('awpt_openrouter_model', '');
+        update_option('awpt_openrouter_model', $model_override, false);
     }
 }
 
@@ -55,7 +129,7 @@ if (!in_array(
 if ($post_id <= 0) {
     fwrite(
         STDERR,
-        "Usage: wp eval-file bin/queue-improve-one.php <post_id> [class=CLASS] [one-shot] [reuse-session]\n",
+        "Usage: wp eval-file bin/queue-improve-one.php <post_id> [notes=...] [class=CLASS] [rollback] [one-shot] [reuse-session]\n",
     );
     exit(1);
 }
@@ -118,6 +192,39 @@ if ('' === ($provider_settings['provider'] ?? '')) {
 if ('' === ($provider_settings['model'] ?? '')) {
     $provider_settings['model'] = (string) get_option('awpt_openrouter_model', '');
 }
+if ('' !== $model_override) {
+    $provider_settings['model'] = $model_override;
+}
+if ('' !== $provider_override) {
+    $provider_settings['provider'] = $provider_override;
+}
+if ('openai' === ($provider_settings['provider'] ?? '') && '' === $model_override) {
+    $provider_settings['model'] = trim((string) get_option('awpt_openai_model', ''));
+    if ('' === $provider_settings['model']) {
+        $provider_settings['model'] = (string) apply_filters(
+            'awpt_openai_model',
+            AWPT\Agent\OpenAIProvider::DEFAULT_MODEL,
+        );
+    }
+}
+
+register_shutdown_function(static function () use (
+    $previous_model,
+    $previous_openai_model,
+    $model_override,
+    $previous_provider,
+    $provider_override,
+): void {
+    if (null !== $previous_model && '' !== $model_override) {
+        update_option('awpt_openrouter_model', $previous_model, false);
+    }
+    if (null !== $previous_openai_model && '' !== $model_override) {
+        update_option('awpt_openai_model', $previous_openai_model, false);
+    }
+    if (null !== $previous_provider && '' !== $provider_override) {
+        update_option('awpt_provider', $previous_provider, false);
+    }
+});
 
 $prompt_version = $one_shot
     ? AWPT\Support\ImprovePagePrompt::PROMPT_VERSION_LEGACY
@@ -126,12 +233,14 @@ $provenance = AWPT\Support\EvaluationProvenance::collect((string) $post->post_ty
 
 echo
     sprintf(
-        "START post=%d title=%s session=%d reused=%s mode=%s\n",
+        "START post=%d title=%s session=%d reused=%s mode=%s model=%s prompt=%s\n",
         $post_id,
         $post->post_title,
         $session_id,
         $session_reused ? 'yes' : 'no',
         $one_shot ? 'one-shot' : 'eval-act',
+        $provider_settings['model'] ?? '',
+        $prompt_variant,
     )
 ;
 
@@ -147,7 +256,13 @@ $result = null;
 
 if (!$one_shot) {
     echo "PHASE evaluate turn={$eval_turn_id}\n";
-    $workflow_run = new AWPT\Support\ImproveWorkflowRunner()->run($session_id, $post_id, $base_turn, $runtime);
+    $workflow_run = new AWPT\Support\ImproveWorkflowRunner()->run(
+        $session_id,
+        $post_id,
+        $base_turn,
+        $runtime,
+        ['evaluation_context' => $notes, 'auto_continue' => true],
+    );
     $eval_result = $workflow_run['evaluate'];
     if (is_wp_error($eval_result)) {
         $elapsed = round(microtime(true) - $started, 1);
@@ -182,8 +297,24 @@ if (!$one_shot) {
     $eval_tools = is_array($eval_result['tool_calls'] ?? null) ? $eval_result['tool_calls'] : [];
     $tool_calls = array_merge($tool_calls, $eval_tools);
     echo 'plan_chars=' . strlen($plan_text) . "\n";
-    echo 'PHASE act turn=' . $act_turn_id . "\n";
-    $result = $workflow_run['act'];
+    $act_results = is_array($workflow_run['acts'] ?? null) ? $workflow_run['acts'] : [];
+    if ([] === $act_results && null !== ($workflow_run['act'] ?? null)) {
+        $act_results = [$workflow_run['act']];
+    }
+    echo 'PHASE act turns=' . count($act_results) . "\n";
+    foreach ($act_results as $act_index => $act_result) {
+        $turn_id = $base_turn . '-act' . ($act_index > 0 ? '-' . $act_index : '');
+        echo "PHASE act turn={$turn_id}\n";
+        if (is_wp_error($act_result)) {
+            $result = $act_result;
+            break;
+        }
+        $result = $act_result;
+        $act_tools = is_array($act_result['tool_calls'] ?? null) ? $act_result['tool_calls'] : [];
+        $tool_calls = array_merge($tool_calls, $act_tools);
+        $act_actions = is_array($act_result['actions'] ?? null) ? $act_result['actions'] : [];
+        $actions = array_merge($actions, $act_actions);
+    }
     $turn_id = $act_turn_id;
 } else {
     $turn_id = $base_turn;
@@ -207,6 +338,7 @@ $run_meta =
         'session_reused' => $session_reused,
         'provider' => $provider_settings['provider'] ?? '',
         'model' => $provider_settings['model'] ?? '',
+        'prompt_variant' => $prompt_variant,
         'plan_chars' => strlen($plan_text),
     ] + $provenance;
 
@@ -231,9 +363,11 @@ if (is_wp_error($result)) {
     exit(1);
 }
 
-$act_tools = is_array($result['tool_calls'] ?? null) ? $result['tool_calls'] : [];
-$tool_calls = array_merge($tool_calls, $act_tools);
-$actions = is_array($result['actions'] ?? null) ? $result['actions'] : [];
+if ($one_shot) {
+    $act_tools = is_array($result['tool_calls'] ?? null) ? $result['tool_calls'] : [];
+    $tool_calls = array_merge($tool_calls, $act_tools);
+    $actions = is_array($result['actions'] ?? null) ? $result['actions'] : [];
+}
 
 // Preserve raw traces separately from derived summaries so classifiers can be replayed.
 file_put_contents($raw_path, wp_json_encode([
@@ -337,6 +471,80 @@ foreach ($actions as $action) {
         } else {
             $entry['status'] = 'applied';
             $entry['applied'] = true;
+            $after = (string) get_post_field('post_content', $post_id);
+            $plain = preg_replace(
+                '/\s+/',
+                ' ',
+                html_entity_decode(wp_strip_all_tags($after), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            ) ?? '';
+            $filler_re =
+                '/Section heading \(h[23]\)|Subsection heading|page heading communicates|particulars of your body copy|inverted pyramid|Keep each section and subsection focused|Use the side navigation menu|Read the full documentation|side navigation on the component page|on the component page/i';
+            $max_repeat = 1;
+            $worst = '';
+            $plain_len = strlen($plain);
+            for ($i = 0; $i < min($plain_len, 2500); $i += 16) {
+                $chunk = substr($plain, $i, 32);
+                if (strlen(trim($chunk)) < 16) {
+                    continue;
+                }
+                $n = substr_count($plain, $chunk);
+                if ($n > $max_repeat) {
+                    $max_repeat = $n;
+                    $worst = $chunk;
+                }
+            }
+            $entry['content_audit'] = [
+                'has_pattern_meta' => str_contains($after, 'patternName') || str_contains($after, 'layout-page-'),
+                'instructional_filler' => (bool) preg_match($filler_re, $plain),
+                'duplication_repeats' => $max_repeat,
+                'duplication_chunk' => $worst,
+                'duplication_suspect' => $max_repeat >= 4,
+                'quality_ok' => !preg_match($filler_re, $plain) && $max_repeat < 4,
+                'plain_len' => $plain_len,
+                'preview' => mb_substr($plain, 0, 240),
+            ];
+            // Persist a browser-viewable snapshot of what applied (before optional rollback).
+            $preview_dir = $out_dir . '/previews';
+            if (!is_dir($preview_dir)) {
+                wp_mkdir_p($preview_dir);
+            }
+            $preview_path = sprintf('%s/post-%d-action-%d.html', $preview_dir, $post_id, $id);
+            $preview_html =
+                '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Staged #'
+                . $post_id
+                . '</title><style>body{font:16px/1.5 Georgia,serif;max-width:52rem;margin:2rem auto;padding:0 1rem}'
+                . '.meta{color:#57534e;font:14px/1.4 system-ui,sans-serif;margin-bottom:1.5rem}</style></head><body>'
+                . '<p class="meta">Staged preview for post #'
+                . (int) $post_id
+                . ' · action #'
+                . (int) $id
+                . ' · '
+                . esc_html((string) ($payload['pattern_name'] ?? $op))
+                . '</p>'
+                . apply_filters('the_content', $after)
+                . '</body></html>';
+            file_put_contents($preview_path, $preview_html);
+            $entry['content_audit']['preview_html'] = $preview_path;
+            if ($rollback_after) {
+                $rollback = new AWPT\Abilities\ApplyAction()->execute([
+                    'action_id' => $id,
+                    'operation' => 'rollback',
+                ]);
+                // Prefer REST-shaped update_status path used elsewhere when execute lacks operation.
+                if (is_wp_error($rollback)) {
+                    $req = new WP_REST_Request('POST', '/awpt/v1/actions/' . $id);
+                    $req->set_param('operation', 'rollback');
+                    $res = rest_do_request($req);
+                    $entry['rolled_back'] = 200 === (int) $res->get_status()
+                        && 'rolled_back' === (string) (($res->get_data()['status'] ?? ''));
+                    if (!$entry['rolled_back']) {
+                        $entry['rollback_error'] = wp_json_encode($res->get_data());
+                    }
+                } else {
+                    $entry['rolled_back'] = true;
+                    $entry['status'] = 'rolled_back';
+                }
+            }
         }
     }
     $applied[] = $entry;
@@ -370,13 +578,18 @@ $top_level_section_count = count(AWPT\Support\PageSectionModel::from_content((st
 ]));
 $run_meta['top_level_section_count'] = $top_level_section_count;
 
+$cache_stats = new AWPT\Database\ProviderCallRepository()->session_token_totals($session_id);
+$run_meta['cache'] = $cache_stats;
+
 $summary = [
     'post_id' => $post_id,
     'title' => $post->post_title,
     'session_id' => $session_id,
     'turn_id' => $turn_id,
     'elapsed_s' => $elapsed,
+    'notes' => $notes,
     'meta' => $run_meta,
+    'cache' => $cache_stats,
     'plan_excerpt' => mb_substr($plan_text, 0, 800),
     'top_level_section_count' => $top_level_section_count,
     'path_used' => $classification['path_used'],

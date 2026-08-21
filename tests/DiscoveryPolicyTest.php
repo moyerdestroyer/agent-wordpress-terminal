@@ -181,7 +181,10 @@ function test_discovery_policy_composes_immediately_from_staged_revision_context
     );
 }
 
-function awpt_presentation_discovery_base(bool $with_empty_recommend = false, bool $with_nonempty_recommend = false): array {
+function awpt_presentation_discovery_base(
+    bool $with_empty_recommend = false,
+    bool $with_nonempty_recommend = false,
+): array {
     $calls = [
         awpt_discovery_call('awpt/analyze-page'),
         [
@@ -228,10 +231,7 @@ function test_presentation_edit_requires_structure_and_render_attempt(): void {
         'presentation_edit' => true,
     ]);
 
-    Assert::false(
-        $without_recommend['compose'],
-        'redesign must consult patterns before compose',
-    );
+    Assert::false($without_recommend['compose'], 'redesign must consult patterns before compose');
     Assert::true(in_array('page_analysis', $without_recommend['coverage'], true), 'page analysis should be tracked');
 }
 
@@ -256,10 +256,7 @@ function test_presentation_edit_accepts_complete_block_tree_as_structural_analys
         'presentation_edit' => true,
     ]);
 
-    Assert::true(
-        $decision['compose'],
-        'block-tree + recommend + read-pattern unlocks redesign compose',
-    );
+    Assert::true($decision['compose'], 'block-tree + recommend + read-pattern unlocks redesign compose');
 }
 
 test_presentation_edit_accepts_complete_block_tree_as_structural_analysis();
@@ -328,7 +325,10 @@ function test_presentation_edit_reads_recommended_pattern_before_composing(): vo
     ]);
 
     Assert::false($unread['compose'], 'nonempty recommend alone must not unlock redesign compose');
-    Assert::true(in_array('pattern_consulted', $unread['coverage'], true), 'nonempty recommend still counts as consulted');
+    Assert::true(
+        in_array('pattern_consulted', $unread['coverage'], true),
+        'nonempty recommend still counts as consulted',
+    );
     Assert::true($read['compose'], 'reading the selected recommended pattern unlocks compose');
     Assert::true(in_array('pattern_structure', $read['coverage'], true), 'read-pattern tracks structure coverage');
 }

@@ -32,6 +32,9 @@ final class EvidencePackBuilder {
     /** Encoded budget for the structural block representation in the pack. */
     private const BLOCK_STRUCTURE_BUDGET = 24_000;
 
+    /** Exact targeted markup used by replace_inner_html recovery. */
+    private const TARGET_BLOCK_HTML_BUDGET = 40_000;
+
     /**
      * Whether the pack includes at least one usable 64-character block fingerprint.
      *
@@ -62,10 +65,12 @@ final class EvidencePackBuilder {
      *     knowledge: list<array<array-key, mixed>>,
      *     theme_files: list<array<string, mixed>>,
      *     content_reads: list<array<string, mixed>>,
+     *     target_blocks: list<array<string, mixed>>,
      *     page_brief: array<string, mixed>,
      *     preparation: array<string, mixed>,
      *     coverage: list<string>,
-     *     reason: string
+     *     reason: string,
+     *     checkpoint: array{kind: string, sha256: string, source_tool_calls: int}
      * }
      */
     public function pack(array $tool_calls, array $coverage = [], string $reason = '', array $options = []): array {
@@ -74,6 +79,8 @@ final class EvidencePackBuilder {
         $knowledge = [];
         $theme_files = [];
         $content_reads = [];
+        $target_blocks = [];
+        $target_block_html_chars = 0;
         $page_brief = [];
         $preparation = [];
         $has_block_structure = false;
@@ -108,6 +115,40 @@ final class EvidencePackBuilder {
             $tool = (string) ($call['tool'] ?? '');
             $output = ArrayKey::string_map(is_array($call['output'] ?? null) ? $call['output'] : []);
             $input = ArrayKey::string_map(is_array($call['input'] ?? null) ? $call['input'] : []);
+
+            if ('awpt/get-block' === $tool) {
+                $inner_html = (string) ($output['inner_html'] ?? '');
+                $key = (string) ($output['id'] ?? $input['id'] ?? 0) . ':' . (string) ($output['path'] ?? '');
+                $prior = is_array($target_blocks[$key] ?? null) ? $target_blocks[$key] : [];
+                $prior_chars = mb_strlen($prior['inner_html'] ?? '', 'UTF-8');
+                $remaining = max(0, self::TARGET_BLOCK_HTML_BUDGET - ($target_block_html_chars - $prior_chars));
+
+                if ($remaining > 0) {
+                    $kept_html = mb_substr($inner_html, 0, $remaining, 'UTF-8');
+                    unset($target_blocks[$key]);
+                    $target_blocks[$key] = [
+                        'id' => (int) ($output['id'] ?? $input['id'] ?? 0),
+                        'path' => (string) ($output['path'] ?? $input['path'] ?? ''),
+                        'name' => (string) ($output['name'] ?? ''),
+                        'attrs' => ArrayKey::as_map($output['attrs'] ?? null),
+                        'fingerprint' => (string) ($output['fingerprint'] ?? ''),
+                        'inner_count' => (int) ($output['inner_count'] ?? 0),
+                        'inner_html' => $kept_html,
+                        'inner_html_editable' =>
+                            true === ($output['inner_html_editable'] ?? false)
+                                && mb_strlen($kept_html, 'UTF-8') === mb_strlen($inner_html, 'UTF-8'),
+                        'inner_html_truncated' =>
+                            true === ($output['inner_html_truncated'] ?? false)
+                                || mb_strlen($kept_html, 'UTF-8') < mb_strlen($inner_html, 'UTF-8'),
+                        'inner_html_editability_reason' => (string) ($output['inner_html_editability_reason'] ?? ''),
+                        'children' => array_slice(ArrayKey::list_of_maps($output['children'] ?? null), 0, 100),
+                        'next' => (string) ($output['next'] ?? ''),
+                    ];
+                    $target_block_html_chars = $target_block_html_chars - $prior_chars + mb_strlen($kept_html, 'UTF-8');
+                }
+
+                continue;
+            }
 
             if ('awpt/prepare-pattern-draft' === $tool) {
                 $mode = (string) ($output['mode'] ?? '');
@@ -224,8 +265,8 @@ final class EvidencePackBuilder {
                         'blocks' => $compact['blocks'],
                         'count' => (int) $compact['count'],
                         'path_format' => (string) ($output['path_format'] ?? ''),
-                        'truncated_excerpts' => !empty($compact['truncated_excerpts']),
-                        'flat_index' => !empty($compact['flat_index']),
+                        'truncated_excerpts' => true === ($compact['truncated_excerpts'] ?? false),
+                        'flat_index' => true === ($compact['flat_index'] ?? false),
                     ],
                 ];
                 continue;
@@ -282,17 +323,26 @@ final class EvidencePackBuilder {
             $content_reads = $this->strip_duplicate_html_from_content_reads($content_reads);
         }
 
-        return [
+        $pack = [
             'patterns' => array_values($patterns),
             'media' => array_values($media),
             'knowledge' => array_values(array_slice($knowledge, 0, 8)),
             'theme_files' => array_values($theme_files),
             'content_reads' => array_values($content_reads),
+            'target_blocks' => array_values(array_slice($target_blocks, -12, null, true)),
             'page_brief' => $page_brief,
             'preparation' => $preparation,
             'coverage' => $coverage,
             'reason' => $reason,
         ];
+        $encoded = wp_json_encode($pack, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $pack['checkpoint'] = [
+            'kind' => 'compose_evidence_v1',
+            'sha256' => hash('sha256', is_string($encoded) ? $encoded : ''),
+            'source_tool_calls' => count($tool_calls),
+        ];
+
+        return $pack;
     }
 
     /**
@@ -407,6 +457,8 @@ final class EvidencePackBuilder {
      * @param array<int, array<string, mixed>> $messages
      */
     private function first_system_content(array $messages): string {
+        $contents = [];
+
         foreach ($messages as $message) {
             if ('system' !== (string) ($message['role'] ?? '')) {
                 continue;
@@ -416,10 +468,10 @@ final class EvidencePackBuilder {
                 continue;
             }
 
-            return $message['content'];
+            $contents[] = $message['content'];
         }
 
-        return '';
+        return implode("\n\n", $contents);
     }
 
     /**
@@ -464,7 +516,7 @@ final class EvidencePackBuilder {
      */
     private function page_brief_from_inspect(array $output): array {
         $brief = [
-            'rendered' => (bool) ($output['rendered'] ?? false),
+            'rendered' => ArrayKey::rest_bool($output['rendered'] ?? false),
             'engine' => (string) ($output['engine'] ?? ''),
             'warning' => (string) ($output['warning'] ?? ''),
             'url' => (string) ($output['url'] ?? ''),
@@ -641,8 +693,8 @@ final class EvidencePackBuilder {
                 'blocks' => $compact['blocks'],
                 'count' => (int) $compact['count'],
                 'path_format' => 'Dotted zero-based visible block path, e.g. 0 or 2.1.',
-                'truncated_excerpts' => !empty($compact['truncated_excerpts']),
-                'flat_index' => !empty($compact['flat_index']),
+                'truncated_excerpts' => true === ($compact['truncated_excerpts'] ?? false),
+                'flat_index' => true === ($compact['flat_index'] ?? false),
             ],
         ];
     }

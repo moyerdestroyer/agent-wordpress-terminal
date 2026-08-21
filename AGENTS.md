@@ -44,11 +44,12 @@ WP AI Client, or a companion AI plugin — those are optional accelerators for s
 already have them configured. The guaranteed baseline on every supported WordPress
 version is the small set of direct-key providers in `src/Agent/` (`OpenRouterProvider`,
 `OpenAIProvider`), thin subclasses of `ChatCompletionsProvider` talking to OpenAI-compatible
-chat completions endpoints. `OpenAIProvider` has no manual model field (it uses OpenAI's
-evergreen `chat-latest` alias) and transparently reuses an already-configured `openai`
+chat completions endpoints. `OpenAIProvider` defaults to `gpt-5.6-luna` (overridable via
+`awpt_openai_model` / Settings) and transparently reuses an already-configured `openai`
 WordPress Connector key when AWPT's own `awpt_openai_api_key` option is empty
 (`ConnectorInspector::resolve_default_provider_api_key()`), so a key never has to be
-entered twice. `WordPressAIClientProvider` is a separate, fully optional adapter that only
+entered twice. On Chat Completions, GPT-5.6 models with function tools require
+`reasoning_effort=none` (set automatically). `WordPressAIClientProvider` is a separate, fully optional adapter that only
 activates when a site has WordPress 7.0+ (Core Connectors API, shipped March 2026) or an
 `AI`/`wp-ai-client` companion plugin with a ready connector selected — every call site is
 feature-detected (`function_exists()`/`class_exists()`/`method_exists()`) and
@@ -88,6 +89,32 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 - Do not store large model payloads in post meta/options — use custom tables (`wp_awpt_*`).
 - Treat the agent as untrusted: ability `permission_callback`s use minimum WordPress caps (no redundant `manage_options` double-gates on content/media/theme/plugin ops). Diagnostics and site-settings stay admin-only. `awpt/apply-action` stays human-only. Discovered abilities/MCP tools are auto-offered unless disabled in the Tools UI (`awpt_disabled_tools`).
 
+## Agent tool design
+
+Simplicity is a product constraint, not a cleanup pass. The model-facing catalog must stay small enough to learn in one turn.
+
+- **One job, one ability.** Do not register a second ability for a job an existing one already does. Adding a model-facing ability requires deleting one or documenting why no existing tool can do it.
+- **Shared vocabulary.** Prompts, Improve units, and input schemas use the same names: `path`, `fingerprint`, `op`. Do not invent parallel fields (`target_path` vs `paths`, hashes that look like preparation receipts).
+- **Descriptions name inputs and effects**, not multi-hop workflows. If a sequence is required (prepare then propose, choose inner HTML vs rich text), the server performs it.
+- **Policy lives in allowlists and executors**, not in 80-word tool descriptions the model will skim.
+- **Server-side pickiness is fine.** Fingerprints, composition gates, and “no Gutenberg delimiters in inner HTML” stay. Caller-side mazes (seven write tools, six batch kinds, a prepare hop the compose phase then hides) do not.
+
+### Model catalog (content work)
+
+| Job | Ability |
+|---|---|
+| Read page structure | `awpt/read-block-tree` |
+| Read one leaf (markup / attrs) | `awpt/get-block` |
+| Surgical edits on an existing page | `awpt/propose-block-batch-update` (`set` / `remove` / `insert`) |
+| Swap or add a theme section | `awpt/propose-pattern-replace` or `awpt/propose-pattern-insert` (server prepares) |
+| Inspect section slots first | `awpt/prepare-pattern-change` (optional read) |
+| Full-document freehand | `awpt/propose-content-update` |
+| New patterned post | `awpt/prepare-pattern-draft` → `awpt/propose-patterned-post` |
+| Expand design-system slice | `awpt/read-design-system` |
+| Rank theme patterns | `awpt/recommend-patterns` |
+
+Do not offer `propose-block-attrs-update`, `propose-block-insert`, `propose-block-remove`, or `list-blocks` as first-class model tools. They are aliases or retired. `analyze-page` extras belong on the block tree, not a second page read.
+
 ## Layers and plugin/theme boundaries
 
 | Layer | Owns |
@@ -99,9 +126,13 @@ models for anyone who wants them. When adding a new AI integration, prefer exten
 
 **Theme vocabulary never belongs in AWPT core.** Pattern name aliases and theme-specific thrash recovery live in the active pack’s manifest (`patterns.namespace`, `patterns.aliases`). AWPT only applies generic, namespace-agnostic heuristics.
 
-**Pattern-native redesign (Ollie-inspired, AWPT tools only):** Prefer **`prepare-pattern-change` → `propose-pattern-replace`** for existing section swaps and **`propose-pattern-insert`** for additions (server-materialized). Full-document freehand `propose-content-update` remains available when needed; claiming `pattern_name` still requires structure evidence (`read-pattern` / prep). Reject dishonest `pattern_unfit_code: no_recommendations` when recommendations were non-empty. Create: `prepare-pattern-draft` → `propose-patterned-post`. Surgical block ops stay exempt.
+**Pattern-native redesign (Ollie-inspired, AWPT tools only):** Prefer **`propose-pattern-replace` / `propose-pattern-insert`** for section swaps and additions (server materializes the pattern; `prepare-pattern-change` is an optional slot preview, not a required first hop). Full-document freehand `propose-content-update` remains available when needed; claiming `pattern_name` still requires structure evidence. Reject dishonest `pattern_unfit_code: no_recommendations` when recommendations were non-empty. Create: `prepare-pattern-draft` → `propose-patterned-post`. Surgical copy/attr/insert/remove work uses **`propose-block-batch-update` only**.
 
 **Review-queue Improve:** Two **internal** AWPT turns (evaluate plan → act), still **one button**. Prompts live in `ImprovePagePrompt` (PHP SoT). Dufresne only mounts `AWPTReviewAssistant` — no tools, prompts, or plan schema in Dufresne. Evaluate turns are read-only (`[awpt:improve_evaluate]` marker → investigate tools). CLI: `bin/queue-improve-one.php` (default two-step; `one-shot` for legacy).
+
+**Failed tool feedback:** Ability failures return to the model as the next `role: tool` payload (`FailedToolFeedback`: `ok: false`, `error`, `fix`, `retry_with`, `use`, `constraints`). Prefer enriching that structured stderr over hard-coded essay fallbacks or long system nag prompts. Keep full nested `error_data` in storage for the Tools UI.
+
+**Avoid hard-coded fallback plans.** Synthesizing an `## Execution plan` / `awpt-units` fence in PHP when the model stalls (e.g. `fallback_evaluate_plan_from_evidence`) is brittle: it guesses intent from partial model text, drifts from reviewer notes, and often lands on dishonest `op: none` or a one-size layout unit. Prefer failing closed, a tools-off repair hop with field nits, or another model turn that must emit a real fence. Do not grow the hardcoded plan template to paper over evaluate failures.
 
 **Dufresne contracts** (string-stable; prefer `Hooks` constants on the Dufresne side):
 

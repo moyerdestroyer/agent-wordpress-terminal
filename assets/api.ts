@@ -24,6 +24,7 @@ declare global {
 			improvePagePrompt?: string;
 			improvePageEvaluatePrompt?: string;
 			improvePageActPrompt?: string;
+			improvePageReviewBrief?: string;
 			reviewBridgeVersion?: number;
 			hasActiveDomainPack?: boolean;
 			environment?: import('./types').EnvironmentStatus;

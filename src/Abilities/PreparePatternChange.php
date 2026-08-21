@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace AWPT\Abilities;
 
 use AWPT\Agent\AgentFeedback;
+use AWPT\Domain\PatternCompactFillGuard;
 use AWPT\Domain\PatternEditableSlots;
 use AWPT\Domain\PatternMediaSlots;
 use AWPT\Domain\PatternPreparationReceipt;
@@ -19,6 +20,7 @@ use AWPT\Support\ArrayKey;
 use AWPT\Support\BlockTree;
 use AWPT\Support\ContentListService;
 use AWPT\Support\PageSectionModel;
+use AWPT\Support\PatternCatalog;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -60,7 +62,7 @@ final class PreparePatternChange implements AbilityInterface {
                     'target_path' => [
                         'type' => 'string',
                         'description' => __(
-                            'Dotted block path for the section to replace, or the insert anchor (e.g. 0 or 2).',
+                            'Dotted block path for a section (e.g. 0 or 2), or document for a complete full-page replace.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -76,6 +78,13 @@ final class PreparePatternChange implements AbilityInterface {
                         'enum' => ['before', 'after', 'append'],
                         'description' => __(
                             'Insert position when mode=insert. Defaults to after.',
+                            'agent-wordpress-terminal',
+                        ),
+                    ],
+                    'pattern_name' => [
+                        'type' => 'string',
+                        'description' => __(
+                            'Optional. Exact registered theme pattern to bind. When set and resolvable, skips section-preferring recommend and uses this pattern.',
                             'agent-wordpress-terminal',
                         ),
                     ],
@@ -120,6 +129,16 @@ final class PreparePatternChange implements AbilityInterface {
         $intent = sanitize_text_field((string) ($input['intent'] ?? ''));
         $mode = sanitize_key((string) ($input['mode'] ?? ''));
         $target_path = sanitize_text_field((string) ($input['target_path'] ?? ''));
+        $replace_entire_document = true === ($input['replace_entire_document'] ?? false);
+        $path_alias = strtolower(trim($target_path, "[] \t\"'"));
+
+        if ('document' === $path_alias) {
+            $replace_entire_document = true;
+            $target_path = 'document';
+        } elseif ($replace_entire_document) {
+            $target_path = 'document';
+        }
+
         $expected_fingerprint = sanitize_text_field((string) ($input['expected_fingerprint'] ?? ''));
         $position = sanitize_key((string) ($input['position'] ?? BlockTree::POSITION_AFTER));
         $media_count = max(0, min(200, (int) ($input['media_count'] ?? 0)));
@@ -137,6 +156,14 @@ final class PreparePatternChange implements AbilityInterface {
             return new \WP_Error(
                 'awpt_pattern_change_mode_invalid',
                 __('mode must be replace or insert.', 'agent-wordpress-terminal'),
+                ['status' => 400],
+            );
+        }
+
+        if ($replace_entire_document && PatternPreparationReceipt::MODE_REPLACE !== $mode) {
+            return new \WP_Error(
+                'awpt_document_pattern_insert_invalid',
+                __('The document target is valid only for pattern replace.', 'agent-wordpress-terminal'),
                 ['status' => 400],
             );
         }
@@ -166,7 +193,7 @@ final class PreparePatternChange implements AbilityInterface {
             );
         }
 
-        if (1 !== preg_match('/^\d+(?:\.\d+)*$/', $target_path)) {
+        if (!$replace_entire_document && 1 !== preg_match('/^\d+(?:\.\d+)*$/', $target_path)) {
             return new \WP_Error(
                 'awpt_invalid_block_path',
                 __('target_path must be a dotted numeric path such as 0 or 2.1.', 'agent-wordpress-terminal'),
@@ -179,9 +206,9 @@ final class PreparePatternChange implements AbilityInterface {
             );
         }
 
-        $target = $tree->get_block($target_path);
+        $target = $replace_entire_document ? null : $tree->get_block($target_path);
 
-        if (null === $target) {
+        if (!$replace_entire_document && null === $target) {
             return new \WP_Error(
                 'awpt_block_not_found',
                 __('Target block path was not found on the current post.', 'agent-wordpress-terminal'),
@@ -195,18 +222,37 @@ final class PreparePatternChange implements AbilityInterface {
             );
         }
 
-        $live_fingerprint = BlockTree::fingerprint($target);
-        $target_section = PageSectionModel::find_by_path($section_menu, $target_path) ?? $this->minimal_target_section(
-            $target_path,
-            $target,
-            $live_fingerprint,
-        );
+        $live_fingerprint = $replace_entire_document
+            ? hash('sha256', $post->post_content)
+            : BlockTree::fingerprint($target);
+        $target_section = $replace_entire_document
+            ? [
+                'path' => 'document',
+                'name' => 'document',
+                'block_name' => 'document',
+                'fingerprint' => $live_fingerprint,
+                'role' => 'document',
+                'heading' => $post->post_title,
+                'heading_text' => $post->post_title,
+                'has_dynamic_blocks' => false,
+                'preserve_by_default' => true,
+                'links' => [],
+                'numeric_tokens' => [],
+                'excerpt' => '',
+                'depth' => 0,
+            ]
+            : PageSectionModel::find_by_path($section_menu, $target_path) ?? $this->minimal_target_section(
+                $target_path,
+                $target,
+                $live_fingerprint,
+            );
         $routing = PageSectionModel::recommend_operation($intent, $target_section, $mode);
-        $carry_forward = $this->carry_forward_from_section($target_section);
+        $carry_forward = $replace_entire_document
+            ? $this->carry_forward_from_post($post)
+            : $this->carry_forward_from_section($target_section);
         $warnings = $this->section_warnings($intent, $mode, $target_section);
         $target_role = sanitize_key((string) ($target_section['role'] ?? ''));
 
-        // Auto-fill fingerprint from live tree when the model omits it (one less hop).
         if ('' === $expected_fingerprint) {
             $expected_fingerprint = $live_fingerprint;
         } elseif (!hash_equals($expected_fingerprint, $live_fingerprint)) {
@@ -225,59 +271,96 @@ final class PreparePatternChange implements AbilityInterface {
             );
         }
 
-        $ranked = new RecommendPatterns()->execute([
-            'intent' => $intent,
-            'post_type' => $post->post_type,
-            'max' => 24,
-            'semantic' => false,
-            'target_role' => $target_role,
-            'post_id' => $post_id,
-            'target_path' => $target_path,
-            'prefer_section_scope' => true,
-        ]);
-        $recommendations = ArrayKey::list_of_maps($ranked['recommendations'] ?? null);
-        $selected = $this->first_section_pattern($recommendations, $target_role);
+        $catalog = new PatternCatalog();
+        $requested_pattern_name = sanitize_text_field((string) ($input['pattern_name'] ?? ''));
+        $selected = [];
+        $summary = [];
+        $pattern_name = '';
+        $selection_meta = [
+            'score' => 0,
+            'rationale' => '',
+        ];
 
-        if ([] === $selected) {
-            return [
-                'mode' => 'custom_fallback',
-                'intent' => $intent,
-                'post_id' => $post_id,
-                'post_type' => $post->post_type,
-                'target_path' => $target_path,
-                'expected_fingerprint' => $live_fingerprint,
-                'target_section' => $this->public_target_section($target_section),
-                'carry_forward' => $carry_forward,
-                'recommended_operation' => $routing,
-                'warnings' => $warnings,
-                'page_sections' => $section_menu,
-                'reason' => __(
-                    'No compatible section pattern was available for this change.',
-                    'agent-wordpress-terminal',
-                ),
-                'fallback_code' => 'scope_mismatch',
-                'media' => $this->media_candidates($media_count),
-                'agent_feedback' => AgentFeedback::make(
-                    'fallback',
-                    __(
-                        'No theme section pattern fit this change; use surgical tools or honest custom composition.',
-                        'agent-wordpress-terminal',
-                    ),
+        if ('' !== $requested_pattern_name) {
+            $resolved = $catalog->resolve_name($requested_pattern_name);
+
+            if (null === $resolved) {
+                return new \WP_Error(
+                    'awpt_pattern_not_found',
+                    __('The requested pattern_name is not a registered theme pattern.', 'agent-wordpress-terminal'),
                     [
-                        'next_actions' => [[
-                            'ability' => 'awpt/propose-block-batch-update',
-                            'reason' => __(
-                                'Prefer surgical edits when no section pattern fits.',
-                                'agent-wordpress-terminal',
-                            ),
-                        ]],
+                        'status' => 404,
+                        'requested_name' => $requested_pattern_name,
+                        'suggested_patterns' => $catalog->suggestions($requested_pattern_name, 8, $post->post_type),
+                        'target_path' => $target_path,
+                        'recommended_operation' => $routing,
                     ],
-                ),
+                );
+            }
+
+            $pattern_name = sanitize_text_field($resolved['resolved_name']);
+            $summary = $catalog->summary($resolved['pattern'], $post->post_type);
+            $selection_meta = [
+                'score' => 100,
+                'rationale' => __('Caller-bound pattern_name; section recommend skipped.', 'agent-wordpress-terminal'),
+            ];
+        } else {
+            $ranked = new RecommendPatterns()->execute([
+                'intent' => $intent,
+                'post_type' => $post->post_type,
+                'max' => 24,
+                'semantic' => false,
+                'target_role' => $target_role,
+                'post_id' => $post_id,
+                'target_path' => $target_path,
+                // Whole-document replaces need page layouts, not section TOC/cards.
+                'prefer_section_scope' => !$replace_entire_document,
+            ]);
+            $recommendations = ArrayKey::list_of_maps($ranked['recommendations'] ?? null);
+            $selected = $replace_entire_document
+                ? $this->first_layout_pattern($recommendations)
+                : $this->first_section_pattern($recommendations, $target_role);
+
+            if ([] === $selected) {
+                return [
+                    'mode' => 'custom_fallback',
+                    'intent' => $intent,
+                    'post_id' => $post_id,
+                    'post_type' => $post->post_type,
+                    'target_path' => $target_path,
+                    'expected_fingerprint' => $live_fingerprint,
+                    'target_section' => $this->public_target_section($target_section),
+                    'carry_forward' => $carry_forward,
+                    'recommended_operation' => $routing,
+                    'warnings' => $warnings,
+                    'page_sections' => $section_menu,
+                    'reason' => __('No compatible pattern was available for this change.', 'agent-wordpress-terminal'),
+                    'fallback_code' => 'scope_mismatch',
+                    'media' => $this->media_candidates($media_count),
+                    'agent_feedback' => AgentFeedback::make(
+                        'fallback',
+                        __('No theme pattern fit this change.', 'agent-wordpress-terminal'),
+                        [
+                            'next_actions' => [[
+                                'ability' => 'awpt/propose-block-batch-update',
+                                'reason' => __(
+                                    'Use surgical edits when they satisfy the requested change.',
+                                    'agent-wordpress-terminal',
+                                ),
+                            ]],
+                        ],
+                    ),
+                ];
+            }
+
+            $summary = ArrayKey::as_map($selected['pattern'] ?? null);
+            $pattern_name = sanitize_text_field((string) ($summary['name'] ?? ''));
+            $selection_meta = [
+                'score' => (int) ($selected['score'] ?? 0),
+                'rationale' => (string) ($selected['rationale'] ?? ''),
             ];
         }
 
-        $summary = ArrayKey::as_map($selected['pattern'] ?? null);
-        $pattern_name = sanitize_text_field((string) ($summary['name'] ?? ''));
         $expanded = new PatternTemplateExpander()->expand($pattern_name);
 
         if (is_wp_error($expanded)) {
@@ -301,6 +384,7 @@ final class PreparePatternChange implements AbilityInterface {
             'position' => PatternPreparationReceipt::MODE_INSERT === $mode ? $position : '',
             'post_type' => $post->post_type,
             'carry_forward' => $carry_forward,
+            'replace_entire_document' => $replace_entire_document,
         ]);
 
         $propose_ability = PatternPreparationReceipt::MODE_REPLACE === $mode
@@ -333,10 +417,7 @@ final class PreparePatternChange implements AbilityInterface {
                 'editable_slots' => new PatternEditableSlots()->from_content($expanded),
                 'media_slots' => new PatternMediaSlots()->from_content($expanded),
             ],
-            'selection' => [
-                'score' => (int) ($selected['score'] ?? 0),
-                'rationale' => (string) ($selected['rationale'] ?? ''),
-            ],
+            'selection' => $selection_meta,
             'media' => $this->media_candidates($media_count),
             'policy' => sprintf(
                 /* translators: %s: propose ability name */
@@ -352,20 +433,65 @@ final class PreparePatternChange implements AbilityInterface {
                 [
                     'next_actions' => [[
                         'ability' => $propose_ability,
-                        'reason' => __(
-                            'Stage the prepared pattern change without resending markup.',
-                            'agent-wordpress-terminal',
+                        'reason' => new PatternCompactFillGuard()->target_is_substantive($carry_forward)
+                            ? __(
+                                'Stage with preparation_id and pattern_text_updates that map carry_forward into editable_slots.',
+                                'agent-wordpress-terminal',
+                            )
+                            : __(
+                                'Stage the prepared pattern change without resending markup.',
+                                'agent-wordpress-terminal',
+                            ),
+                        'input' => $this->propose_next_action_input(
+                            $minted['preparation_id'],
+                            $post_id,
+                            $carry_forward,
+                            $expanded,
                         ),
-                        'input' => [
-                            'preparation_id' => $minted['preparation_id'],
-                            'post_id' => $post_id,
-                            'pattern_text_updates' => [],
-                            'media_placements' => [],
-                        ],
                     ]],
                 ],
             ),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $carry_forward
+     * @return array<string, mixed>
+     */
+    private function propose_next_action_input(
+        string $preparation_id,
+        int $post_id,
+        array $carry_forward,
+        string $expanded,
+    ): array {
+        $input = [
+            'preparation_id' => $preparation_id,
+            'post_id' => $post_id,
+            'media_placements' => [],
+        ];
+
+        if (!new PatternCompactFillGuard()->target_is_substantive($carry_forward)) {
+            return $input;
+        }
+
+        $slots = new PatternEditableSlots()->from_content($expanded);
+        $sample_path = (string) ($slots[0]['block_path'] ?? '0.0');
+        $sample_content = trim((string) ($carry_forward['heading'] ?? ''));
+
+        if ('' === $sample_content) {
+            $sample_content = trim((string) ($carry_forward['excerpt'] ?? ''));
+        }
+
+        if ('' === $sample_content) {
+            $sample_content = __('Mapped page copy', 'agent-wordpress-terminal');
+        }
+
+        $input['pattern_text_updates'] = [[
+            'block_path' => $sample_path,
+            'content' => $sample_content,
+        ]];
+
+        return $input;
     }
 
     /**
@@ -437,6 +563,52 @@ final class PreparePatternChange implements AbilityInterface {
     }
 
     /**
+     * Prefer page layouts when replacing an entire document (section picker skips layouts).
+     *
+     * @param list<array<string, mixed>> $recommendations
+     * @return array<string, mixed>
+     */
+    private function first_layout_pattern(array $recommendations): array {
+        $layout = [];
+
+        foreach ($recommendations as $recommendation) {
+            $pattern = ArrayKey::as_map($recommendation['pattern'] ?? null);
+
+            if ('incompatible' === (string) ($pattern['compatibility'] ?? '')) {
+                continue;
+            }
+
+            $domain = ArrayKey::as_map($pattern['domain'] ?? null);
+            $role = sanitize_key((string) ($domain['role'] ?? ''));
+            $scope = sanitize_key((string) ($pattern['composition_scope'] ?? ''));
+            $name = mb_strtolower((string) ($pattern['name'] ?? ''), 'UTF-8');
+            $is_layout =
+                in_array($role, ['page-layout', 'page'], true)
+                || in_array($scope, ['page', 'layout'], true)
+                || str_contains($name, 'layout-page-');
+
+            if (!$is_layout) {
+                continue;
+            }
+
+            if ([] === $layout) {
+                $layout = $recommendation;
+            }
+
+            if ([] !== $layout) {
+                break;
+            }
+        }
+
+        if ([] !== $layout) {
+            return $layout;
+        }
+
+        // A section pattern is not a safe implicit substitute for a document layout.
+        return [];
+    }
+
+    /**
      * @return list<string>
      */
     private function role_match_needles(string $target_role): array {
@@ -501,8 +673,8 @@ final class PreparePatternChange implements AbilityInterface {
             'fingerprint' => (string) ($section['fingerprint'] ?? ''),
             'role' => (string) ($section['role'] ?? PageSectionModel::ROLE_UNKNOWN),
             'heading' => (string) ($section['heading'] ?? ''),
-            'has_dynamic_blocks' => (bool) ($section['has_dynamic_blocks'] ?? false),
-            'preserve_by_default' => (bool) ($section['preserve_by_default'] ?? false),
+            'has_dynamic_blocks' => ArrayKey::rest_bool($section['has_dynamic_blocks'] ?? false),
+            'preserve_by_default' => ArrayKey::rest_bool($section['preserve_by_default'] ?? false),
             'excerpt' => (string) ($section['excerpt'] ?? ''),
         ];
     }
@@ -527,6 +699,59 @@ final class PreparePatternChange implements AbilityInterface {
     }
 
     /**
+     * Whole-document carry_forward for full-page layout replaces.
+     *
+     * @return array<string, mixed>
+     */
+    private function carry_forward_from_post(\WP_Post $post): array {
+        $html = $post->post_content;
+        // Keep block/paragraph boundaries so member lists and FAQ answers stay separable.
+        $html = preg_replace('/<!--\s*\/?wp:[^>]*-->/', "\n", $html) ?? $html;
+        $html = preg_replace('/<br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/(p|h[1-6]|li|blockquote|figcaption)>/i', "</$1>\n", $html) ?? $html;
+        $plain = trim(html_entity_decode(wp_strip_all_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $plain = preg_replace("/[^\S\n]+/u", ' ', $plain) ?? $plain;
+        $plain = preg_replace("/\n{3,}/u", "\n\n", $plain) ?? $plain;
+        $plain = trim($plain);
+        $heading = trim($post->post_title);
+
+        $match = [];
+
+        if (preg_match('/^(.{1,120}?)(?:\?|!|\.|$)/u', preg_replace('/\s+/u', ' ', $plain) ?? $plain, $match) === 1) {
+            $candidate = trim($match[1] ?? '');
+
+            if ('' !== $candidate && str_contains($candidate, '?')) {
+                $heading = $candidate . (str_ends_with($candidate, '?') ? '' : '?');
+            }
+        }
+
+        $links = [];
+        $hrefs = [];
+        $href_count = preg_match_all('/href=["\']([^"\']+)["\']/i', $post->post_content, $hrefs);
+
+        if (false !== $href_count && $href_count > 0) {
+            foreach ($hrefs[1] as $href) {
+                $href = trim($href);
+
+                if ('' !== $href && !str_starts_with($href, '#')) {
+                    $links[] = $href;
+                }
+            }
+        }
+
+        return [
+            'links' => array_values(array_unique($links)),
+            'numeric_tokens' => [],
+            'heading' => $heading,
+            'excerpt' => mb_substr($plain, 0, 1_200, 'UTF-8'),
+            'note' => __(
+                'Map these into pattern text/media slots when relevant. Line breaks separate original blocks; do not flatten distinct members/sections into one sentence.',
+                'agent-wordpress-terminal',
+            ),
+        ];
+    }
+
+    /**
      * Soft warnings only — never block freehand or replace solely on role.
      *
      * @param array<string, mixed> $section
@@ -534,7 +759,8 @@ final class PreparePatternChange implements AbilityInterface {
      */
     private function section_warnings(string $intent, string $mode, array $section): array {
         $warnings = [];
-        $preserve = !empty($section['preserve_by_default']) || !empty($section['has_dynamic_blocks']);
+        $preserve =
+            true === ($section['preserve_by_default'] ?? false) || true === ($section['has_dynamic_blocks'] ?? false);
 
         if ($preserve && PatternPreparationReceipt::MODE_REPLACE === $mode) {
             $explicit = (bool) preg_match(

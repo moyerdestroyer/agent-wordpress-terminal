@@ -148,7 +148,9 @@ final class FrontendInspector {
 
         if (preg_match_all('~\bclass=(["\'])(.*?)\1~is', $html, $matches)) {
             foreach ($matches[2] as $class_attr) {
-                foreach (preg_split('/\s+/', trim($class_attr)) ?: [] as $token) {
+                $split = preg_split('/\s+/', trim($class_attr));
+
+                foreach (false === $split ? [] : $split as $token) {
                     $token = strtolower(trim($token));
 
                     if ('' === $token || strlen($token) < 3 || strlen($token) > 80) {

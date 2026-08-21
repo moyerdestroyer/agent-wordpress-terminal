@@ -280,6 +280,7 @@ final class ApplyAction implements AbilityInterface {
                 'block_insert',
                 'block_remove',
                 'pattern_insert',
+                'pattern_replace',
                 'template_update',
                 'global_styles_update',
                 'navigation_update',
@@ -328,8 +329,7 @@ final class ApplyAction implements AbilityInterface {
             'new_post' => 'compose',
             'template_update' => 'template',
             'global_styles_update', 'global_styles_create' => 'global_styles',
-            'navigation_update' => 'navigation',
-            'resource_change' => 'navigation',
+            'navigation_update', 'resource_change' => 'navigation',
             default => 'edit',
         };
     }

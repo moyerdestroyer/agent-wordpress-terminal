@@ -90,6 +90,7 @@ final class DomainPackHealth {
         $broken_references = [];
         $sparse = [];
         $duplicate_slots = [];
+        $unbound_slots = [];
 
         foreach ($catalog as $name => $metadata) {
             $docs = sanitize_text_field((string) ($metadata['docs'] ?? ''));
@@ -123,9 +124,18 @@ final class DomainPackHealth {
                 $sparse[] = $name;
             }
 
+            $slots = ArrayKey::list_of_maps($metadata['slots'] ?? null);
             $slot_ids = array_values(array_filter(array_map(static fn(array $slot): string => sanitize_key(
                 (string) ($slot['id'] ?? ''),
-            ), ArrayKey::list_of_maps($metadata['slots'] ?? null))));
+            ), $slots)));
+
+            foreach ($slots as $slot) {
+                if ('' !== trim((string) ($slot['block_path'] ?? ''))) {
+                    continue;
+                }
+
+                $unbound_slots[] = $name . '#' . (string) ($slot['id'] ?? 'unknown');
+            }
 
             if (count($slot_ids) !== count(array_unique($slot_ids))) {
                 $duplicate_slots[] = $name;
@@ -161,6 +171,20 @@ final class DomainPackHealth {
                 sprintf(
                     __('%d patterns contain duplicate editable slot IDs.', 'agent-wordpress-terminal'),
                     count($duplicate_slots),
+                ),
+            );
+        }
+
+        if ([] !== $unbound_slots) {
+            $issues[] = $this->issue(
+                'warning',
+                'unbound-pattern-slots',
+                sprintf(
+                    __(
+                        '%d editable slots are not bound to a block path and cannot be prepared reliably.',
+                        'agent-wordpress-terminal',
+                    ),
+                    count($unbound_slots),
                 ),
             );
         }
@@ -211,6 +235,40 @@ final class DomainPackHealth {
             );
         }
 
+        $design_catalog = new DesignCatalog($this->registry);
+        $design = $design_catalog->all();
+        $design_diagnostics = array_values(array_filter($design_catalog->diagnostics(), static fn(array $diagnostic): bool => str_starts_with(
+            $diagnostic['pointer'],
+            '/' . (string) $pack['id'],
+        )));
+
+        foreach (ArrayKey::list_of_maps($pack['_diagnostics'] ?? null) as $diagnostic) {
+            $issues[] = $this->issue(
+                sanitize_key((string) ($diagnostic['severity'] ?? 'warning')),
+                sanitize_key((string) ($diagnostic['code'] ?? 'pack-diagnostic')),
+                sanitize_text_field((string) ($diagnostic['message'] ?? '')),
+                sanitize_text_field((string) ($diagnostic['pointer'] ?? '')),
+            );
+        }
+
+        foreach ($design_diagnostics as $diagnostic) {
+            $issues[] = $this->issue(
+                $diagnostic['severity'],
+                $diagnostic['code'],
+                $diagnostic['message'],
+                $diagnostic['pointer'],
+            );
+        }
+        $pack_id = (string) $pack['id'];
+        $design_count = static fn(string $section): int => count(array_filter(
+            ArrayKey::as_map($design[$section] ?? null),
+            static fn(array $record): bool => $pack_id === (string) ($record['pack_id'] ?? ''),
+        ));
+        $design_source = array_values(array_filter(
+            ArrayKey::list_of_maps($design['sources'] ?? null),
+            static fn(array $source): bool => $pack_id === (string) ($source['pack_id'] ?? ''),
+        ))[0] ?? [];
+
         return [
             'pack_id' => (string) $pack['id'],
             'schema_version' => (int) ($pack['schema_version'] ?? 1),
@@ -230,6 +288,15 @@ final class DomainPackHealth {
                 'missing_docs' => count($missing_docs),
                 'broken_references' => count($broken_references),
                 'sparse_contracts' => count($sparse),
+                'unbound_slots' => count($unbound_slots),
+            ],
+            'design_coverage' => [
+                'catalog_hash' => (string) ($design_source['hash'] ?? ''),
+                'token_roles' => $design_count('token_roles'),
+                'components' => $design_count('components'),
+                'style_variations' => $design_count('style_variations'),
+                'archetypes' => $design_count('archetypes'),
+                'diagnostics' => count($design_diagnostics),
             ],
             'rule_count' => count($rules) - count($unsupported),
             'issues' => $issues,
@@ -314,9 +381,19 @@ final class DomainPackHealth {
     }
 
     /**
-     * @return array{severity: string, code: string, message: string}
+     * @return array{severity: string, code: string, message: string, pointer?: string}
      */
-    private function issue(string $severity, string $code, string $message): array {
-        return ['severity' => $severity, 'code' => $code, 'message' => $message];
+    private function issue(string $severity, string $code, string $message, string $pointer = ''): array {
+        $issue = [
+            'severity' => $severity,
+            'code' => $code,
+            'message' => $message,
+        ];
+
+        if ('' !== $pointer) {
+            $issue['pointer'] = $pointer;
+        }
+
+        return $issue;
     }
 }

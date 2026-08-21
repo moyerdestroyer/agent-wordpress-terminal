@@ -43,10 +43,7 @@ function test_queue_path_classifier_does_not_treat_provenance_freehand_as_materi
         $result['path_used'],
         'content_update with pattern_name after a read is provenance freehand',
     );
-    Assert::false(
-        $result['server_materialized'],
-        'pattern_name alone must not count as server materialization',
-    );
+    Assert::false($result['server_materialized'], 'pattern_name alone must not count as server materialization');
 }
 
 function test_queue_path_classifier_pattern_insert_is_materialized(): void {

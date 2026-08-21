@@ -26,8 +26,10 @@ final class BlockBatchUpdater {
      */
     public function describe(array $changes): string {
         $counts = [
+            'set' => 0,
             'update_attrs' => 0,
             'replace_text' => 0,
+            'replace_inner_html' => 0,
             'update_block' => 0,
             'remove' => 0,
             'insert' => 0,
@@ -43,6 +45,13 @@ final class BlockBatchUpdater {
 
         $parts = [];
 
+        if ($counts['set'] > 0) {
+            $parts[] = sprintf(
+                _n('%d block update', '%d block updates', $counts['set'], 'agent-wordpress-terminal'),
+                $counts['set'],
+            );
+        }
+
         if ($counts['update_attrs'] > 0) {
             $parts[] = sprintf(
                 _n('%d attribute update', '%d attribute updates', $counts['update_attrs'], 'agent-wordpress-terminal'),
@@ -54,6 +63,18 @@ final class BlockBatchUpdater {
             $parts[] = sprintf(
                 _n('%d text replacement', '%d text replacements', $counts['replace_text'], 'agent-wordpress-terminal'),
                 $counts['replace_text'],
+            );
+        }
+
+        if ($counts['replace_inner_html'] > 0) {
+            $parts[] = sprintf(
+                _n(
+                    '%d saved HTML replacement',
+                    '%d saved HTML replacements',
+                    $counts['replace_inner_html'],
+                    'agent-wordpress-terminal',
+                ),
+                $counts['replace_inner_html'],
             );
         }
 
@@ -114,10 +135,16 @@ final class BlockBatchUpdater {
 
         foreach ($changes as $index => $change) {
             $kind = sanitize_key((string) ($change['kind'] ?? ''));
-            $path = sanitize_text_field((string) ($change['block_path'] ?? ''));
-            $fingerprint = sanitize_text_field((string) ($change['expected_fingerprint'] ?? ''));
+            $path = sanitize_text_field((string) ($change['block_path'] ?? $change['path'] ?? ''));
+            $fingerprint = sanitize_text_field(
+                (string) ($change['expected_fingerprint'] ?? $change['fingerprint'] ?? ''),
+            );
 
-            if (!in_array($kind, ['update_attrs', 'replace_text', 'update_block', 'remove', 'insert'], true)) {
+            if (!in_array(
+                $kind,
+                ['set', 'update_attrs', 'replace_text', 'replace_inner_html', 'update_block', 'remove', 'insert'],
+                true,
+            )) {
                 return $this->error(
                     'awpt_invalid_block_batch_kind',
                     __('Unsupported block batch change.', 'agent-wordpress-terminal'),
@@ -133,12 +160,29 @@ final class BlockBatchUpdater {
                 static fn(string $candidate): bool => 'insert' !== $candidate,
             ));
             $compatible_shared_anchor = count($non_insert_kinds) <= 1 && !in_array('remove', $non_insert_kinds, true);
+            // Allow remove+insert on one path as an in-place block type swap.
+            $compatible_replace =
+                1 === count(array_filter(
+                    $combined_kinds,
+                    static fn(string $candidate): bool => 'remove' === $candidate,
+                ))
+                && 1 === count(array_filter(
+                    $combined_kinds,
+                    static fn(string $candidate): bool => 'insert' === $candidate,
+                ))
+                && count($combined_kinds) === (count($non_insert_kinds) + 1)
+                && ['remove'] === $non_insert_kinds;
 
-            if ('' === $path || '' === $fingerprint || [] !== $prior_kinds && !$compatible_shared_anchor) {
+            if (
+                '' === $path
+                || '' === $fingerprint
+                || [] !== $prior_kinds && !$compatible_shared_anchor && !$compatible_replace
+            ) {
                 return $this->error(
                     'awpt_invalid_block_batch_target',
                     __(
-                        'Each path may have one non-insertion mutation plus any number of anchored insertions. When one block needs both attributes and rich text changed, send one update_block change with attrs and content.',
+                        'Each path may have one non-insertion mutation plus any number of anchored insertions, or a remove+insert swap. '
+                        . 'Use kind set with attrs and/or html for combined edits on the same path.',
                         'agent-wordpress-terminal',
                     ),
                     $index,
@@ -186,6 +230,16 @@ final class BlockBatchUpdater {
                 'change_index' => $index,
             ];
 
+            if ('set' === $kind) {
+                $set = $this->normalize_set($change, $block, $index, $path);
+
+                if (is_wp_error($set)) {
+                    return $set;
+                }
+
+                $normalized = array_merge($normalized, $set);
+            }
+
             if (in_array($kind, ['update_attrs', 'update_block'], true)) {
                 $attrs = is_array($change['attrs'] ?? null)
                     ? new ActionPayloadSanitizer()->sanitize_attrs_map($change['attrs'])
@@ -198,6 +252,12 @@ final class BlockBatchUpdater {
                         $index,
                         $path,
                     );
+                }
+
+                $attribute_error = $this->validate_registered_attributes((string) ($block['blockName'] ?? ''), $attrs);
+
+                if (is_wp_error($attribute_error)) {
+                    return $this->with_change_context($attribute_error, $index, $path);
                 }
 
                 $normalized['attrs'] = $attrs;
@@ -214,6 +274,25 @@ final class BlockBatchUpdater {
                 }
 
                 $normalized['content'] = wp_kses_post((string) $change['content']);
+            }
+
+            if ('replace_inner_html' === $kind) {
+                if (!array_key_exists('inner_html', $change)) {
+                    return $this->error(
+                        'awpt_block_batch_inner_html_required',
+                        __('A saved HTML replacement needs inner_html.', 'agent-wordpress-terminal'),
+                        $index,
+                        $path,
+                    );
+                }
+
+                $inner_html = new BlockInnerHtmlUpdater()->validate($block, (string) $change['inner_html']);
+
+                if (is_wp_error($inner_html)) {
+                    return $this->with_change_context($inner_html, $index, $path);
+                }
+
+                $normalized['inner_html'] = $inner_html;
             }
 
             if ('insert' === $kind) {
@@ -245,7 +324,52 @@ final class BlockBatchUpdater {
                 $attrs = is_array($change['attrs'] ?? null)
                     ? new ActionPayloadSanitizer()->sanitize_attrs_map($change['attrs'])
                     : [];
+                $attribute_error = $this->validate_registered_attributes($block_name, $attrs);
+
+                if (is_wp_error($attribute_error)) {
+                    return $this->with_change_context($attribute_error, $index, $path);
+                }
+
+                $content_text = trim((string) ($change['content'] ?? ''));
                 $inner_html = wp_kses_post((string) ($change['inner_html'] ?? ''));
+
+                if (in_array($block_name, ['core/heading', 'core/paragraph'], true) && '' === $inner_html) {
+                    if ('' === $content_text) {
+                        return new \WP_Error(
+                            'awpt_block_insert_content_required',
+                            __('An inserted heading or paragraph needs non-empty content.', 'agent-wordpress-terminal'),
+                            [
+                                'status' => 400,
+                                'change_index' => $index,
+                                'block_path' => $path,
+                                'recovery' => __(
+                                    'Retry the same insert with content on the insert row. Do not add a set change for the anchor.',
+                                    'agent-wordpress-terminal',
+                                ),
+                                'retry_example' => [
+                                    'changes' => [[
+                                        'kind' => 'insert',
+                                        'block_path' => $path,
+                                        'expected_fingerprint' => $fingerprint,
+                                        'position' => $position,
+                                        'block_name' => $block_name,
+                                        'attrs' => 'core/heading' === $block_name ? ['level' => 1] : [],
+                                        'content' => 'Use the verified page title or required copy',
+                                    ]],
+                                ],
+                            ],
+                        );
+                    }
+
+                    if ('core/heading' === $block_name) {
+                        $level = max(1, min(6, (int) ($attrs['level'] ?? 2)));
+                        $attrs['level'] = $level;
+                        $inner_html = sprintf('<h%1$d>%2$s</h%1$d>', $level, wp_kses_post($content_text));
+                    } else {
+                        $inner_html = '<p>' . wp_kses_post($content_text) . '</p>';
+                    }
+                }
+
                 $normalized['block_name'] = $block_name;
                 $normalized['position'] = $position;
                 $normalized['attrs'] = $attrs;
@@ -266,11 +390,15 @@ final class BlockBatchUpdater {
         $working = $content;
 
         foreach ($validated as $change) {
-            if (!in_array($change['kind'], ['update_attrs', 'update_block'], true)) {
+            if (!in_array($change['kind'], ['set', 'update_attrs', 'update_block'], true)) {
                 continue;
             }
 
-            $attrs = is_array($change['attrs'] ?? null) ? $change['attrs'] : [];
+            if ('set' === $change['kind'] && !isset($change['attrs'])) {
+                continue;
+            }
+
+            $attrs = ArrayKey::as_map($change['attrs'] ?? null);
             $result = BlockTree::from_content($working)->update_attrs(
                 $change['block_path'],
                 $attrs,
@@ -285,14 +413,38 @@ final class BlockBatchUpdater {
         }
 
         foreach ($validated as $change) {
-            if (!in_array($change['kind'], ['replace_text', 'update_block'], true)) {
+            if (
+                !in_array($change['kind'], ['replace_text', 'update_block'], true)
+                && !('set' === $change['kind'] && isset($change['content']) && !isset($change['inner_html']))
+            ) {
                 continue;
             }
 
             $result = new PatternTextUpdater()->apply($working, [[
                 'block_path' => $change['block_path'],
-                'content' => (string) $change['content'],
+                'content' => (string) ($change['content'] ?? ''),
             ]]);
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            $working = $result;
+        }
+
+        foreach ($validated as $change) {
+            if (
+                'replace_inner_html' !== $change['kind']
+                && !('set' === $change['kind'] && isset($change['inner_html']))
+            ) {
+                continue;
+            }
+
+            $result = new BlockInnerHtmlUpdater()->apply(
+                $working,
+                $change['block_path'],
+                (string) ($change['inner_html'] ?? ''),
+            );
 
             if (is_wp_error($result)) {
                 return $result;
@@ -318,8 +470,8 @@ final class BlockBatchUpdater {
                 ? $tree->remove_block($change['block_path'])
                 : $tree->insert_block(
                     $change['block_path'],
-                    is_array($change['block'] ?? null) ? $change['block'] : [],
-                    $change['position'] ?? BlockTree::POSITION_BEFORE,
+                    ArrayKey::as_map($change['block'] ?? null),
+                    (string) ($change['position'] ?? BlockTree::POSITION_BEFORE),
                 );
 
             if (is_wp_error($result)) {
@@ -336,6 +488,76 @@ final class BlockBatchUpdater {
         }, $validated);
 
         return ['content' => $working, 'changes' => $validated];
+    }
+
+    /**
+     * @param array<string, mixed> $change
+     * @param array<string, mixed> $block
+     * @return array<string, mixed>|\WP_Error
+     */
+    private function normalize_set(array $change, array $block, int $index, string $path): array|\WP_Error {
+        $attrs = is_array($change['attrs'] ?? null)
+            ? new ActionPayloadSanitizer()->sanitize_attrs_map($change['attrs'])
+            : [];
+        $html = (string) ($change['html'] ?? $change['inner_html'] ?? '');
+        $text = (string) ($change['text'] ?? $change['content'] ?? '');
+        $out = [];
+        $block_name = (string) ($block['blockName'] ?? '');
+
+        // Models often put rich text in attrs.content; that is not a registered block attr.
+        if (isset($attrs['content']) && is_string($attrs['content'])) {
+            if ('' === $text && '' === $html) {
+                $text = $attrs['content'];
+            }
+
+            unset($attrs['content']);
+        }
+
+        if ([] !== $attrs) {
+            $attribute_error = $this->validate_registered_attributes($block_name, $attrs);
+
+            if (is_wp_error($attribute_error)) {
+                // If html/text can still mutate the leaf, drop invalid attrs instead of failing the whole set.
+                if ('' === $html && '' === $text) {
+                    return $this->with_change_context($attribute_error, $index, $path);
+                }
+
+                $attribute_error = null;
+            } else {
+                $out['attrs'] = $attrs;
+            }
+        }
+
+        if ('' !== $html) {
+            $inner_html = new BlockInnerHtmlUpdater()->validate($block, $html);
+
+            if (is_wp_error($inner_html)) {
+                $inspect = new BlockInnerHtmlUpdater()->inspect($block);
+
+                if ($inspect['editable']) {
+                    return $this->with_change_context($inner_html, $index, $path);
+                }
+
+                $text = '' !== $text ? $text : wp_strip_all_tags($html);
+            } else {
+                $out['inner_html'] = $inner_html;
+            }
+        }
+
+        if ('' !== $text && !isset($out['inner_html'])) {
+            $out['content'] = wp_kses_post($text);
+        }
+
+        if ([] === $out) {
+            return $this->error(
+                'awpt_empty_block_set',
+                __('A set change needs attrs and/or html (or text).', 'agent-wordpress-terminal'),
+                $index,
+                $path,
+            );
+        }
+
+        return $out;
     }
 
     private static function compare_paths(string $left, string $right): int {
@@ -360,5 +582,52 @@ final class BlockBatchUpdater {
             'change_index' => $index,
             'block_path' => $path,
         ]);
+    }
+
+    /** @param array<string, mixed> $attrs */
+    private function validate_registered_attributes(string $block_name, array $attrs): ?\WP_Error {
+        if (!class_exists('WP_Block_Type_Registry')) {
+            return null;
+        }
+
+        $type = \WP_Block_Type_Registry::get_instance()->get_registered($block_name);
+
+        if (!is_object($type)) {
+            return null;
+        }
+
+        $registered = is_array($type->attributes ?? null) ? array_keys($type->attributes) : [];
+        $unknown = array_values(array_diff(array_keys($attrs), $registered));
+
+        if ([] === $unknown) {
+            return null;
+        }
+
+        return new \WP_Error(
+            'awpt_unknown_block_attribute',
+            sprintf(
+                __('Block %1$s does not declare attribute(s): %2$s.', 'agent-wordpress-terminal'),
+                $block_name,
+                implode(', ', $unknown),
+            ),
+            [
+                'status' => 400,
+                'block_name' => $block_name,
+                'unknown_attributes' => $unknown,
+                'allowed_attributes' => $registered,
+                'recommended_next_tools' => ['awpt/get-block', 'awpt/propose-block-batch-update'],
+            ],
+        );
+    }
+
+    private function with_change_context(\WP_Error $error, int $index, string $path): \WP_Error {
+        $raw_data = $error->get_error_data();
+        $data = is_array($raw_data) ? $raw_data : [];
+
+        return new \WP_Error(
+            $error->get_error_code(),
+            $error->get_error_message(),
+            array_merge($data, ['change_index' => $index, 'block_path' => $path]),
+        );
     }
 }

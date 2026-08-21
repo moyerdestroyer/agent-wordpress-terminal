@@ -1,202 +1,414 @@
-# Pattern-native workflow gaps: current state and next work
+# Ollie system reassessment for AWPT
 
-Ollie remains reference-only (`ol/` is offline parity material). AWPT borrows useful workflow ideas without making Ollie Pro, the Ollie theme, or the Ollie skill a runtime dependency.
+> **Implementation status (August 2026):** G1–G3 are **closed**. The model-facing **content catalog is small on purpose** (see the tool comparison below): surgical work is `propose-block-batch-update` (`set` / `remove` / `insert`); section swaps and adds are `propose-pattern-replace` / `propose-pattern-insert` and the server prepares. Do not re-expose retired aliases (`propose-block-attrs-update`, `propose-block-insert`, `propose-block-remove`, `list-blocks`) to match Ollie's action-routers. `awpt-domain.json` remains the theme's only manifest and may reference `design.catalog`. AWPT compiles a theme-neutral snapshot behind `awpt/read-design-system`; a task-scoped slice is injected; the ability expands a named section. Theme-derived preset checks reject newly introduced hardcoded tokens when the active theme publishes matching presets; unchanged legacy markup is grandfathered. Declined: a second manifest, a compiled rubric/example schema, a full block/template inventory, Ollie aesthetics as universal rules, a forced evaluate tool call, and extra model-facing abilities for jobs the catalog already covers. This document is architectural background and the backlog for G4–G8.
 
-## Status as of 2026-08-10
+## Purpose and source boundary
 
-The implementation gaps that previously made Improve unreliable are now closed in this workspace:
+The `ol/` subtree is an offline reference implementation. It contains:
 
-- Evaluate → act is a typed, server-backed workflow rather than transcript inference. The server owns the plan, focus binding, expiry, state transitions, and action linkage.
-- The terminal, review bridge, and CLI use the same two-phase semantics. `/improve` now enters evaluate rather than silently retaining the legacy one-shot server behavior.
-- Prepared insert consumes the signed insert receipt, its bound pattern body and position, compact text/media updates, source hash, and anchor fingerprint. The simpler catalog-name insert remains an explicit uncustomized path.
-- Compact-slot failures return receipt-bound editable/media slots, carry-forward values, and a same-receipt retry example for both replace and insert.
-- Scorecards now use declared scenario classes, unique run IDs, separate insert/replace metrics, correction counts, and an explicit prepare → propose funnel.
-- Review-queue Improve is one-click evaluate → act → apply for one reversible, page-scoped content action. It exposes whether page-specific AI history is fresh or continuing, accepts optional reviewer direction, supports an explicit fresh start, and retains Undo. Terminal writes remain staged behind explicit approval.
-- Surgical batches now support one atomic `update_block` mutation when a block needs both attribute and rich-text changes. The ability schema, validator recovery text, stored payload, review summary, and act prompt all expose the same per-path rule.
-- Improve act uses a generous 480-second overall safety ceiling instead of rigid phase allocations. A productive existing-page composition may use up to 450 seconds of the remaining wall; completion-count and repeated-proposal-failure caps remain the loop breakers.
+- Ollie theme 1.6.1 and its pattern/token system.
+- Ollie Pro 2.6.4, including seven consolidated WordPress Abilities.
+- A modular Ollie agent skill: a short routing spine plus token, markup, ability, design, archetype, preset, and rubric references.
 
-The main uncertainty has moved from capability to repeatability and measured behavior. One clean live review run now validates surgical execution and automatic apply, but the historical cohorts still cannot tell us whether the model consistently authors and follows a page-specific plan, adopts prepared operations, recovers from compact-slot errors, or produces better rendered results across scenario classes.
+AWPT must not import or require this code at runtime. The useful comparison is architectural: how does an agent gain enough access to a design system to make theme-native decisions, and how should AWPT safely execute those decisions?
 
-### Evidence levels
+This assessment is based on the checked-in source, not only the prose documentation. The snapshot contains ability classes marked `@since 3.0.0` and `3.1.0` while the plugin header remains 2.6.4, and no automated test suite is present in `ol/`. Treat it as design evidence, not a verified release contract.
 
-| Area | Current state | Evidence |
+## Executive conclusion
+
+Ollie remains highly relevant, but it should not be AWPT's target architecture.
+
+Ollie's strongest contribution is its **design-system access layer**:
+
+- a compact, progressively disclosed map of the theme's identity, tokens, patterns, components, and constraints;
+- explicit routes from user intent to existing design-system assets;
+- concrete markup examples and composition archetypes;
+- a vocabulary for theme-native design judgment: hierarchy, rhythm, contrast, density, width, and accessibility;
+- a rubric that lets the agent evaluate custom work against the same system;
+- tools that expose and persist the design choices described by the instructions.
+
+AWPT's strongest contribution is its **transaction and runtime system**:
+
+- narrow typed abilities selected per task;
+- durable evaluate → act workflows;
+- staged proposals and explicit approval boundaries;
+- block fingerprints, source hashes, and apply-time drift checks;
+- one coherent proposal per model response;
+- preview, apply, reject, rollback, and Review Undo;
+- preservation/domain validation;
+- structured recovery, incident logs, and scorecards.
+
+AWPT and Dufresne specifics are necessary delivery mechanics, not the design system itself. AWPT should discover and compile design-system evidence, reason against it, and execute through its safer proposal architecture. Dufresne should remain a review surface that supplies page context, reviewer intent, and constrained apply/Undo behavior. Replacing AWPT's transaction model with Ollie's immediate-write model would be a regression; treating AWPT's mechanics as a substitute for design-system access would also miss the point.
+
+## The three-layer model
+
+### 1. Design authority
+
+This layer answers: **What does good, native work look like on this site?**
+
+It includes:
+
+- identity and active style direction;
+- resolved tokens and allowed values;
+- registered blocks, variations, and components;
+- patterns and page/section archetypes;
+- semantic, accessibility, and responsive rules;
+- representative examples and anti-patterns;
+- a quality rubric;
+- provenance and confidence for every rule.
+
+Ollie supplies this as a theme-specific skill plus theme/plugin data. AWPT needs a generic contract that any theme or domain pack can fulfill.
+
+### 2. Execution substrate
+
+This layer answers: **How can the agent inspect and change WordPress safely?**
+
+This is AWPT: a small model-facing job catalog, server-side pattern preparation, proposal staging, fingerprints, preservation checks, previews, apply-time conflict detection, recovery, rollback, and observability. Receipts and slot maps are executor details, not extra tools.
+
+### 3. Product surface
+
+This layer answers: **Who initiated the work, what context applies, and how is it reviewed?**
+
+Dufresne is one such surface. It provides the review-queue item, optional reviewer direction, automatic application of one constrained action, visible results, and Undo. Terminal and CLI are other surfaces with different approval semantics. None should own theme design knowledge.
+
+## System maps
+
+### Ollie
+
+#### Design-system access layer
+
+`ol/ollie-skill/SKILL.md` is a 91-line routing spine. It loads detail only when needed:
+
+- `reference/TOKENS.md` for theme tokens;
+- `reference/ABILITIES.md` for tool contracts;
+- `reference/MARKUP.md` for Gutenberg serialization rules;
+- `design/DESIGN.md` plus archetypes, presets, and rubric only for deliberate custom work.
+
+Its default route is simple:
+
+1. Prefer a full-page pattern for creation.
+2. Prefer pattern search/apply/replace for existing sections.
+3. Use surgical block editing for text or attributes.
+4. Enter the from-scratch design layer only after a pattern miss or an explicit bespoke request.
+5. Read global styles before changing the site-wide design.
+
+This is a strong progressive-disclosure model. More importantly, it makes the theme legible to the agent: available assets, valid values, composition grammar, and evaluation criteria are all accessible without asking the model to infer the system from rendered pages alone.
+
+#### Ability layer
+
+Ollie exposes seven consolidated abilities:
+
+| Ability | Scope |
+|---|---|
+| `ollie/manage-posts` | Post/CPT CRUD and pattern-based creation |
+| `ollie/manage-content` | Top-level block replacement, insertion, deletion, and replacement batches |
+| `ollie/manage-blocks` | Nested attribute and saved-HTML updates |
+| `ollie/manage-patterns` | Cloud search plus top-level pattern apply/replace |
+| `ollie/manage-global-styles` | Global style tokens and Font Library operations |
+| `ollie/manage-navigation` | Block navigation list/get/create/update |
+| `ollie/manage-templates` | Template and template-part reads/updates |
+
+The action-router design keeps the **ability name list** small (seven). Each ability is still a large enum of actions (`list`, `create`, `batch-update`, `list-text`, …). The model chooses a router **and** an action. Descriptions do substantial routing work. Writes are immediate except pattern apply/replace's unbound preview/confirm.
+
+That is a different kind of small than AWPT's catalog: Ollie hides cardinality inside schemas; AWPT hides sequences inside executors and keeps one job per ability.
+
+#### Write and preview model
+
+Most Ollie mutation actions write immediately. Pattern apply/replace is the exception: it offers a transient preview and a second `confirm` call.
+
+Structural deletion does exist, correcting the earlier assessment: `ollie/manage-content delete_block` removes a **top-level** block by numeric index. Ollie's nested `manage-blocks` path supports updates but not nested deletion. AWPT's dotted-path removal is therefore broader.
+
+### AWPT
+
+AWPT still *registers* many abilities (diagnostics, site settings, knowledge, MCP). **The model does not see that list.** Turn allowlists expose a small job catalog. Prompt modules, work-context, domain packs, and recovery text stay behind that catalog — they are not extra tools.
+
+For focused **content edit / Improve**, the model-facing jobs are:
+
+| Job | Ability the model may call |
+|---|---|
+| Page structure, sections, fingerprints | `awpt/read-block-tree` |
+| One leaf's attrs / inner HTML | `awpt/get-block` |
+| Surgical set / remove / insert | `awpt/propose-block-batch-update` |
+| Swap a section with a theme pattern | `awpt/propose-pattern-replace` (server prepares) |
+| Add a section | `awpt/propose-pattern-insert` (server prepares) |
+| Optional slot preview | `awpt/prepare-pattern-change` |
+| Full-document freehand | `awpt/propose-content-update` |
+| Expand a named design-system section | `awpt/read-design-system` |
+| Rank theme patterns | `awpt/recommend-patterns` |
+
+Create stays `prepare-pattern-draft` → `propose-patterned-post` (bespoke fallback: `propose-new-post`). Site, template, navigation, and diagnose tools appear only when the turn profile is that job.
+
+AWPT uses the active theme as design authority and compiles `theme.json`, registered patterns, domain-pack catalogs, and declarative rules into one inspectable snapshot. A task-scoped slice of that snapshot is injected into the prompt; `awpt/read-design-system` expands a named section. Ollie remains richer as theme-specific prose.
+
+AWPT routes content, layout, and configuration mutations through staged actions. Terminal requires human approval; Review may auto-apply exactly one constrained, reversible action after validation and rendered inspection. Supporting operations such as approved media acquisition have their own boundaries and are not evidence that proposal writes may bypass staging.
+
+## Tool catalog comparison
+
+Count abilities the model is offered on a typical page-edit turn, not every PHP class on disk.
+
+| | Ollie | AWPT (content edit / Improve) |
 |---|---|---|
-| Patterned new post | Implemented | Composition and contract tests |
-| Existing-section replace | Implemented, receipt-bound | Integrity, drift, preservation, and rebuild tests |
-| Basic registered-pattern insert | Implemented | Catalog materialization tests |
-| Customized prepared insert | Implemented in this workspace | Schema/receipt/recovery contract tests; live provider run pending |
-| Evaluate-only and act isolation | Implemented; one live review run | Runtime/workflow tests and session 328; evaluate used deterministic fallback plan |
-| Durable plan lifecycle | Implemented in this workspace | Database-backed state and transition tests |
-| Surface-specific apply boundary | Implemented; review happy path exercised | Session 328 auto-applied action 143; Terminal and Review edge cases remain |
-| Mixed-class scorecard v2 | Implemented in this workspace | Unit tests; fresh cohort pending |
-| Routing adoption and rendered quality | One positive surgical case; broader behavior unknown | Render inspection succeeded and reviewer accepted page 847; no fresh cohort or formal rubric yet |
+| Names on the wire | 7 routers (`ollie/manage-*`) | About 6–9 abilities, allowlist by turn (evaluate is read-only; act is batch + pattern propose) |
+| How the model picks a verb | `action` enum inside the router (`list-text`, `batch-update`, `delete_block`, …) | Ability name **is** the verb (`propose-block-batch-update` with `kind` `set` / `remove` / `insert`) |
+| Who routes multi-hop work | Skill prose + action descriptions | Server (pattern propose prepares; `set` chooses attr vs HTML slot) |
+| Targeting | Top-level numeric index; nested `index_path` arrays | Dotted `path` + 64-char `fingerprint` |
+| Pattern change | `manage-patterns` search → apply/replace; model often resends markup; preview token is not bound | `propose-pattern-replace` / `insert` with `path` + `intent` (or a real `preparation_id`). Compact text/media slots. Receipt is an implementation detail |
+| Surgical copy | `list-text` (leaves + current HTML) → `batch-update` | `read-block-tree` then `get-block` only when markup is required → one `set` batch. **No `list-text` yet (G4)** |
+| Write boundary | Immediate, except an unbound pattern confirm | Staged proposal; human apply (Review: one constrained auto-apply) |
 
-“Implemented in this workspace” is narrower than “validated in production.” The code is currently uncommitted. One clean post-change review run is recorded below, but there is not yet a representative provider cohort.
+**Do not close the cardinality gap by adding tools.** Ollie looks small because routing is stuffed into seven schemas. AWPT looks small because allowlists and executors own routing. Re-offering `propose-block-attrs-update` / `insert` / `remove`, `list-blocks`, or a required `prepare-pattern-change` hop would recreate the maze session 352 died in.
 
-## What changed
+If surgical turns still take too many `get-block` calls, the fix is G4: a **compact leaf view on the existing tree read** (path, fingerprint, editable HTML, mutation kinds) — not a new write ability.
 
-### One durable Improve workflow
+## Secondary implementation comparison
 
-Sessions now store one active Improve workflow with a UUID, prompt version, focused post, expiry, evaluate/act turn IDs, authoritative plan, related action IDs, and terminal state. The lifecycle distinguishes evaluating, plan-ready, acting, staged, no-change, failed, applied, rejected, and rolled back.
+This table is useful for implementation choices, but tool parity is not the objective. The remaining product gap is **live adoption of the small catalog** (G5) and cheaper leaf evidence (G4), not whether a design-system contract exists and not whether AWPT's registered-ability count matches Ollie's seven names.
 
-The act phase accepts a workflow ID, not a client-supplied plan. This closes two earlier problems: a reload no longer has to guess whether transcript text is executable, and a stale or duplicated Execute click cannot silently launch a second act turn. Focus mismatches, expired plans, empty plans, and invalid transitions fail closed.
+| Dimension | Ollie | AWPT | Assessment |
+|---|---|---|---|
+| Design-system access | Theme-specific skill, tokens, patterns, archetypes, examples, rubric | Compiled snapshot via `awpt/read-design-system` plus a task-scoped injected slice; packs optionally enrich it | AWPT now has a theme-neutral contract; Ollie is still richer as prose for one theme |
+| Agent routing | Small, explicit skill spine | Dynamic work-context and prompt modules | Ollie is easier to reason about; AWPT is more context-sensitive |
+| Progressive disclosure | Dedicated token/markup/design references | Slim injected spine; compose/global-styles slices; `read-design-system` expands a named section | Both use it; Ollie still has richer hand-authored references |
+| Pattern policy | Strong default: pattern first | Pattern preferred, bespoke fallback allowed | Similar intent; Ollie communicates it more decisively |
+| Pattern retrieval | Semantic cloud search, local disk cache | Registered/theme/domain pattern catalog and recommendations | Ollie has broader discovery; AWPT has stronger provenance/control |
+| New-page speed | One-shot best-pattern creation | Prepared/staged patterned post workflow | Ollie is faster; AWPT is safer and more customizable |
+| Custom content in patterns | Returns `merge_required` and asks the model to merge raw markup | Receipt-bound compact text/media slots | AWPT is materially safer |
+| Surgical text workflow | `list-text → batch-update` with precomputed paths | `read-block-tree` (+ `get-block` for markup) → `propose-block-batch-update` `kind=set` | Ollie is more ergonomic (one compact leaf list). AWPT is more strongly verified. Do not add a second write tool to close this |
+| Structural edits | Top-level numeric indices and immediate writes | Dotted paths, fingerprints, atomic `set`/`remove`/`insert` proposals, staged apply | AWPT is broader and safer |
+| Batch execution | Mutate one tree, serialize/save once | Validate against original; apply staged typed mutations | Shared atomic goal; AWPT adds proposal and drift boundaries |
+| Design tokens | Explicit hard rules and detailed theme-specific reference | Resolved tokens in the compiled snapshot; theme-derived preset baseline plus optional pack rules | Lesson adopted at the proposal boundary, not as Ollie token names |
+| Design judgment | Presets, archetypes, rhythm, hierarchy, rubric | Injected scope-specific guidance IDs, pack guidance files, and composition validators. No first-class compiled rubric object | Rubric stays pack guidance, not a second schema |
+| Schema validation | Parser/registry checks, mostly warnings, plus sanitizer fixes | Composition, block, preservation, and domain validators | AWPT is stricter at proposal/apply boundaries |
+| Preview | Pattern-only transient preview | Staged WordPress preview/autosave plus rendered inspection | AWPT is stronger |
+| Concurrency | Numeric position; no content fingerprint | Fingerprints, original content, source hashes, apply-time conflicts | AWPT is much stronger |
+| Approval and recovery | Mostly immediate mutation | Stage, apply, reject, rollback/Undo, duplicate/retry control | AWPT is much stronger |
+| Observability | Ability responses | Sessions, workflows, tool calls, incidents, scorecards | AWPT is much stronger |
+| Global styles | Rich token and font-management convenience | Read then staged `propose-global-styles-patch` (full-document update is not on the default compose list) | Ollie is more complete; AWPT is safer |
+| Navigation/templates | Consolidated direct reads and mutations | Read then staged proposals | Same capability class; different safety model |
 
-Frontend orchestration is shared by the terminal and review bridge; PHP orchestration is shared by the CLI runners. Their completion policy is intentionally different: Terminal stops at a staged action, while a reviewer’s Improve click applies exactly one page-scoped, reversible, review-safe content action. Unsupported or ambiguous action sets fail closed. Recovered proposals stay staged rather than being silently applied on reload.
+## Important code-versus-documentation findings
 
-The review bridge keeps page-specific history because follow-up reviewer requests benefit from continuity, but now states whether that history is fresh or continuing. **Start fresh** creates a new focused session, and focused-session reuse selects that newest session rather than preferring an older session with more actions. The review evaluation query also carries the post ID/title, a generic final-review rubric, and optional reviewer notes so knowledge and pattern retrieval receive task-shaped context.
+The Ollie skill is valuable, but some guarantees in its prose are stronger than the implementation.
 
-### Honest prepared insert
+### Design linting is not a universal write gate
 
-`propose-pattern-insert` now has two explicit modes:
+The skill says the linter rejects hardcoded tokens and the ability reference says all block markup passes through two validation layers. In source:
 
-1. Prepared: `preparation_id` plus compact `pattern_text_updates` / `media_placements`. The server loads the receipt-bound pattern and position, rechecks the page and anchor, applies the compact edits, and records preparation provenance.
-2. Uncustomized: `pattern_name`, path, and position after pattern-structure evidence. This remains useful only when the registered pattern is valid as-is.
+- the design linter is called by pattern apply/replace and by the standalone lint endpoint;
+- post creation/update, content mutation, block mutation, template mutation, and navigation mutation call the block sanitizer but not the design linter;
+- pattern apply/replace returns the lint summary but does not stop an apply when `validation.valid` is false;
+- most schema findings—unregistered blocks, attribute type mismatches, invalid child blocks, empty content, excessive nesting, and duplicate anchors—are warnings.
 
-Catalog drift does not invalidate the bound prepared body. Page or anchor drift does. Prompt copy now agrees with composition validation: required authoring placeholders must be replaced before staging.
+AWPT should adopt the token checks, but enforce them at its proposal boundary instead of copying the advisory behavior.
 
-### Recoverable compact-slot errors
+### Pattern preview confirmation is not bound
 
-Insert and replace proposal errors now return the rejected slot along with the receipt’s allowed text/media slots, carry-forward data, and a compact retry shape. Correctable errors keep the same receipt usable. Scorecard v2 infers correction count from failed pattern proposal attempts before success and records `prepared_then_corrected` when the run recovers to server materialization.
+The pattern schema describes `preview_token` as required when `confirm=true`. The execute path accepts confirmation with no token, does not load or compare the transient payload, and merely deletes a supplied token before writing newly recomputed content.
 
-### Better artifacts
+AWPT's durable action ID, preview payload, content fingerprints, and apply-time conflict checks are the correct foundation to retain.
 
-Queue and scenario artifacts use stable unique run IDs instead of overwriting by post ID. Metadata now includes scenario class, provider/model, prompt version, plugin version and Git state when available, active theme/version, active domain packs, and a deterministic pattern-catalog hash.
+### Immediate writes are pervasive
 
-Structural denominators come from declared classes:
+Ollie directly updates posts, templates, navigation, global styles, and fonts. Several paths temporarily remove KSES filters after custom sanitization. Ability annotations also mark mutation tools—including post deletion—as non-destructive.
 
-- `structural_replace`
-- `additive_insert`
-- `surgical_copy`
-- `no_change`
+This is appropriate evidence about Ollie's intended convenience, not a safety pattern for AWPT.
 
-Legacy summaries still use the old heuristic so historical artifacts remain aggregatable.
+### Block mutation boundaries matter
 
-## Historical evidence
+- `manage-content delete_block` is top-level only.
+- `manage-content batch_update` replaces top-level blocks in descending index order and saves once.
+- `manage-blocks batch-update` supports nested attribute/inner-HTML edits and saves once.
+- `manage-blocks update` replaces `innerContent` with one HTML string; the skill correctly routes it toward text leaves, because using it indiscriminately on a container could invalidate its child placeholder map.
+- Ollie's block validator keeps duplicate-anchor state in a static local variable during recursive validation, which can leak state across validations in one request.
 
-All recorded cohorts below predate durable workflow state, prepared insert, and the current act isolation.
+These caveats reinforce AWPT's typed-operation and exact-target approach.
 
-| Cohort | n | Prepare success | Replace success | Server materialized | Freehand provenance | Interpretation |
-|---|---:|---:|---:|---:|---:|---|
-| Post-M1 | 10 | — | 0 | 1 | 2 | Replacement existed; one insert materialized. |
-| Post-M2 enforcement | 10 | 0 | 0 | 0 | 7 | Hard freehand locks were counterproductive. |
-| Smoke post-rollback | 5 | — | 0 | 0 | 3 | Staging recovered, but preparation was unused. |
-| Post-M3 | 5 | 0/5 (0 attempts) | 0/5 | 0/5 | 3/5 | Section metadata alone did not change routing. |
-| Scenario pack | 7 | 1/7 | 0/7 | 0/7 | 2/7 | Exposed missing slot mapping and prepared-insert support. |
+### Cloud pattern caching changes theme files
 
-The old S2 and S4 failures are now direct regression targets: S2 should recover from a bad compact path without touching its dynamic Query subtree; S4 should customize a prepared CTA before composition validation.
+Semantic pattern search writes fetched pattern PHP files into the active theme's `patterns/cloud` directory. AWPT should not adopt this side effect implicitly. External pattern acquisition would need an explicit trust, provenance, update, and storage policy.
 
-### First post-change live evidence
+## What AWPT should build
 
-Two non-applying S4 additive-insert smokes were recorded after the implementation:
-
-- Run `20260810140443-rzne4f` preserved evaluate isolation and successfully prepared an insert receipt, but the act model discarded the receipt, guessed `civicpress/call-to-action-section` instead of using the prepared pattern, failed the pattern proposal, and staged a surgical fallback. Scorecard v2 correctly reported one correction and `proposal_failed`; elapsed time was 250.6 seconds.
-- After tightening receipt guidance, run `20260810141041-n67uuc` again preserved evaluate isolation but the plan itself contained the same guessed slug. Act never reached preparation, the insert failed, and provider finalization timed out at 290.2 seconds. No action was staged.
-
-This is useful negative evidence: the prepared-insert server contract works, but plan fidelity and provider latency still block adoption. The current workspace now prevents a plan that explicitly names `prepare-pattern-change` from entering composition until bound preparation succeeds, tells evaluation not to guess slugs or placeholder URLs, and makes the prepared proposal schema distinguish receipt-bound fields from the legacy name-based path. A larger cohort should wait until the next S4 smoke reaches receipt-bound proposal input; otherwise it will mostly measure the same known failure at roughly four to five minutes per run.
-
-A live review-queue retry on post 847 exposed a separate surgical-batch failure. Evaluate completed successfully in session 327, and act composed a detailed 20-change batch, but path `7.0` appeared twice: once as `update_attrs` and once as `replace_text`. The batch correctly failed atomically, then the old 240-second act wall left only about 32 seconds for correction after a 204-second compose call. No action was staged or applied. The new `update_block` contract removes the invalid-shape cause, and the 480-second outer circuit breaker leaves productive correction time without assigning fixed budgets to discovery, composition, or repair.
-
-The next live review attempt on the same post succeeded end to end:
-
-- Session 328 moved its durable workflow to `applied` and linked action 143. Evaluate ran for about 73 seconds; act ran for about 137 seconds, comfortably inside the 480-second outer safety ceiling.
-- Act staged one atomic 18-change `propose-block-batch-update`: eight heading attribute updates, one combined `update_block` at the formerly conflicting path `7.0`, and nine removals of redundant `A:` paragraphs. There were no failed proposal or provider calls.
-- Rendered-preview inspection succeeded before the Review surface auto-applied the action. The current post content matches the action’s applied payload, contains no `A:` marker, and was positively assessed by the reviewer.
-- This validates the new combined mutation contract and one-click Review stage → inspect → apply happy path. It does **not** yet validate model-authored plan quality: evaluate exhausted its tool loop and AWPT produced the deterministic fallback plan, after which act used targeted page evidence to create the successful surgical batch. Plan finalization quality therefore remains a measured-behavior gap rather than a blocker for this case.
-
-## Remaining gaps
-
-### G1 — Run the post-change mixed cohort
+### G1 — Define a Design System Access Contract — closed
 
 **Priority: highest**
 
-After one S4 smoke reaches a receipt-bound proposal input, run at least 12 fresh evaluate → act cases, with three runs in each declared class. Retain summary and raw artifacts together. For structural cases, inspect whether the act turn followed the evaluated operation/path and where the funnel stopped. For copy and no-change controls, verify they are excluded from the structural denominator.
+Define a normalized, inspectable contract that separates design authority from execution mechanics. The contract should be fillable by active-theme data, theme-owned guidance, registered WordPress assets, and domain packs.
 
-Exit criterion: a reproducible scorecard locates prepare → propose loss by stage and reports insert separately from replace without denominator pollution.
+It should expose:
 
-### G2 — Exercise lifecycle and surface-specific apply UX in a real browser
+- system identity, source, version/hash, and active variation;
+- resolved design tokens with semantic roles, not only raw values;
+- available blocks, variations, patterns, templates, and reusable components;
+- pattern and component selection guidance;
+- composition archetypes and representative native examples;
+- hard constraints, soft guidance, and anti-patterns as distinct rule classes;
+- semantic/accessibility/responsive expectations;
+- a quality rubric;
+- source provenance, scope, priority, and confidence for each rule or asset;
+- validation hooks or machine-checkable equivalents where available.
+
+The contract must be theme-neutral. Ollie can populate it richly; CivicPress or another theme can provide different tokens, patterns, and rules without changing AWPT's workflow code.
+
+Exit criterion: one read returns a stable design-system manifest whose provenance can be traced back to active-theme, WordPress, and domain-pack sources without importing Ollie-specific knowledge.
+
+### G2 — Compile task-scoped design context progressively — closed
 
 **Priority: high**
 
-The production bundle and unit contracts are healthy, and session 328 now confirms Review’s basic one-click evaluate → act → rendered inspection → apply path. Remaining browser work is lifecycle and failure coverage. In Terminal, exercise evaluate failure, plan-ready reload, Execute, duplicate Execute, act failure/retry, staged reload, Apply, Reject, and focus change. In Review, verify fresh/continuing context, Start fresh persistence, optional reviewer notes, unsafe/multiple-action fail-closed behavior, reload recovery, and Undo.
+Add an AWPT-owned compiler that selects the smallest relevant slice of the design-system manifest for the current work type.
 
-Exit criterion: browser evidence confirms state copy, button availability, reload recovery, Terminal’s human Apply boundary, and Review’s remaining constrained-apply edge cases plus Undo. The basic Review happy path is complete.
+Examples:
 
-### G3 — Add live prepared-insert and same-receipt recovery fixtures
+- surgical copy work needs editable-block rules and existing component semantics, not the full archetype catalog;
+- pattern insertion needs pattern candidates, token compatibility, intended section role, and carry-forward rules;
+- bespoke composition needs the active direction, tokens, components, archetypes, examples, anti-patterns, and rubric;
+- global-style work needs resolved current tokens, allowed mutations, and downstream impact;
+- Dufresne Review needs the same design evidence as Terminal, plus its surface-specific apply constraint—not a separate design prompt.
+
+Keep the always-on spine short and load detailed references only after routing. Record which design-system sources influenced the plan and proposal.
+
+Exit criterion: prompt/contract tests prove the correct design context appears for pattern creation, surgical editing, global-style changes, and bespoke fallback without bloating unrelated turns.
+
+### G3 — Enforce the compiled design contract on proposals — closed
 
 **Priority: high**
 
-Contract tests prove the server shape; provider behavior is still unknown. Run an additive CTA case that maps copy/media into prepared slots and an FAQ case that first targets a rejected dynamic path, then retries using the returned allowed slot without renewed discovery or freehand fallback.
+Use the same compiled contract for validation, so instructions and enforcement cannot silently diverge. For custom or pattern-adapted markup:
 
-Exit criterion: both runs reach server materialization, preserve unrelated sections, and report correction cost accurately.
+- reject hardcoded colors when a matching token system exists;
+- reject unsupported custom font sizes and spacing where theme presets are available;
+- validate referenced slugs against resolved theme settings;
+- validate block registration, attribute types, allowed children, anchors, and wrapper synchronization;
+- distinguish blocking errors from safe, deterministic normalization;
+- return exact path/rule recovery data.
 
-### G4 — Score rendered quality and preservation
+Do not impose Ollie's palette names, section wrappers, or aesthetic preferences on other themes. Existing legacy content should not be rejected merely because it predates the policy; enforce this primarily on newly proposed or materially rewritten markup.
+
+Exit criterion: invalid bespoke proposals fail before staging, while unchanged legacy markup and valid active-theme patterns pass.
+
+**Shipped vs declined for G1–G3.** Shipped: one theme-neutral snapshot, unified catalog scopes (`compose`, `edit`, `evaluate`, `template`, `navigation`, `global_styles`, `diagnose`, `investigate`), a slim injected spine, compose/redesign and global-styles detail slices, Improve evaluate/act instructions that treat the slice as given, and `theme-require-presets` on newly introduced findings when the active theme publishes matching presets. Declined: a second theme manifest, a compiled rubric/example/anti-pattern schema, a full registered-block or template inventory in the always-on slice, Ollie palette names or section wrappers as universal rules, and a DiscoveryPolicy gate that forces `read-design-system` on evaluate.
+
+### G4 — Add a compact editable-block inventory
+
+**Priority: high**
+
+Ollie's best execution ergonomic is `list-text`: it returns only editable leaves with precomputed paths, types, and current HTML. This is not a new write ability. AWPT already retired `list-blocks` from the model catalog; do not bring it back.
+
+Fold a compact **leaf view into `read-block-tree`** (or a bounded flag on that same ability) containing:
+
+- dotted path;
+- block name, semantic type, and component/design role when known;
+- complete fingerprint;
+- exact editable rich text or saved HTML when safely bounded;
+- supported mutation kinds (`set` / `remove` only for that leaf);
+- parent section identity;
+- truncation flags and a direct `get-block` recovery hint.
+
+Exit criterion: a multi-block copy edit can move from **one** tree read to one `propose-block-batch-update` without a full-content read, path guessing, or extra `get-block` on group wrappers whose inner HTML is empty.
+
+### G5 — Finish live small-catalog adoption
+
+**Priority: high**
+
+Pattern propose now auto-prepares. Score **outcomes**, not a `prepare-pattern-change` tool hit. Session 352 (LASLI / post 829, August 2026) wrote a strong evaluate plan and then failed act on an invented `preparation_id` and Gutenberg comments in inner HTML — both of those contracts have since been internalized.
+
+Run:
+
+1. an additive CTA case that stages **one** `propose-pattern-insert` with `path` + `intent` (or a real receipt). Internal prepare is an implementation detail;
+2. a dynamic FAQ case that first targets an invalid compact slot, then recovers using returned allowed slots without renewed discovery or freehand fallback;
+3. a saved-HTML surgical case that stages `propose-block-batch-update` `kind=set` with leaf `html` (wrapping `<!-- wp: -->` may be stripped). Unrelated sections stay put.
+
+Exit criterion: all three reach one staged proposal, preserve unrelated content, and report correction cost accurately. Do not fail a run because the model skipped the optional `prepare-pattern-change` read.
+
+### G6 — Run a comparative outcome cohort
+
+**Priority: medium after G1–G5**
+
+Run at least 12 fresh AWPT cases across:
+
+- structural replacement;
+- additive insertion;
+- surgical copy/saved-markup repair;
+- no-change control.
+
+For a smaller matched subset, use Ollie fixtures to compare outcomes—not API call counts. Score:
+
+- task completion;
+- factual/content preservation;
+- active-theme coherence;
+- hierarchy and accessibility;
+- responsive/render quality;
+- number and cost of corrections;
+- provenance;
+- approval clarity;
+- safe handling of concurrent edits.
+
+Exit criterion: the scorecard identifies where AWPT loses quality or adoption by workflow stage and does not treat Ollie-specific tool shapes as parity requirements.
+
+### G7 — Complete lifecycle browser coverage
 
 **Priority: medium**
 
-The harness is stronger on tool paths than outcomes. Add retained preview/render findings, exact before/after preservation checks, successful apply, rendered validation, approval clarity, and a rubric for paired AWPT/CivicPress vs Ollie fixtures. Pattern provenance alone is not parity evidence.
+Current live evidence covers Review apply, Undo visibility, atomic competing-proposal rejection, and nested-removal replay. Remaining coverage:
 
-Exit criterion: another operator can reproduce a run and compare task quality, preservation, correction cost, validation, and approval clarity.
+- Terminal evaluate failure, plan-ready reload, Execute, duplicate Execute, act retry, staged reload, Apply, Reject, and focus change;
+- Review fresh/continuing context, Start fresh persistence, optional notes, unsafe-action rejection, reload recovery, and Undo after reload.
 
-### G5 — Audit fallback honesty using current evidence
+Exit criterion: every durable state has verified copy, buttons, reload behavior, and the intended approval boundary.
 
-**Priority: medium, evidence-gated**
+### G8 — Decide whether site-design administration belongs in AWPT
 
-Do not restore the rolled-back global freehand lock. After the new cohort, measure fallback-code frequency and validate objectively checkable claims such as dynamic-section or preservation conflicts. Keep legitimate bespoke/surgical work available.
+**Priority: low / product decision**
 
-Exit criterion: checkable fallback claims are evidence-backed without blocking valid custom work.
+Ollie includes Font Library installation/removal and structured global-style controls. AWPT can stage global-style JSON changes but does not offer equivalent font acquisition and lifecycle management.
 
-## Current workflows
+Do not add this merely for parity. Decide whether AWPT is meant to administer design assets or only propose changes using installed assets. If added, remote font acquisition needs explicit network trust, license/provenance metadata, file validation, preview, approval, and rollback.
 
-### Existing section (Terminal/CLI)
+## What AWPT should not copy
 
-```text
-evaluate plan
-  → prepare-pattern-change(mode=replace, target path/fingerprint)
-  → propose-pattern-replace(preparation_id, compact text/media changes)
-  → staged preview
-  → human approval
-  → apply
-```
+- Immediate writes from ordinary agent tool calls.
+- Numeric indices without fingerprints or source hashes.
+- Preview tokens that are optional or not bound to the proposed payload.
+- Raw model-side merging of custom content into full pattern markup.
+- Validation summaries that do not block invalid writes.
+- Temporary KSES removal as the main safety story.
+- Implicit writes into the active theme during pattern search.
+- Ollie-specific tokens, section wrappers, or aesthetic presets as universal rules.
+- One large action-router schema (Ollie's seven `manage-*` enums) **or** a pile of overlapping `propose-block-*` aliases. Both overexpose verbs. Keep one job per ability; keep validation in the executor.
+- A required `prepare-pattern-change` hop now that propose can prepare. Optional slot preview is enough.
+- Placeholder-first page creation for tasks where the user supplied authoritative content or Review requires preservation.
 
-### Added section (Terminal/CLI)
+## Current evidence
 
-```text
-evaluate plan
-  → prepare-pattern-change(mode=insert, target path/fingerprint, position)
-  → propose-pattern-insert(preparation_id, compact text/media changes)
-  → staged preview
-  → human approval
-  → apply
-```
+### AWPT live Review evidence
 
-### Explicit uncustomized insert
+- Session 328 / action 143: one atomic 18-change surgical batch applied after rendered inspection.
+- Session 335 / action 145: competing proposals failed together with `awpt_multiple_proposals`; a later consolidated batch applied and exposed Undo.
+- Post 843 / stored tool call 2697: after the direct-parent placeholder fix, the exact four-removal batch replayed successfully, retained five intended nested children, emitted no PHP warnings, and made no database write.
+- Pending posts 829, 834, 777, 778, and 779: read-only deep-removal dry runs each removed exactly one simulated target, preserved its parent, emitted no warnings, and left the database unchanged.
+- Sessions 346–352 (post 829 LASLI, August 2026): evaluate can produce a concrete keep/improve plan and `awpt-units`. Act failed on the old catalog (invented `preparation_id` / `<FROM_PREPARE>`, 20k-token `[`, `replace_inner_html` with block comments). Session 351 staged a heading-level batch, then was rolled back by the next Improve. A provider-authored live `set`/`html` success after the catalog change remains pending.
 
-```text
-read-pattern
-  → propose-pattern-insert(pattern_name, path, position)
-  → composition validation
-  → staged preview
-```
+These are targeted checks, not a representative cohort.
 
-### Review queue
+### Historical baseline
 
-```text
-explicit Improve click + optional reviewer request
-  → evaluate with page-specific review context
-  → act into exactly one page-scoped review-safe proposal
-     (combined attrs + text on one path use one atomic update_block)
-  → automatic apply
-  → visible result + Undo
-```
+All cohorts below predate the current durable workflow, prepared insert, atomic proposal boundary, saved-HTML operation, and nested-removal fix.
 
-### Custom fallback
+| Cohort | n | Prepare success | Replace success | Server materialized | Freehand provenance |
+|---|---:|---:|---:|---:|---:|
+| Post-M1 | 10 | — | 0 | 1 | 2 |
+| Post-M2 enforcement | 10 | 0 | 0 | 0 | 7 |
+| Smoke post-rollback | 5 | — | 0 | 0 | 3 |
+| Post-M3 | 5 | 0/5 (0 attempts) | 0/5 | 0/5 | 3/5 |
+| Scenario pack | 7 | 1/7 | 0/7 | 0/7 | 2/7 |
 
-Preparation may return `custom_fallback` with a machine-derived reason. Freehand remains available but cannot claim server-materialized pattern provenance.
+Do not use these cohorts to judge the current workflow.
 
 ## Recommended next order
 
-1. Record the 12-run mixed cohort (G1).
-2. Browser-test lifecycle and approval states (G2).
-3. Run the prepared-insert and correction recovery fixtures (G3).
-4. Add rendered/preservation scoring before making parity claims (G4).
-5. Tighten only fallback claims the new evidence shows are unsupported (G5).
+1. Run the three G5 **outcome** fixtures on the current catalog (insert, slot recovery, `set`/`html`). Do not score a prepare-pattern-change tool call.
+2. If those runs still spend hops on empty group `get-block`s, add the G4 leaf view **on `read-block-tree`**. Do not add a write ability.
+3. Run the mixed comparative cohort (G6).
+4. Finish lifecycle browser coverage (G7).
+5. Make an explicit product decision about Font Library/design-asset administration (G8).

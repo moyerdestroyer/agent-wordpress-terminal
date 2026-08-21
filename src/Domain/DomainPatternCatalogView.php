@@ -43,7 +43,7 @@ final class DomainPatternCatalogView {
                 'role' => (string) ($domain['role'] ?? ''),
                 'summary' => (string) ($domain['summary'] ?? ''),
                 'intents' => ArrayKey::list_of_strings($domain['intents'] ?? null),
-                'dynamic_content' => (bool) ($domain['dynamic_content'] ?? false),
+                'dynamic_content' => ArrayKey::rest_bool($domain['dynamic_content'] ?? false),
                 'post_types' => ArrayKey::list_of_strings($domain['post_types'] ?? null),
                 'slot_count' => count(ArrayKey::list_of_maps($domain['slots'] ?? null)),
                 'docs' => (string) ($domain['docs'] ?? ''),

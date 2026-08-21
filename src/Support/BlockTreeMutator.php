@@ -51,7 +51,7 @@ final class BlockTreeMutator {
             return new \WP_Error(
                 'awpt_pattern_replace_requires_content',
                 __(
-                    'position "replace" is not a block insert. Use awpt/prepare-pattern-change with mode=replace, then awpt/propose-pattern-replace.',
+                    'position "replace" is not a block insert. Call awpt/propose-pattern-replace with path and intent (the server prepares).',
                     'agent-wordpress-terminal',
                 ),
                 [
@@ -60,22 +60,15 @@ final class BlockTreeMutator {
                     'received_position' => 'replace',
                     'recommended_next_tools' => [
                         [
-                            'tool' => 'awpt/prepare-pattern-change',
-                            'reason' => __(
-                                'Prepare a section replacement with a verified target path and fingerprint, then stage with propose-pattern-replace.',
-                                'agent-wordpress-terminal',
-                            ),
-                        ],
-                        [
                             'tool' => 'awpt/propose-pattern-replace',
                             'reason' => __(
-                                'Stage a server-materialized section replacement without freehand markup.',
+                                'Stage a server-materialized section replacement with path and intent.',
                                 'agent-wordpress-terminal',
                             ),
                         ],
                     ],
                     'recovery' => __(
-                        'Do not retry propose-pattern-insert with position replace. Call prepare-pattern-change (mode=replace) then propose-pattern-replace.',
+                        'Do not retry propose-pattern-insert with position replace. Call propose-pattern-replace with path and intent.',
                         'agent-wordpress-terminal',
                     ),
                 ],
@@ -565,11 +558,19 @@ final class BlockTreeMutator {
                 }
 
                 $inner = $this->paths->inner_blocks($block);
+                $before_count = count($inner);
+                $child_index = $segments[0];
                 $removed = $this->remove_at($inner, $segments, $expected_fingerprint);
                 $block['innerBlocks'] = $inner;
 
+                if (!is_wp_error($removed) && count($inner) < $before_count) {
+                    $this->remove_inner_content_placeholder($block, $child_index);
+                }
+
                 return $removed;
             }
+
+            unset($block);
 
             return $this->paths->error(
                 'awpt_block_not_found',
@@ -601,6 +602,31 @@ final class BlockTreeMutator {
         array_splice($blocks, $raw_index, 1);
 
         return $block;
+    }
+
+    /**
+     * Keep a parent block's null-to-innerBlock map aligned after nested removal.
+     *
+     * @param array<string, mixed> $parent
+     */
+    private function remove_inner_content_placeholder(array &$parent, int $child_index): void {
+        $inner_content = is_array($parent['innerContent'] ?? null) ? $parent['innerContent'] : [];
+        $visible_child = 0;
+
+        foreach ($inner_content as $index => $part) {
+            if (null !== $part) {
+                continue;
+            }
+
+            if ($visible_child === $child_index) {
+                array_splice($inner_content, (int) $index, 1);
+                $parent['innerContent'] = $inner_content;
+
+                return;
+            }
+
+            ++$visible_child;
+        }
     }
 
     /**
@@ -660,6 +686,8 @@ final class BlockTreeMutator {
 
                 return $removed;
             }
+
+            unset($block);
 
             return $this->paths->error(
                 'awpt_block_not_found',

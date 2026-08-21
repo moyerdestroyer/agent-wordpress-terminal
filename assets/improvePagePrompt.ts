@@ -9,7 +9,11 @@ const EVALUATE_MARKER = '[awpt:improve_evaluate]';
 const ACT_MARKER = '[awpt:improve_act]';
 
 function fromSettings(
-	key: 'improvePagePrompt' | 'improvePageEvaluatePrompt' | 'improvePageActPrompt',
+	key:
+		| 'improvePagePrompt'
+		| 'improvePageEvaluatePrompt'
+		| 'improvePageActPrompt'
+		| 'improvePageReviewBrief',
 ): string {
 	if (typeof window === 'undefined' || !window.awptSettings) {
 		return '';
@@ -18,7 +22,7 @@ function fromSettings(
 	return typeof value === 'string' ? value.trim() : '';
 }
 
-/** Legacy one-shot redesign brief. */
+/** Legacy one-shot improve brief. */
 export function improvePagePrompt(): string {
 	const from = fromSettings('improvePagePrompt');
 	if (from !== '') {
@@ -26,13 +30,8 @@ export function improvePagePrompt(): string {
 	}
 
 	return (
-		'Redesign this focused page using active-theme patterns.\n\n' +
-		'Read the current page (and block paths/fingerprints when targeting a section). ' +
-		'Prefer prepare-pattern-change → propose-pattern-replace for structural section swaps, ' +
-		'or propose-pattern-insert for additions. Use surgical block edits for copy-only fixes. ' +
-		'Map existing copy into the new structure and replace required authoring placeholders with credible copy. ' +
-		'Do not invent facts or Media Library URLs. Prefer theme patterns when they fit; ' +
-		'a full-document freehand rewrite is fine when no pattern fits.'
+		'Improve this focused page.\n\n' +
+		'Read the page. Keep what already works. Stage only changes that would actually help.'
 	);
 }
 
@@ -46,15 +45,13 @@ export function improvePageEvaluatePrompt(): string {
 	return (
 		EVALUATE_MARKER +
 		'\n' +
-		'Evaluate this focused page and produce a short execution plan only.\n\n' +
-		'You must NOT stage proposals, call propose-* tools, or rewrite the page in this turn.\n\n' +
-		'1. Read the page (prefer awpt/read-block-tree for top_level_sections).\n' +
-		'2. Summarize what to keep vs improve.\n' +
-		'3. For each change, name least-destructive op: batch/attrs, prepare-replace, insert, or no change.\n' +
-		'4. Flag preserve_by_default sections and carry-forward links/numbers.\n' +
-		'5. End with a compact markdown plan, grouping incompatible work into coherent phases. If nothing needs changing, say so clearly.'
+		'Improve this focused page.\n\n' +
+		'Read the page, then write a short plan the next turn can execute. ' +
+		'Do not stage changes in this turn. Keep what already works. If nothing should change, say so.'
 	);
 }
+
+const FALLBACK_REVIEW_BRIEF = 'Improve this page.';
 
 /** Review-queue context layered onto the canonical read-only evaluation brief. */
 export function improvePageReviewEvaluatePrompt(
@@ -64,13 +61,7 @@ export function improvePageReviewEvaluatePrompt(
 ): string {
 	const notes = reviewerNotes.trim();
 	const pageTitle = title.trim() || 'Untitled';
-	const reviewBrief =
-		'You are preparing the focused WordPress page for final editorial review. ' +
-		'Assess the whole page, not just the first visible defect. Check page-title and heading hierarchy, ' +
-		'section structure, repeated or redundant markup, readability, accessibility, and fit with active-theme patterns. ' +
-		'Plan a polished, coherent result while preserving accurate facts, useful copy, links, numbers, and dynamic sections. ' +
-		'Only plan page-scoped, reversible content or block changes that are safe to apply automatically. ' +
-		'Include all intended work in a compact, executable plan, grouped into coherent phases when operations cannot safely share one proposal.';
+	const reviewBrief = fromSettings('improvePageReviewBrief') || FALLBACK_REVIEW_BRIEF;
 
 	return (
 		`${improvePageEvaluatePrompt()}\n\n## Review queue context\n` +
@@ -91,10 +82,9 @@ export function improvePageActPrompt(): string {
 		'\n' +
 		'Execute the plan below for this focused page.\n\n' +
 		'The plan is authoritative. Do not re-evaluate the page or restart open-ended discovery.\n\n' +
-		'1. Trust the plan’s operations, paths, and preserve list.\n' +
+		'1. Trust the plan’s operations, paths, and preserve list. Do not re-discover the design system.\n' +
 		'2. At most one targeted re-read if fingerprints are missing (read-block-tree or get-block).\n' +
-		'3. Stage batch/attrs and prepare-replace/insert as the plan named; one coherent proposal for the first incomplete phase(s).\n' +
-		'For a block batch, use only one non-insertion mutation per path. Use one update_block with attrs and content when the same block needs both; never split those edits across update_attrs and replace_text.\n' +
+		'3. Stage with propose-block-batch-update (kind set/remove/insert) or propose-pattern-replace/insert as the plan named; the server prepares section changes.\n' +
 		'4. Map existing copy into slots, carry links/numbers forward, and replace required authoring placeholders before staging.\n' +
 		'5. Full-document freehand only if the plan says no pattern fits.\n' +
 		'6. Do not invent preparation_id values.'
@@ -108,4 +98,22 @@ export function improvePageActMessage(plan: string): string {
 		return improvePagePrompt();
 	}
 	return `${improvePageActPrompt()}\n\n## Plan\n${trimmed}`;
+}
+
+/** Act brief with full plan essay plus one unit fence (mirrors PHP act_message_for_unit). */
+export function improvePageActMessageForUnit(plan: string, unitJson: string): string {
+	const trimmedPlan = (plan || '').trim();
+	const trimmedUnit = (unitJson || '').trim();
+	const parts = [
+		improvePageActPrompt(),
+		'',
+		'Execute only this unit. Do not stage later units or reopen page-wide diagnosis.',
+	];
+	if (trimmedPlan !== '') {
+		parts.push('', '## Plan', trimmedPlan);
+	}
+	if (trimmedUnit !== '') {
+		parts.push('', `## Unit\n\`\`\`awpt-unit\n${trimmedUnit}\n\`\`\``);
+	}
+	return parts.join('\n');
 }
